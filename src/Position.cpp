@@ -17,7 +17,7 @@ Board::Board(std::string fen)
     auto parts = split(fen, ' ');
     assert(parts.size() == 6 && "Invalid FEN, wrong number of fields");
 
-    int pos = 0;
+    uint pos = 0;
     for (int i = 7; i >= 0; i--)
     {
         int n_empty = 0;
@@ -105,7 +105,7 @@ Board::Board(std::string fen)
     }
     else
     {
-        for (int i = 0; i < parts[2].size(); i++)
+        for (uint i = 0; i < parts[2].size(); i++)
         {
             if (parts[2][i] == 'K' && !m_castling_rights[KINGSIDE][WHITE])
                 m_castling_rights[KINGSIDE][WHITE] = true;
@@ -259,7 +259,6 @@ std::string Board::to_fen() const
         out += " b ";
 
     // Castling rights
-    int n_castles = 0;
     if (m_castling_rights[0][0])
         out += "K";
     if (m_castling_rights[1][0])

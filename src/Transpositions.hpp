@@ -64,12 +64,12 @@ class TranspositionTable
 
 public:
     TranspositionTable()
-        : m_size(1), m_table(1), m_full(0)
+        : m_table(1), m_size(1), m_full(0)
     {}
 
 
     TranspositionTable(int64_t size_mb)
-        : m_size(size_mb * 1024 / sizeof(T) * 1024 + 1), m_table(size_mb * 1024 / sizeof(T) * 1024 + 1), m_full(0)
+        : m_table(size_mb * 1024 / sizeof(T) * 1024 + 1), m_size(size_mb * 1024 / sizeof(T) * 1024 + 1), m_full(0)
     {}
 
 

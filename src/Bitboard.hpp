@@ -184,7 +184,7 @@ public:
     }
     constexpr bool is_full() const noexcept
     {
-        return m_data == (~0);
+        return (~m_data) == 0;
     }
     constexpr int count() const noexcept
     {

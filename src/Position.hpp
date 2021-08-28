@@ -581,11 +581,11 @@ struct MoveInfo
 
 class Position
 {
-    int m_pos;
-    MoveStack m_stack;
     std::vector<Board> m_boards;
-    std::vector<MoveInfo> m_moves;
+    MoveStack m_stack;
+    int m_pos;
     int m_extensions;
+    std::vector<MoveInfo> m_moves;
     bool m_reduced;
 
 public:

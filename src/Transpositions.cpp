@@ -9,8 +9,8 @@ TranspositionEntry::TranspositionEntry()
 {}
 
 TranspositionEntry::TranspositionEntry(Hash hash, Depth depth, Score score, Move best_move, EntryType type, Score static_eval)
-    : m_depth(depth), m_score(score), m_best_move(best_move), m_type(type), m_static_eval(static_eval),
-      m_hash(hash^ data_hash(depth, score, best_move, type, static_eval))
+    : m_hash(hash ^ data_hash(depth, score, best_move, type, static_eval)), m_depth(depth),
+      m_type(type), m_score(score), m_best_move(best_move), m_static_eval(static_eval)
 {
 }
 

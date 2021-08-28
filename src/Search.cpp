@@ -32,10 +32,10 @@ namespace Search
 
 
     SearchData::SearchData(Histories& histories, int thread_id, int64_t& nodes_searched, Depth& seldepth)
-        : m_histories(histories), m_ply(1), m_extensions(0), m_reductions(0),
-          m_nodes_searched(nodes_searched), m_seldepth(seldepth),
-          m_prev(nullptr), m_excluded_move(MOVE_NULL), m_thread_id(thread_id),
-          m_flags(NONE), m_static_eval(SCORE_NONE), m_move(MOVE_NULL)
+        : m_ply(1), m_nodes_searched(nodes_searched), m_seldepth(seldepth), m_flags(NONE),
+          m_reductions(0), m_extensions(0), m_histories(histories), m_prev(nullptr),
+          m_excluded_move(MOVE_NULL), m_thread_id(thread_id), m_static_eval(SCORE_NONE),
+          m_move(MOVE_NULL)
     {
     }
 
@@ -305,7 +305,10 @@ namespace Search
 
         // Pv is populated, undo the moves
         for (auto move : pv)
+        {
+            (void)move; // To remove the unused warning
             position.unmake_move();
+        }
     }
 
 
@@ -536,9 +539,9 @@ namespace Search
             if (!PvNode && entry->depth() >= depth)
             {
                 auto type = entry->type();
-                if (type == EntryType::EXACT ||
-                    type == EntryType::UPPER_BOUND && tt_score <= alpha ||
-                    type == EntryType::LOWER_BOUND && tt_score >= beta)
+                if ((type == EntryType::EXACT) ||
+                    (type == EntryType::UPPER_BOUND && tt_score <= alpha) ||
+                    (type == EntryType::LOWER_BOUND && tt_score >= beta))
                     return score_from_tt(tt_score, Ply);
             }
         }

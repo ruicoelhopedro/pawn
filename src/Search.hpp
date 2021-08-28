@@ -107,9 +107,9 @@ namespace Search
 
     class SearchThread
     {
+        std::unique_ptr<Histories> m_histories;
         int64_t m_nodes_searched;
         Depth m_seldepth;
-        std::unique_ptr<Histories> m_histories;
         SearchData m_data;
 
     public:

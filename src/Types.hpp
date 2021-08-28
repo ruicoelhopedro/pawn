@@ -254,17 +254,14 @@ constexpr int mate_in(const Score& score)
 
 inline constexpr Square horizontal_distance(Square square)
 {
-    int rank = square / 8;
-    int file = square % 8;
-    return std::min(file, 7 - file);
+    int this_file = file(square);
+    return std::min(this_file, 7 - this_file);
 }
 
 
 inline constexpr Square vertical_mirror(Square square)
 {
-    int rank = square / 8;
-    int file = square % 8;
-    return file + (7 - rank);
+    return file(square) + (7 - rank(square));
 }
 
 

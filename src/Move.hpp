@@ -188,7 +188,7 @@ class MoveStack
 
 public:
     MoveStack(int depth = 1)
-        : m_depth(depth), m_moves(new Move[NUM_MAX_MOVES * depth]), m_current(0)
+        : m_moves(new Move[NUM_MAX_MOVES * depth]), m_depth(depth), m_current(0)
     {
     }
 
@@ -198,7 +198,7 @@ public:
     }
 
     MoveStack(const MoveStack& other)
-        : m_depth(other.m_depth), m_current(other.m_current), m_moves(new Move[NUM_MAX_MOVES * other.m_depth])
+        : m_moves(new Move[NUM_MAX_MOVES * other.m_depth]), m_depth(other.m_depth), m_current(other.m_current)
     {
         for (int i = 0; i < NUM_MAX_MOVES * other.m_depth; i++)
             m_moves[i] = other.m_moves[i];

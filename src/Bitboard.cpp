@@ -217,7 +217,7 @@ namespace Bitboards
     MagicBitboard::MagicBitboard(uint64_t magic, Bitboard blockmask, const std::vector<Bitboard>& blockboards, const std::vector<Bitboard>& moveboards)
         : m_bits(blockmask.count()), m_magic(magic), m_blockmask(blockmask), m_moveboards(moveboards.size())
     {
-        for (int i = 0; i < moveboards.size(); i++)
+        for (uint i = 0; i < moveboards.size(); i++)
             m_moveboards[get_index(blockboards[i])] = moveboards[i];
     }
     int MagicBitboard::get_index(Bitboard blockboard) const
@@ -327,11 +327,11 @@ namespace Bitboards
         while (!unique)
         {
             result = random_uint64_fewbits();
-            for (int i = 0; i < blockboards.size(); i++)
+            for (uint i = 0; i < blockboards.size(); i++)
             {
                 unique = true;
                 numbers[i] = (blockboards[i].to_uint64() * result) >> (64 - n_bits);
-                for (int j = 0; j < i; j++)
+                for (uint j = 0; j < i; j++)
                 {
                     unique = (numbers[i] != numbers[j]);
                     if (!unique)
@@ -367,7 +367,7 @@ namespace Bitboards
             Bitboard blockmask = blockmask_bishop(static_cast<Square>(square));
             std::vector<Bitboard> blockboards = gen_blockboards(blockmask);
             std::vector<Bitboard> moveboards(blockboards.size());
-            for (int i = 0; i < blockboards.size(); i++)
+            for (uint i = 0; i < blockboards.size(); i++)
                 moveboards[i] = moveboard_bishop(static_cast<Square>(square), blockboards[i]);
             uint64_t magic;
             if (compute)
@@ -382,7 +382,7 @@ namespace Bitboards
             Bitboard blockmask = blockmask_rook(static_cast<Square>(square));
             std::vector<Bitboard> blockboards = gen_blockboards(blockmask);
             std::vector<Bitboard> moveboards(blockboards.size());
-            for (int i = 0; i < blockboards.size(); i++)
+            for (uint i = 0; i < blockboards.size(); i++)
                 moveboards[i] = moveboard_rook(static_cast<Square>(square), blockboards[i]);
             uint64_t magic;
             if (compute)
