@@ -578,7 +578,7 @@ namespace Search
             position.board().sliders())
         {
             int reduction = 3;
-            Depth new_depth = std::max(0, depth - 1 - reduction);
+            Depth new_depth = reduce(depth, 1 + reduction);
             SearchData curr_data = data.next(MOVE_NULL) | REDUCED;
             position.make_null_move();
             nodes_searched++;
@@ -659,7 +659,9 @@ namespace Search
 
                 // Search with the move excluded
                 curr_data.exclude(move);
+                curr_data |= REDUCED;
                 Score score = negamax<NON_PV>(position, singularDepth, singularBeta - 1, singularBeta, curr_data);
+                curr_data ^= REDUCED;
                 curr_data.exclude(MOVE_NULL);
 
                 if (score < singularBeta)
@@ -695,7 +697,7 @@ namespace Search
                 data.thread() % 3 < 2)
             {
                 int reduction = 3 + (move_number - 4) / 8;
-                Depth new_depth = std::min(depth - 1, std::max(1, depth - 1 - reduction));
+                Depth new_depth = reduce(depth, 1 + reduction);
 
                 // Reduced depth search
                 curr_data |= REDUCED;

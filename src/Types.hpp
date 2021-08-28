@@ -245,6 +245,12 @@ constexpr Score score_from_tt(const Score& score, int ply)
 }
 
 
+constexpr Depth reduce(const Depth& depth, const Depth& reduction)
+{
+    return (reduction > depth) ? 0 : depth - reduction;
+}
+
+
 constexpr int mate_in(const Score& score)
 {
     int distance = (score > 0) ? (SCORE_MATE - score) : (SCORE_MATE + score);
