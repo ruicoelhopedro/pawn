@@ -249,7 +249,7 @@ MixedScore king_safety(const Board& board)
     Bitboard black_pawns = board.get_pieces<BLACK, PAWN>();
 
     MixedScore king_shelter = pawn_shelter[((white_mask | white_mask.shift< 2 * Up>()) & white_pawns).count()]
-                            - pawn_shelter[((white_mask | black_mask.shift<-2 * Up>()) & black_pawns).count()];
+                            - pawn_shelter[((black_mask | black_mask.shift<-2 * Up>()) & black_pawns).count()];
 
     // Back-rank bonus
     king_shelter += MixedScore(50, -50) * (white_king & Bitboards::rank_1).count();
@@ -294,8 +294,8 @@ MixedScore king_safety(const Board& board)
                           | Bitboards::get_attacks<  ROOK>(black_king.bitscan_forward(), occupancy);
     int white_possible_dirs = white_mask.count() - 1;
     int black_possible_dirs = black_mask.count() - 1;
-    int white_safe_dirs = (white_slides & board.get_pieces<WHITE>()).count();
-    int black_safe_dirs = (black_slides & board.get_pieces<BLACK>()).count();
+    int white_safe_dirs = (white_slides & white_pieces).count();
+    int black_safe_dirs = (black_slides & black_pieces).count();
     king_threats += MixedScore(-15, 8) * (white_possible_dirs - white_safe_dirs - black_possible_dirs + black_safe_dirs);
 
 
@@ -312,7 +312,7 @@ MixedScore king_safety(const Board& board)
     king_threats += MixedScore(-35, 0) * !(white_file_left  & board.get_pieces<WHITE, PAWN>());
     king_threats -= MixedScore(-35, 0) * !(black_file_left  & board.get_pieces<BLACK, PAWN>());
     king_threats += MixedScore(-35, 0) * !(white_file_right & board.get_pieces<WHITE, PAWN>());
-    king_threats -= MixedScore(-35, 0) * !(white_file_right & board.get_pieces<BLACK, PAWN>());
+    king_threats -= MixedScore(-35, 0) * !(black_file_right & board.get_pieces<BLACK, PAWN>());
 
 
     return king_shelter + x_rays + king_threats;
