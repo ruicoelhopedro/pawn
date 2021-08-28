@@ -8,10 +8,10 @@
 
 int main()
 {
-	Bitboards::init_bitboards();
-	Zobrist::build_rnd_hashes();
-	ttable = TranspositionTable<TranspositionEntry>(16);
-	Search::base_position = new Position();
+    Bitboards::init_bitboards();
+    Zobrist::build_rnd_hashes();
+    ttable = TranspositionTable<TranspositionEntry>(16);
+    Search::base_position = new Position();
 
-	UCI::main_loop();
+    UCI::main_loop();
 }
