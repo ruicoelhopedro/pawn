@@ -10,6 +10,7 @@ enum class MoveStage
     HASH,
     CAPTURES_INIT,
     CAPTURES,
+    CAPTURES_END,
     COUNTERMOVES,
     KILLERS,
     QUIET_INIT,
@@ -50,52 +51,63 @@ public:
 
 class MoveOrder
 {
+    Position& m_position;
+    Depth m_depth;
+    Move m_hash_move;
+    const Histories& m_histories;
+    Move m_prev_move;
     bool m_quiescence;
     MoveList m_moves;
-    Move m_prev_move;
-    Position& m_position;
     MoveStage m_stage;
-    Move m_hash_move;
     Move m_countermove;
     Move m_killer;
-    Depth m_depth;
-    const Histories& m_histories;
 
     bool hash_move(Move& move);
-    bool capture_move(Move& move);
-    bool quiet_move(Move& move);
     Score capture_score(Move move) const;
     Score quiet_score(Move move) const;
 
+
     template<bool CAPTURES>
-    Score move_score(Move move) const
+    int move_score(Move move) const
     {
         if (CAPTURES)
-        {
-            // MVV-LVA
-            constexpr Score piece_score[] = { 10, 30, 31, 50, 90, 1000 };
-            Piece from = m_position.board().get_piece_at(move.from());
-            Piece to = (move.is_ep_capture()) ? PAWN : m_position.board().get_piece_at(move.to());
-            return piece_score[to] - piece_score[from];
-        }
+            return capture_score(move);
         else
-        {
-            return m_histories.butterfly_score(move, m_position.get_turn())
-                + m_histories.piece_type_score(move, static_cast<PieceType>(m_position.board().get_piece_at(move.from())));
-            //// Promotions go first
-            //if (move.is_promotion())
-            //	return piece_value[move.promo_piece()] + MixedScore(SCORE_INFINITE, SCORE_INFINITE);
-
-            //// Castling goes second
-            //if (move.is_castle())
-            //	return MixedScore(SCORE_INFINITE, SCORE_INFINITE);
-
-            //// Compute static evaluation difference
-            //Turn turn = m_position.board().turn();
-            //Piece piece = m_position.board().get_piece_at(move.from());
-            //return piece_square(piece, move.to(), turn) - piece_square(piece, move.from(), turn);
-        }
+            return quiet_score(move);
     }
+    
+    
+    template<bool CAPTURES>
+    bool best_move(Move& move)
+    {
+        // Do we have any move?
+        if (m_moves.begin() == m_moves.end())
+            return false;
+
+        auto list_move = m_moves.begin();
+        int curr_score = move_score<CAPTURES>(*list_move);
+        Move* curr_move = list_move;
+
+        // Find move with greater score
+        list_move++;
+        while (list_move != m_moves.end())
+        {
+            int score = move_score<CAPTURES>(*list_move);
+            if (score > curr_score)
+            {
+                curr_score = score;
+                curr_move = list_move;
+            }
+
+            list_move++;
+        }
+        
+        // Pop the move and return
+        move = *curr_move;
+        m_moves.pop(curr_move);
+        return true;
+    }
+
 
     template<bool CAPTURES>
     MoveList threshold_moves(MoveList& list, Score threshold)
@@ -113,6 +125,7 @@ class MoveOrder
 
         return MoveList(list.begin(), pos);
     }
+
 
     template<bool CAPTURES>
     void sort_moves(MoveList list) const
@@ -134,6 +147,7 @@ class MoveOrder
                 std::swap(*best_move, *move);
         }
     }
+
 
 public:
     MoveOrder(Position& pos, Depth depth, Move hash_move, const Histories& histories, Move prev_move, bool quiescence = false);
