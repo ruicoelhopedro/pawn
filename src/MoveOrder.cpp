@@ -172,7 +172,7 @@ Move MoveOrder::next_move()
         }
         else if (m_stage == MoveStage::CAPTURES)
         {
-            if (best_move<true>(move))
+            while (best_move<true>(move))
                 if (move != m_hash_move)
                     return move;
             ++m_stage;
