@@ -713,7 +713,7 @@ namespace Search
             }
 
             // Check extensions
-            if (IsCheck && data.extensions() < 3)
+            if (IsCheck && data.extensions() < 3 && depth < 4)
             {
                 curr_data |= EXTENDED;
                 curr_depth++;
