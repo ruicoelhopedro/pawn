@@ -436,7 +436,7 @@ namespace Search
                 {
                     std::cout << "info";
                     std::cout << " depth " << iDepth;
-                    std::cout << " seldepth " << data.seldepth() + iDepth;
+                    std::cout << " seldepth " << static_cast<int>(data.seldepth());
                     std::cout << " multipv " << iPv + 1;
                     if (is_mate(multiPV_scores[iPv]))
                         std::cout << " score mate " << mate_in(multiPV_scores[iPv]);
@@ -813,7 +813,7 @@ namespace Search
         if (!is_check)
         {
             // Update seldepth and compute node score
-            data.seldepth() = std::max(data.seldepth(), depth);
+            data.seldepth() = std::max(data.seldepth(), position.ply());
             best_score = turn_to_color(position.get_turn()) * evaluation(position);
 
             // Alpha-beta prunning
