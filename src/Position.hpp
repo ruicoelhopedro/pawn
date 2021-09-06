@@ -548,7 +548,7 @@ public:
     Square least_valuable(Bitboard bb) const;
 
 
-    Score see(Move move) const;
+    Score see(Move move, int threshold = 0) const;
 
 
     MixedScore material_eval() const;

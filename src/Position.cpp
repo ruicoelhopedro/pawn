@@ -17,7 +17,7 @@ Board::Board(std::string fen)
     auto parts = split(fen, ' ');
     assert(parts.size() == 6 && "Invalid FEN, wrong number of fields");
 
-    uint pos = 0;
+    unsigned int pos = 0;
     for (int i = 7; i >= 0; i--)
     {
         int n_empty = 0;
@@ -105,7 +105,7 @@ Board::Board(std::string fen)
     }
     else
     {
-        for (uint i = 0; i < parts[2].size(); i++)
+        for (unsigned int i = 0; i < parts[2].size(); i++)
         {
             if (parts[2][i] == 'K' && !m_castling_rights[KINGSIDE][WHITE])
                 m_castling_rights[KINGSIDE][WHITE] = true;
@@ -685,16 +685,16 @@ Square Board::least_valuable(Bitboard bb) const
 }
 
 
-Score Board::see(Move move) const
+Score Board::see(Move move, int threshold) const
 {
     // Static-Exchange evaluation with prunning
-    constexpr Score piece_score[] = { 10, 30, 30, 50, 90, 1000 };
+    constexpr Score piece_score[] = { 0, 10, 30, 30, 50, 90, 1000 };
 
     Square target = move.to();
 
     // Make the initial capture
     Piece last_attacker = get_piece_at(move.from());
-    Score gain = piece_score[move.is_ep_capture() ? PAWN : get_piece_at(target)];
+    Score gain = piece_score[1 + (move.is_ep_capture() ? PAWN : get_piece_at(target))] - threshold / 10;
     Bitboard from_bb = Bitboard::from_square(move.from());
     Bitboard occupancy = get_pieces() ^ from_bb;
     Turn side_to_move = ~m_turn;
@@ -707,14 +707,14 @@ Score Board::see(Move move) const
         // If the side to move is already ahead they can stop the capture sequence,
         // so we can prune the remaining iterations
         if (color * gain > 0)
-            return gain;
+            return 10 * gain;
 
         // Get least valuable attacker
         Square attacker = least_valuable(attacks_target);
         Bitboard attacker_bb = Bitboard::from_square(attacker);
 
         // Make the capture
-        gain += color * piece_score[last_attacker];
+        gain += color * piece_score[1 + last_attacker];
         last_attacker = get_piece_at(attacker);
         occupancy ^= attacker_bb;
         side_to_move = ~side_to_move;
@@ -724,7 +724,7 @@ Score Board::see(Move move) const
         attacks_target = attackers(target, occupancy, side_to_move) & occupancy;
     }
 
-    return gain;
+    return 10 * gain;
 }
 
 
