@@ -107,7 +107,7 @@ MixedScore pawn_structure(Bitboard white_pawns, Bitboard black_pawns)
 
 
 template <PieceType PIECE_TYPE, Turn TURN>
-MixedScore piece(const Board& board, Bitboard occupancy, Bitboard filter, Bitboard safe_squares_from_pawns, Bitboard our_pawn_attacks)
+MixedScore piece(const Board& board, Bitboard occupancy, Bitboard filter, Bitboard safe_squares_from_pawns, Bitboard our_pawn_attacks, Bitboard& our_attacks)
 {
     constexpr Direction Up = (TURN == WHITE) ? 8 : -8;
     constexpr Bitboard rank7 = (TURN == WHITE) ? Bitboards::rank_7 : Bitboards::rank_2;
@@ -124,7 +124,9 @@ MixedScore piece(const Board& board, Bitboard occupancy, Bitboard filter, Bitboa
     while (b)
     {
         Square square = b.bitscan_forward_reset();
-        Bitboard attacks = Bitboards::get_attacks<PIECE_TYPE>(square, occupancy) & filter;
+        Bitboard attacks = Bitboards::get_attacks<PIECE_TYPE>(square, occupancy);
+        our_attacks |= attacks;
+        attacks &= filter;
 
         int safe_squares = attacks.count();
 
@@ -210,14 +212,34 @@ MixedScore pieces(const Board& board)
     Bitboard black_filter = ~white_pawn_attacks | ~board.get_pieces<BLACK>();
     Bitboard occupancy = board.get_pieces<WHITE>() | board.get_pieces<BLACK>();
 
-    MixedScore result = piece<KNIGHT, WHITE>(board, occupancy, white_filter, ~black_pawn_attack_span, white_pawn_attacks)
-                      + piece<BISHOP, WHITE>(board, occupancy, white_filter, ~black_pawn_attack_span, white_pawn_attacks)
-                      + piece<  ROOK, WHITE>(board, occupancy, white_filter, ~black_pawn_attack_span, white_pawn_attacks)
-                      + piece< QUEEN, WHITE>(board, occupancy, white_filter, ~black_pawn_attack_span, white_pawn_attacks)
-                      - piece<KNIGHT, BLACK>(board, occupancy, black_filter, ~white_pawn_attack_span, black_pawn_attacks)
-                      - piece<BISHOP, BLACK>(board, occupancy, black_filter, ~white_pawn_attack_span, black_pawn_attacks)
-                      - piece<  ROOK, BLACK>(board, occupancy, black_filter, ~white_pawn_attack_span, black_pawn_attacks)
-                      - piece< QUEEN, BLACK>(board, occupancy, black_filter, ~white_pawn_attack_span, black_pawn_attacks);
+    Bitboard white_attacks = white_pawn_attacks;
+    Bitboard black_attacks = black_pawn_attacks;
+
+    MixedScore result(0, 0);
+
+    result += piece<KNIGHT, WHITE>(board, occupancy, white_filter, ~black_pawn_attack_span, white_pawn_attacks, white_attacks)
+            - piece<KNIGHT, BLACK>(board, occupancy, black_filter, ~white_pawn_attack_span, black_pawn_attacks, black_attacks);
+    result += piece<BISHOP, WHITE>(board, occupancy, white_filter, ~black_pawn_attack_span, white_pawn_attacks, white_attacks)
+            - piece<BISHOP, BLACK>(board, occupancy, black_filter, ~white_pawn_attack_span, black_pawn_attacks, black_attacks);
+    white_filter &= ~black_attacks;
+    black_filter &= ~white_attacks;
+    result += piece<  ROOK, WHITE>(board, occupancy, white_filter, ~black_pawn_attack_span, white_pawn_attacks, white_attacks)
+            - piece<  ROOK, BLACK>(board, occupancy, black_filter, ~white_pawn_attack_span, black_pawn_attacks, black_attacks);
+    white_filter &= ~black_attacks;
+    black_filter &= ~white_attacks;
+    result += piece< QUEEN, WHITE>(board, occupancy, white_filter, ~black_pawn_attack_span, white_pawn_attacks, white_attacks)
+            - piece< QUEEN, BLACK>(board, occupancy, black_filter, ~white_pawn_attack_span, black_pawn_attacks, black_attacks);
+    white_filter &= ~black_attacks;
+    black_filter &= ~white_attacks;
+
+    // King mobility
+    Bitboard white_king_safe_squares = Bitboards::get_attacks<KING>(board.get_pieces<WHITE, KING>().bitscan_forward(), occupancy) & white_filter;
+    Bitboard black_king_safe_squares = Bitboards::get_attacks<KING>(board.get_pieces<BLACK, KING>().bitscan_forward(), occupancy) & black_filter;
+    white_attacks |= white_king_safe_squares;
+    black_attacks |= black_king_safe_squares;
+
+    // Global mobility
+    result += MixedScore(0, 100) * (std::min(10, white_attacks.count()) - std::min(10, black_attacks.count()));
 
     return result;
 }
