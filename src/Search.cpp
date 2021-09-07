@@ -563,11 +563,10 @@ namespace Search
         data.static_eval() = static_eval;
 
         // Futility pruning
-        if (depth < 5 && !position.is_check() &&
-            !is_mate(alpha) && !is_mate(beta))
+        if (depth < 5 && !position.is_check() && static_eval < SCORE_MATE_FOUND)
         {
             Score margin = 200 * depth;
-            if (static_eval - margin >= beta || static_eval + margin <= alpha)
+            if (static_eval - margin >= beta)
                 return static_eval;
         }
 
@@ -585,8 +584,8 @@ namespace Search
             data.nodes_searched()++;
             Score null = -negamax<NON_PV>(position, new_depth, -beta, -beta + 1, curr_data);
             position.unmake_null_move();
-            if (null >= beta && !is_mate(null))
-                return null;
+            if (null >= beta)
+                return null < SCORE_MATE_FOUND ? null : beta;
         }
 
         // TT-based reduction idea
@@ -599,12 +598,17 @@ namespace Search
         int move_number = 0;
         Move best_move = MOVE_NULL;
         Score best_score = -SCORE_INFINITE;
+        Move quiet_list[NUM_MAX_MOVES];
+        MoveList quiets_searched(quiet_list);
         MoveOrder orderer = MoveOrder(position, depth, tt_move, data.histories(), data.last_move());
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;
             if (!move.is_capture() && !move.is_promotion())
+            {
+                quiets_searched.push(move);
                 move_number++;
+            }
 
             // Skip excluded moves
             if (move == data.excluded_move())
@@ -641,6 +645,27 @@ namespace Search
                 std::cout << "info depth " << static_cast<int>(depth)
                           << " currmove " << move.to_uci()
                           << " currmovenumber " << n_moves << std::endl;
+
+            // Shallow depth prunings
+            if (!RootSearch && position.board().non_pawn_material() && !IsCheck && best_score > -SCORE_MATE_FOUND)
+            {
+                if (move.is_capture() || move.is_promotion())
+                {
+                    if (position.board().see(move, -200 * depth) < 0)
+                        continue;
+                }
+                else
+                {
+                    if (n_moves > 3 + depth * depth)
+                        continue;
+
+                    if (depth < 5 && orderer.quiet_score(move) < -3000 * (depth - 1))
+                        continue;
+
+                    if (position.board().see(move, -20 * (depth + (int)depth * depth)) < 0)
+                        continue;
+                }
+            }
 
             // Singular extensions: when the stored TT value fails high, we carry a reduced search on the remaining moves
             // If all moves fail low then we extend the TT move
@@ -775,6 +800,12 @@ namespace Search
                 break;
             }
         }
+
+        // Update quiet histories (penalise searched moves if some move raised alpha)
+        if (best_score >= alpha)
+            for (auto move : quiets_searched)
+                if (move != best_move)
+                    data.histories().add_bonus(move, Turn, static_cast<PieceType>(position.board().get_piece_at(move.from())), -depth * depth / 4);
 
         // Check for game end
         if (n_moves == 0)

@@ -63,8 +63,6 @@ class MoveOrder
     Move m_killer;
 
     bool hash_move(Move& move);
-    Score capture_score(Move move) const;
-    Score quiet_score(Move move) const;
 
 
     template<bool CAPTURES>
@@ -153,4 +151,7 @@ public:
     MoveOrder(Position& pos, Depth depth, Move hash_move, const Histories& histories, Move prev_move, bool quiescence = false);
 
     Move next_move();
+
+    Score capture_score(Move move) const;
+    Score quiet_score(Move move) const;
 };
