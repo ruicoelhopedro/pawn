@@ -528,9 +528,11 @@ namespace Search
         Score tt_score = SCORE_NONE;
         Score tt_static_eval = SCORE_NONE;
         TranspositionEntry* entry = nullptr;
+        EntryType tt_type = EntryType::EXACT;
         bool tt_hit = ttable.query(position.hash(), &entry);
         if (tt_hit)
         {
+            tt_type = entry->type();
             tt_score = entry->score();
             tt_move = entry->hash_move();
             tt_static_eval = entry->static_eval();
@@ -538,10 +540,9 @@ namespace Search
             // TT cutoff in non-PV nodes
             if (!PvNode && entry->depth() >= depth)
             {
-                auto type = entry->type();
-                if ((type == EntryType::EXACT) ||
-                    (type == EntryType::UPPER_BOUND && tt_score <= alpha) ||
-                    (type == EntryType::LOWER_BOUND && tt_score >= beta))
+                if ((tt_type == EntryType::EXACT) ||
+                    (tt_type == EntryType::UPPER_BOUND && tt_score <= alpha) ||
+                    (tt_type == EntryType::LOWER_BOUND && tt_score >= beta))
                     return score_from_tt(tt_score, Ply);
             }
         }
@@ -561,6 +562,13 @@ namespace Search
                 static_eval = turn_to_color(Turn) * evaluation(position);
         }
         data.static_eval() = static_eval;
+
+        // Can we use the TT value for a better static evaluation?
+        if (tt_hit && tt_score != SCORE_NONE &&
+            ((tt_type == EntryType::EXACT) ||
+             (tt_type == EntryType::LOWER_BOUND && tt_score > static_eval) ||
+             (tt_type == EntryType::UPPER_BOUND && tt_score < static_eval)))
+            static_eval = tt_score;
 
         // Futility pruning
         if (depth < 5 && !position.is_check() && static_eval < SCORE_MATE_FOUND)
