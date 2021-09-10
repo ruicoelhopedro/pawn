@@ -169,7 +169,8 @@ namespace Search
     Score negamax(Position& position, Depth depth, Score alpha, Score beta, SearchData& data);
 
 
-    Score quiescence(Position& position, Depth depth, Score alpha, Score beta, SearchData& data);
+    template<SearchType ST>
+    Score quiescence(Position& position, Score alpha, Score beta, SearchData& data);
 
 
     bool legality_tests(Position& position, MoveList& move_list);

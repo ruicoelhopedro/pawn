@@ -516,7 +516,7 @@ namespace Search
 
         // Dive into quiescence at leaf nodes
         if (depth <= 0)
-            return quiescence(position, 0, alpha, beta, data);
+            return quiescence<ST>(position, alpha, beta, data);
 
         // Early check for draw
         if (position.is_draw(!RootSearch))
@@ -839,58 +839,114 @@ namespace Search
 
 
 
-    Score quiescence(Position& position, Depth depth, Score alpha, Score beta, SearchData& data)
+    template<SearchType ST>
+    Score quiescence(Position& position, Score alpha, Score beta, SearchData& data)
     {
-        bool is_check = position.is_check();
+        constexpr bool PvNode = ST == PV;
+        const bool IsCheck = position.is_check();
+        const Turn Turn = position.get_turn();
+        const Depth Ply = position.ply();
 
         // Early check for draw
         if (position.is_draw(true))
             return SCORE_DRAW;
 
-        // Only call evaluation on non-check positions
-        Score best_score = -SCORE_INFINITE;
-        if (!is_check)
+        // TT lookup
+        Score alpha_init = alpha;
+        Move tt_move = MOVE_NULL;
+        Score tt_score = SCORE_NONE;
+        Score tt_static_eval = SCORE_NONE;
+        TranspositionEntry* entry = nullptr;
+        EntryType tt_type = EntryType::EXACT;
+        bool tt_hit = ttable.query(position.hash(), &entry);
+        if (tt_hit)
         {
-            // Update seldepth and compute node score
-            data.seldepth() = std::max(data.seldepth(), position.ply());
-            best_score = turn_to_color(position.get_turn()) * evaluation(position);
+            tt_type = entry->type();
+            tt_score = entry->score();
+            tt_move = entry->hash_move();
+            tt_static_eval = entry->static_eval();
 
-            // Alpha-beta prunning
-            alpha = std::max(best_score, alpha);
-            if (alpha >= beta)
-                return alpha;
+            // In quiescence ensure the tt_move is a capture in non-check positions
+            if (!IsCheck && !tt_move.is_capture())
+                tt_move = MOVE_NULL;
+
+            // TT cutoff in non-PV nodes
+            if (!PvNode)
+            {
+                if ((tt_type == EntryType::EXACT) ||
+                    (tt_type == EntryType::UPPER_BOUND && tt_score <= alpha) ||
+                    (tt_type == EntryType::LOWER_BOUND && tt_score >= beta))
+                    return score_from_tt(tt_score, Ply);
+            }
         }
+
+        // Position static evaluation (when not in check)
+        Score static_eval = SCORE_NONE;
+        Score best_score = -SCORE_INFINITE;
+        if (!IsCheck)
+        {
+            data.seldepth() = std::max(data.seldepth(), position.ply());
+            // Don't recompute static eval if we have a valid TT hit
+            if (tt_hit && tt_static_eval != SCORE_NONE)
+                static_eval = tt_static_eval;
+            else
+                static_eval = turn_to_color(Turn) * evaluation(position);
+            best_score = static_eval;
+        }
+
+        // Can we use the TT value for a better static evaluation?
+        if (tt_hit && tt_score != SCORE_NONE &&
+            ((tt_type == EntryType::EXACT) ||
+             (tt_type == EntryType::LOWER_BOUND && tt_score > best_score) ||
+             (tt_type == EntryType::UPPER_BOUND && tt_score < best_score)))
+            best_score = tt_score;
+
+        // Alpha-beta pruning on stand pat
+        alpha = std::max(best_score, alpha);
+        if (alpha >= beta)
+            return alpha;
 
         // Search
         Move move;
         int n_moves = 0;
-        MoveOrder orderer = MoveOrder(position, 0, MOVE_NULL, data.histories(), MOVE_NULL, true);
+        Move best_move = MOVE_NULL;
+        MoveOrder orderer = MoveOrder(position, 0, tt_move, data.histories(), MOVE_NULL, true);
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;
 
             // Only search captures with positive SEE
-            if (!is_check && position.board().see(move) < 0)
+            if (!IsCheck && position.board().see(move) < 0)
                 continue;
 
             position.make_move(move);
             nodes_searched++;
             data.nodes_searched()++;
-            Score score = -quiescence(position, depth + 1, -beta, -alpha, data);
+            Score score = -quiescence<ST>(position, -beta, -alpha, data);
             position.unmake_move();
 
             // New best value
-            best_score = std::max(best_score, score);
-            alpha = std::max(alpha, best_score);
+            if (score > best_score)
+            {
+                best_score = score;
+                best_move = move;
+                alpha = std::max(alpha, best_score);
+            }
 
-            // Prunning
+            // Pruning
             if (alpha >= beta)
                 break;
         }
 
         // Checkmate?
-        if (n_moves == 0 && is_check)
+        if (n_moves == 0 && IsCheck)
             return -SCORE_MATE + position.ply();
+
+        // TT store
+        EntryType type = best_score >= beta                  ? EntryType::LOWER_BOUND
+                       : (PvNode && best_score > alpha_init) ? EntryType::EXACT
+                       :                                       EntryType::UPPER_BOUND;
+        ttable.store(TranspositionEntry(position.hash(), 0, score_to_tt(best_score, Ply), best_move, type, static_eval));
 
         return best_score;
     }
