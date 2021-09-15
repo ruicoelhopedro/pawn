@@ -323,6 +323,12 @@ namespace Search
         Score alpha = (depth <= 4) ? (-SCORE_INFINITE) : std::max(-SCORE_INFINITE, (init_score - l_window));
         Score beta  = (depth <= 4) ? ( SCORE_INFINITE) : std::min(+SCORE_INFINITE, (init_score + r_window));
 
+        // Open windows for large values
+        if (alpha < 1000)
+            alpha = -SCORE_INFINITE;
+        if (beta > 1000)
+            beta = SCORE_INFINITE;
+
         Score final_score = negamax<PV>(position, depth, alpha, beta, data);
 
         // Increase window in the failed side exponentially
@@ -350,6 +356,12 @@ namespace Search
             // Increase window (without overflowing)
             alpha = std::max(((init_score - l_window) > init_score) ? (-SCORE_INFINITE) : (init_score - l_window), -SCORE_INFINITE);
             beta  = std::min(((init_score + r_window) < init_score) ? (+SCORE_INFINITE) : (init_score + r_window), +SCORE_INFINITE);
+
+            // Open windows for large values
+            if (alpha < 1000)
+                alpha = -SCORE_INFINITE;
+            if (beta > 1000)
+                beta = SCORE_INFINITE;
 
             // Repeat search
             final_score = negamax<PV>(position, depth, alpha, beta, data);
@@ -509,7 +521,7 @@ namespace Search
         if (!RootSearch)
         {
             alpha = std::max(alpha, static_cast<Score>(-SCORE_MATE + position.ply()));
-            beta  = std::min(beta,  static_cast<Score>( SCORE_MATE - position.ply()));
+            beta  = std::min(beta,  static_cast<Score>( SCORE_MATE - position.ply() + 1));
             if (alpha >= beta)
                 return alpha;
         }
@@ -850,6 +862,12 @@ namespace Search
         // Early check for draw
         if (position.is_draw(true))
             return SCORE_DRAW;
+
+        // Mate distance prunning: don't bother searching if we are deeper than the shortest mate up to this point
+        alpha = std::max(alpha, static_cast<Score>(-SCORE_MATE + position.ply()));
+        beta = std::min(beta, static_cast<Score>(SCORE_MATE - position.ply() + 1));
+        if (alpha >= beta)
+            return alpha;
 
         // TT lookup
         Score alpha_init = alpha;
