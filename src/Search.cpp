@@ -919,10 +919,23 @@ namespace Search
             if (!IsCheck && position.board().see(move) < 0)
                 continue;
 
+            // PVS
+            Score score;
             position.make_move(move);
             nodes_searched++;
             data.nodes_searched()++;
-            Score score = -quiescence<ST>(position, -beta, -alpha, data);
+            if (PvNode && best_move == MOVE_NULL)
+            {
+                score = -quiescence<PV>(position, -beta, -alpha, data);
+            }
+            else
+            {
+                // Regular non-PV node search
+                score = -quiescence<NON_PV>(position, -alpha - 1, -alpha, data);
+                // Redo a PV node search if move not refuted
+                if (score > alpha && score < beta)
+                    score = -quiescence<PV>(position, -beta, -alpha, data);
+            }
             position.unmake_move();
 
             // New best value
