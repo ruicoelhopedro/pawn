@@ -346,8 +346,8 @@ Score evaluation(const Position& position, bool output)
     auto board = position.board();
     MixedScore mixed_result(0, 0);
 
-    // Material and PSQT: incrementally updated in the position
-    MixedScore tmp = board.material_eval() / 10;
+    // Material and PSQT: incrementally updated in the position (with eg scaling)
+    MixedScore tmp = board.material_eval() / MixedScore(10, 5);
     mixed_result += tmp;
     if (output)
         std::cout << "Material    " << (int)tmp.middlegame() << " " << (int)tmp.endgame() << std::endl;
