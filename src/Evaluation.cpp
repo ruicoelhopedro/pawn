@@ -232,6 +232,9 @@ MixedScore pieces(const Board& board)
     white_filter &= ~black_attacks;
     black_filter &= ~white_attacks;
 
+    Bitboard white_control = white_attacks & ~black_attacks;
+    Bitboard black_control = black_attacks & ~white_attacks;
+
     // King mobility
     Bitboard white_king_safe_squares = Bitboards::get_attacks<KING>(board.get_pieces<WHITE, KING>().bitscan_forward(), occupancy) & white_filter;
     Bitboard black_king_safe_squares = Bitboards::get_attacks<KING>(board.get_pieces<BLACK, KING>().bitscan_forward(), occupancy) & black_filter;
@@ -240,6 +243,10 @@ MixedScore pieces(const Board& board)
 
     // Global mobility
     result += MixedScore(0, 100) * (std::min(10, white_attacks.count()) - std::min(10, black_attacks.count()));
+
+    // Space and square control
+    Bitboard center = Bitboards::zone1 | Bitboards::zone2;
+    result += MixedScore(15, 1) * ((white_control & center).count() - (black_control & center).count());
 
     return result;
 }

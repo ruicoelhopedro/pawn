@@ -353,6 +353,15 @@ namespace Bitboards
 
     constexpr Bitboard square_color[NUM_COLORS] = { 0xAA55AA55AA55AA55ULL, ~0xAA55AA55AA55AA55ULL };
 
+    constexpr Bitboard zone1 = (d_file | e_file) & (rank_4 | rank_5);
+    constexpr Bitboard zone2 = (c_file | d_file | e_file | f_file)
+                             & (rank_3 | rank_4 | rank_5 | rank_6)
+                             & ~zone1;
+    constexpr Bitboard zone3 = (b_file | c_file | d_file | e_file | f_file | g_file)
+                             & (rank_2 | rank_3 | rank_4 | rank_5 | rank_6 | rank_7)
+                             & ~zone1 & ~zone2;
+    constexpr Bitboard zone4 = full & ~zone1 & ~zone2 & ~zone3;
+
     class MagicBitboard
     {
         int m_bits;
