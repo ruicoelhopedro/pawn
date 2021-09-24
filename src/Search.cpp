@@ -550,11 +550,23 @@ namespace Search
             tt_static_eval = entry->static_eval();
 
             // TT cutoff in non-PV nodes
-            if (!PvNode && entry->depth() >= depth)
+            if (!PvNode && entry->depth() >= depth &&
+                ((tt_type == EntryType::EXACT) ||
+                 (tt_type == EntryType::UPPER_BOUND && tt_score <= alpha) ||
+                 (tt_type == EntryType::LOWER_BOUND && tt_score >= beta)))
             {
-                if ((tt_type == EntryType::EXACT) ||
-                    (tt_type == EntryType::UPPER_BOUND && tt_score <= alpha) ||
-                    (tt_type == EntryType::LOWER_BOUND && tt_score >= beta))
+                // Update histories for quiet TT moves
+                if (tt_move != MOVE_NULL && !tt_move.is_capture() && !tt_move.is_promotion())
+                {
+                    PieceType piece = static_cast<PieceType>(position.board().get_piece_at(tt_move.from()));
+                    if (tt_score >= beta)
+                        data.histories().fail_high(tt_move, data.last_move(), Turn, depth, Ply, piece);
+                    else
+                        data.histories().add_bonus(tt_move, Turn, piece, -depth);
+                }
+
+                // Do not cutoff when we are approaching the 50 move rule
+                if (position.board().half_move_clock() < 90)
                     return score_from_tt(tt_score, Ply);
             }
         }
