@@ -59,7 +59,7 @@ void Histories::fail_high(Move move, Move prev_move, Turn turn, Depth depth, Dep
 
 void Histories::update_low_ply(Move move, Depth ply, PieceType piece, int value)
 {
-    m_low_ply_history[ply - 1][piece][move.to()] += value;
+    m_low_ply_history[ply][piece][move.to()] += value;
 }
 
 
@@ -98,7 +98,7 @@ Move Histories::countermove(Move move) const
 
 int Histories::low_ply_score(Move move, PieceType piece, Depth ply) const
 {
-    return ply < NUM_LOW_PLY ? m_low_ply_history[ply - 1][piece][move.to()] : 0;
+    return ply < NUM_LOW_PLY ? m_low_ply_history[ply][piece][move.to()] : 0;
 }
 
 

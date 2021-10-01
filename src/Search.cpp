@@ -31,11 +31,11 @@ namespace Search
     }
 
 
-    SearchData::SearchData(Histories& histories, int thread_id, int64_t& nodes_searched, Depth& seldepth)
-        : m_ply(1), m_nodes_searched(nodes_searched), m_seldepth(seldepth), m_flags(NONE),
+    SearchData::SearchData(Histories& histories, int thread_id, int64_t& nodes_searched, Depth& seldepth, Move* pv, Move* prev_pv)
+        : m_ply(0), m_nodes_searched(nodes_searched), m_seldepth(seldepth), m_flags(NONE),
           m_reductions(0), m_extensions(0), m_histories(histories), m_prev(nullptr),
           m_excluded_move(MOVE_NULL), m_thread_id(thread_id), m_static_eval(SCORE_NONE),
-          m_move(MOVE_NULL)
+          m_move(MOVE_NULL), m_pv(pv), m_prev_pv(prev_pv), m_isPv(true)
     {
     }
 
@@ -55,6 +55,11 @@ namespace Search
         result.m_static_eval = SCORE_NONE;
         result.m_ply++;
         result.m_excluded_move = MOVE_NULL;
+        // New pv location
+        result.m_prev_pv++;
+        result.m_pv += PV_LENGTH - m_ply;
+        // Are we still in a PV line?
+        result.m_isPv = m_isPv && move == *m_prev_pv;
         return result;
     }
 
@@ -134,9 +139,62 @@ namespace Search
     }
 
 
+    bool SearchData::in_pv() const
+    {
+        return m_isPv;
+    }
+
+
+    Move* SearchData::pv()
+    {
+        return m_pv;
+    }
+
+
+    Move SearchData::pv_move()
+    {
+        return m_isPv ? *m_prev_pv : MOVE_NULL;
+    }
+
+
     void SearchData::exclude(Move move)
     {
         m_excluded_move = move;
+    }
+
+
+    void SearchData::update_pv(Move best_move, Move* new_pv)
+    {
+        // Set the initial bestmove
+        Move* dst = m_pv;
+        *(dst++) = best_move;
+
+        // Loop over remaining PV
+        while (*new_pv != MOVE_NULL)
+            *(dst++) = *(new_pv++);
+
+        // Set last entry as null move for a stop condition
+        *dst = MOVE_NULL;
+    }
+
+
+    void SearchData::accept_pv()
+    {
+        // Copy last PV from the table to the prev PV
+        Move* src = m_pv;
+        Move* dst = m_prev_pv;
+        while (*src != MOVE_NULL)
+            *(dst++) = *(src++);
+
+        // Set last entry as null move as a stop condition
+        *dst = MOVE_NULL;
+    }
+
+
+    void SearchData::clear_pv()
+    {
+        for (int i = 0; i < TOTAL_PV_LENGTH; i++)
+            m_pv[i] = MOVE_NULL;
     }
 
 
@@ -179,10 +237,15 @@ namespace Search
 
     SearchThread::SearchThread(int id)
         : m_histories(std::make_unique<Histories>()),
+          m_pv(std::make_unique<PvContainer>()),
           m_nodes_searched(0),
           m_seldepth(0),
-          m_data(*m_histories, id, m_nodes_searched, m_seldepth)
+          m_data(*m_histories, id, m_nodes_searched, m_seldepth, m_pv->pv, m_pv->prev_pv)
     {
+        for (int i = 0; i < TOTAL_PV_LENGTH; i++)
+            m_pv->pv[i] = MOVE_NULL;
+        for (int i = 0; i < PV_LENGTH; i++)
+            m_pv->prev_pv[i] = MOVE_NULL;
     }
 
 
@@ -287,28 +350,12 @@ namespace Search
 
 
 
-    void get_pv(Position& position, Depth depth, MoveList& pv)
+    void get_pv(Position& position, SearchData& data, MoveList& pv)
     {
-        Depth curr_depth = 0;
-        TranspositionEntry* entry = nullptr;
         pv.clear();
-        Move move;
-        while (ttable.query(position.hash(), &entry) &&
-               (move = entry->hash_move()) != MOVE_NULL &&
-               position.board().legal(move) &&
-               (curr_depth++) < depth &&
-               !position.is_draw(false))
-        {
-            pv.push(move);
-            position.make_move(move);
-        }
-
-        // Pv is populated, undo the moves
-        for (auto move : pv)
-        {
-            (void)move; // To remove the unused warning
-            position.unmake_move();
-        }
+        Move* pos = data.pv();
+        while (*pos != MOVE_NULL)
+            pv.push(*(pos++));
     }
 
 
@@ -329,7 +376,12 @@ namespace Search
         if (beta > 1000)
             beta = SCORE_INFINITE;
 
-        Score final_score = negamax<PV>(position, depth, alpha, beta, data);
+        // Special case for mate scores: only search shorter mates than the one found up to this point
+        if (init_score > SCORE_MATE_FOUND)
+            alpha = init_score - 1;
+
+        data.clear_pv();
+        Score final_score = negamax<ROOT>(position, depth, alpha, beta, data);
 
         // Increase window in the failed side exponentially
         while ((final_score <= alpha || final_score >= beta) && !timeout())
@@ -364,7 +416,8 @@ namespace Search
                 beta = SCORE_INFINITE;
 
             // Repeat search
-            final_score = negamax<PV>(position, depth, alpha, beta, data);
+            data.clear_pv();
+            final_score = negamax<ROOT>(position, depth, alpha, beta, data);
         }
 
         return final_score;
@@ -424,9 +477,10 @@ namespace Search
                     break;
 
                 // Store depth results
+                data.accept_pv();
                 if (main_thread)
                 {
-                    get_pv(position, iDepth, multiPV_lists[iPv]);
+                    get_pv(position, data, multiPV_lists[iPv]);
                     multiPV_scores[iPv] = curr_score;
                     multiPV_roots[iPv] = *multiPV_lists[iPv].begin();
                 }
@@ -457,7 +511,7 @@ namespace Search
                     std::cout << " nodes " << nodes_searched;
                     std::cout << " nps " << static_cast<int>(nodes_searched / elapsed);
                     std::cout << " hashfull " << ttable.hashfull();
-                    std::cout << " time " << std::max(1, static_cast<int>(time_depth * 1000));
+                    std::cout << " time " << std::max(1, static_cast<int>(elapsed * 1000));
                     std::cout << " pv " << multiPV_lists[iPv];
                     std::cout << std::endl;
                 }
@@ -504,14 +558,21 @@ namespace Search
     Score negamax(Position& position, Depth depth, Score alpha, Score beta, SearchData& data)
     {
         // Node data
-        constexpr bool PvNode = ST == PV;
-        const bool RootSearch = data.ply() == 1;
+        constexpr bool PvNode = ST != NON_PV;
+        const bool RootSearch = ST == ROOT;
         const bool Reduced = data.reductions() > 0;
         const bool Extended = data.extensions() > 0;
         const bool HasExcludedMove = data.excluded_move() != MOVE_NULL;
         const bool IsCheck = position.is_check();
         const Turn Turn = position.get_turn();
         const Depth Ply = position.ply();
+
+        if (PvNode)
+        {
+            // Update seldepth and clear PV
+            *(data.pv()) = MOVE_NULL;
+            data.seldepth() = std::max(data.seldepth(), Ply);
+        }
 
         // Timeout?
         if (depth > 1 && timeout())
@@ -520,8 +581,8 @@ namespace Search
         // Mate distance prunning: don't bother searching if we are deeper than the shortest mate up to this point
         if (!RootSearch)
         {
-            alpha = std::max(alpha, static_cast<Score>(-SCORE_MATE + position.ply()));
-            beta  = std::min(beta,  static_cast<Score>( SCORE_MATE - position.ply() + 1));
+            alpha = std::max(alpha, static_cast<Score>(-SCORE_MATE + Ply));
+            beta  = std::min(beta,  static_cast<Score>( SCORE_MATE - Ply + 1));
             if (alpha >= beta)
                 return alpha;
         }
@@ -545,7 +606,7 @@ namespace Search
         if (tt_hit)
         {
             tt_type = entry->type();
-            tt_score = entry->score();
+            tt_score = score_from_tt(entry->score(), Ply);
             tt_move = entry->hash_move();
             tt_static_eval = entry->static_eval();
 
@@ -567,7 +628,7 @@ namespace Search
 
                 // Do not cutoff when we are approaching the 50 move rule
                 if (position.board().half_move_clock() < 90)
-                    return score_from_tt(tt_score, Ply);
+                    return tt_score;
             }
         }
 
@@ -606,7 +667,7 @@ namespace Search
         if (!PvNode && !IsCheck && !HasExcludedMove &&
             static_eval >= beta &&
             data.last_move() != MOVE_NULL &&
-            position.board().sliders())
+            position.board().non_pawn_material(Turn))
         {
             int reduction = 3 + (static_eval - beta) / 200;
             Depth new_depth = reduce(depth, 1 + reduction);
@@ -632,7 +693,8 @@ namespace Search
         Score best_score = -SCORE_INFINITE;
         Move quiet_list[NUM_MAX_MOVES];
         MoveList quiets_searched(quiet_list);
-        MoveOrder orderer = MoveOrder(position, depth, tt_move, data.histories(), data.last_move());
+        Move hash_move = (data.in_pv() && data.pv_move() != MOVE_NULL) ? data.pv_move() : tt_move;
+        MoveOrder orderer = MoveOrder(position, depth, hash_move, data.histories(), data.last_move());
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;
@@ -679,7 +741,7 @@ namespace Search
                           << " currmovenumber " << n_moves << std::endl;
 
             // Shallow depth prunings
-            if (!RootSearch && position.board().non_pawn_material() && !IsCheck && best_score > -SCORE_MATE_FOUND)
+            if (!RootSearch && position.board().non_pawn_material(Turn) && !IsCheck && best_score > -SCORE_MATE_FOUND)
             {
                 if (move.is_capture() || move.is_promotion())
                 {
@@ -795,7 +857,7 @@ namespace Search
                     // Regular non-PV node search
                     score = -negamax<NON_PV>(position, curr_depth - 1, -alpha - 1, -alpha, curr_data);
                     // Redo a PV node search if move not refuted
-                    if (score > alpha&& score < beta)
+                    if (score > alpha && score < beta)
                     {
                         // But before add a bonus to the move
                         data.histories().add_bonus(move, Turn, piece, depth);
@@ -817,6 +879,10 @@ namespace Search
                 best_score = score;
                 best_move = move;
                 alpha = std::max(alpha, score);
+
+                // Update PV when we have a bestmove
+                if (PvNode)
+                    data.update_pv(best_move, curr_data.pv());
             }
 
             // Update low-ply history
@@ -844,7 +910,7 @@ namespace Search
         {
             // Checkmate or stalemate?
             if (position.is_check())
-                best_score = -SCORE_MATE + position.ply();
+                best_score = -SCORE_MATE + Ply;
             else
                 best_score = SCORE_DRAW;
         }
@@ -855,7 +921,7 @@ namespace Search
             EntryType type = best_score >= beta                  ? EntryType::LOWER_BOUND
                            : (PvNode && best_score > alpha_init) ? EntryType::EXACT
                            :                                       EntryType::UPPER_BOUND;
-            ttable.store(TranspositionEntry(position.hash(), depth, score_to_tt(best_score, position.ply()), best_move, type, static_eval), RootSearch);
+            ttable.store(TranspositionEntry(position.hash(), depth, score_to_tt(best_score, Ply), best_move, type, data.static_eval()), RootSearch);
         }
 
         return best_score;
@@ -871,13 +937,20 @@ namespace Search
         const Turn Turn = position.get_turn();
         const Depth Ply = position.ply();
 
+        if (PvNode)
+        {
+            // Update seldepth and clear PV
+            *(data.pv()) = MOVE_NULL;
+            data.seldepth() = std::max(data.seldepth(), Ply);
+        }
+
         // Early check for draw
         if (position.is_draw(true))
             return SCORE_DRAW;
 
         // Mate distance prunning: don't bother searching if we are deeper than the shortest mate up to this point
-        alpha = std::max(alpha, static_cast<Score>(-SCORE_MATE + position.ply()));
-        beta = std::min(beta, static_cast<Score>(SCORE_MATE - position.ply() + 1));
+        alpha = std::max(alpha, static_cast<Score>(-SCORE_MATE + Ply));
+        beta = std::min(beta, static_cast<Score>(SCORE_MATE - Ply + 1));
         if (alpha >= beta)
             return alpha;
 
@@ -892,7 +965,7 @@ namespace Search
         if (tt_hit)
         {
             tt_type = entry->type();
-            tt_score = entry->score();
+            tt_score = score_from_tt(entry->score(), Ply);
             tt_move = entry->hash_move();
             tt_static_eval = entry->static_eval();
 
@@ -906,7 +979,7 @@ namespace Search
                 if ((tt_type == EntryType::EXACT) ||
                     (tt_type == EntryType::UPPER_BOUND && tt_score <= alpha) ||
                     (tt_type == EntryType::LOWER_BOUND && tt_score >= beta))
-                    return score_from_tt(tt_score, Ply);
+                    return tt_score;
             }
         }
 
@@ -915,26 +988,25 @@ namespace Search
         Score best_score = -SCORE_INFINITE;
         if (!IsCheck)
         {
-            data.seldepth() = std::max(data.seldepth(), position.ply());
             // Don't recompute static eval if we have a valid TT hit
             if (tt_hit && tt_static_eval != SCORE_NONE)
                 static_eval = tt_static_eval;
             else
                 static_eval = turn_to_color(Turn) * evaluation(position);
             best_score = static_eval;
+
+            // Can we use the TT value for a better static evaluation?
+            if (tt_hit && abs(tt_score) < SCORE_MATE_FOUND &&
+                ((tt_type == EntryType::EXACT) ||
+                 (tt_type == EntryType::LOWER_BOUND && tt_score > static_eval) ||
+                 (tt_type == EntryType::UPPER_BOUND && tt_score < static_eval)))
+                best_score = tt_score;
+
+            // Alpha-beta pruning on stand pat
+            alpha = std::max(alpha, best_score);
+            if (alpha >= beta)
+                return alpha;
         }
-
-        // Can we use the TT value for a better static evaluation?
-        if (tt_hit && tt_score != SCORE_NONE &&
-            ((tt_type == EntryType::EXACT) ||
-             (tt_type == EntryType::LOWER_BOUND && tt_score > best_score) ||
-             (tt_type == EntryType::UPPER_BOUND && tt_score < best_score)))
-            best_score = tt_score;
-
-        // Alpha-beta pruning on stand pat
-        alpha = std::max(best_score, alpha);
-        if (alpha >= beta)
-            return alpha;
 
         // Search
         Move move;
@@ -954,17 +1026,18 @@ namespace Search
             position.make_move(move);
             nodes_searched++;
             data.nodes_searched()++;
+            auto curr_data = data.next(move);
             if (PvNode && best_move == MOVE_NULL)
             {
-                score = -quiescence<PV>(position, -beta, -alpha, data);
+                score = -quiescence<PV>(position, -beta, -alpha, curr_data);
             }
             else
             {
                 // Regular non-PV node search
-                score = -quiescence<NON_PV>(position, -alpha - 1, -alpha, data);
+                score = -quiescence<NON_PV>(position, -alpha - 1, -alpha, curr_data);
                 // Redo a PV node search if move not refuted
                 if (score > alpha && score < beta)
-                    score = -quiescence<PV>(position, -beta, -alpha, data);
+                    score = -quiescence<PV>(position, -beta, -alpha, curr_data);
             }
             position.unmake_move();
 
@@ -974,16 +1047,20 @@ namespace Search
                 best_score = score;
                 best_move = move;
                 alpha = std::max(alpha, best_score);
-            }
 
-            // Pruning
-            if (alpha >= beta)
-                break;
+                // Update PV in PvNodes
+                if (PvNode)
+                    data.update_pv(best_move, curr_data.pv());
+
+                // Pruning
+                if (alpha >= beta)
+                    break;
+            }
         }
 
         // Checkmate?
         if (n_moves == 0 && IsCheck)
-            return -SCORE_MATE + position.ply();
+            return -SCORE_MATE + Ply;
 
         // TT store
         EntryType type = best_score >= beta                  ? EntryType::LOWER_BOUND

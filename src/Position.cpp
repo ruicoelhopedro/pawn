@@ -843,6 +843,16 @@ Bitboard Board::non_pawn_material() const
          | get_pieces<WHITE, QUEEN>()  | get_pieces<BLACK, QUEEN>();
 }
 
+Bitboard Board::non_pawn_material(Turn turn) const
+{
+    if (turn == WHITE)
+        return get_pieces<WHITE, KNIGHT>() | get_pieces<WHITE, BISHOP>()
+             | get_pieces<WHITE, ROOK  >() | get_pieces<WHITE, QUEEN>();
+    else
+        return get_pieces<BLACK, KNIGHT>() | get_pieces<BLACK, BISHOP>()
+             | get_pieces<BLACK, ROOK  >() | get_pieces<BLACK, QUEEN>();
+}
+
 
 Bitboard Board::sliders() const
 {
@@ -930,6 +940,7 @@ MoveList Position::generate_moves(MoveGenType type)
 void Position::make_move(Move move, bool extension)
 {
     ++m_stack;
+    ++m_pos;
     m_boards.push_back(board().make_move(move));
     m_moves.push_back(MoveInfo{ move, extension });
 
@@ -942,6 +953,7 @@ void Position::unmake_move()
 {
     m_boards.pop_back();
     --m_stack;
+    --m_pos;
 
     auto info = m_moves.back();
     if (info.extended)
@@ -954,6 +966,7 @@ void Position::unmake_move()
 void Position::make_null_move()
 {
     ++m_stack;
+    ++m_pos;
     m_boards.push_back(board().make_null_move());
     m_moves.push_back(MoveInfo{ MOVE_NULL, false });
 }
@@ -963,6 +976,7 @@ void Position::unmake_null_move()
 {
     m_boards.pop_back();
     --m_stack;
+    --m_pos;
     m_moves.pop_back();
 }
 
@@ -999,14 +1013,14 @@ int Position::num_extensions() const
 
 void Position::set_init_ply()
 {
-    m_pos = m_boards.size();
+    m_pos = 0;
     m_stack.reset_pos();
 }
 
 
 Depth Position::ply() const
 {
-    return m_boards.size() - m_pos;
+    return m_pos;
 }
 
 

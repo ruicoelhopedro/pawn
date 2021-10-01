@@ -566,6 +566,9 @@ public:
     Bitboard non_pawn_material() const;
 
 
+    Bitboard non_pawn_material(Turn turn) const;
+
+
     Bitboard sliders() const;
 };
 

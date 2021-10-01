@@ -11,6 +11,15 @@
 
 namespace Search
 {
+    constexpr int PV_LENGTH = NUM_MAX_MOVES;
+    constexpr int TOTAL_PV_LENGTH = (PV_LENGTH * PV_LENGTH + PV_LENGTH) / 2;
+
+    struct PvContainer
+    {
+        Move pv[TOTAL_PV_LENGTH];
+        Move prev_pv[PV_LENGTH];
+    };
+
     struct Limits
     {
         std::vector<Move> searchmoves;
@@ -40,6 +49,7 @@ namespace Search
 
     enum SearchType
     {
+        ROOT,
         PV,
         NON_PV,
     };
@@ -76,9 +86,12 @@ namespace Search
         int m_thread_id;
         Score m_static_eval;
         Move m_move;
+        Move* m_pv;
+        Move* m_prev_pv;
+        bool m_isPv;
 
     public:
-        SearchData(Histories& histories, int thread_id, int64_t& nodes_searched, Depth& seldepth);
+        SearchData(Histories& histories, int thread_id, int64_t& nodes_searched, Depth& seldepth, Move* pv, Move* prev_pv);
 
         SearchData next(Move move) const;
 
@@ -95,8 +108,15 @@ namespace Search
         const SearchData* previous(int distance = 1) const;
         int64_t& nodes_searched();
         Depth& seldepth();
+        bool in_pv() const;
+        Move* pv();
+        Move pv_move();
 
         void exclude(Move move);
+
+        void update_pv(Move best_move, Move* new_pv);
+        void accept_pv();
+        void clear_pv();
 
         SearchData& operator|=(SearchFlags flag);
         SearchData& operator^=(SearchFlags flag);
@@ -108,6 +128,7 @@ namespace Search
     class SearchThread
     {
         std::unique_ptr<Histories> m_histories;
+        std::unique_ptr<PvContainer> m_pv;
         int64_t m_nodes_searched;
         Depth m_seldepth;
         SearchData m_data;
@@ -179,7 +200,7 @@ namespace Search
     template<bool OUTPUT, bool USE_ORDER = false, bool TT = false, bool LEGALITY = false>
     int64_t perft(Position& position, Depth depth)
     {
-        // TT lookup			
+        // TT lookup
         PerftEntry* entry = nullptr;
         if (TT && perft_table.query(position.hash(), &entry) && entry->depth() == depth)
             return entry->n_nodes();
