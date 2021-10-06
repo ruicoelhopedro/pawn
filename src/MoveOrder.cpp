@@ -142,7 +142,6 @@ Score MoveOrder::quiet_score(Move move) const
     // 1. Butterfly histories
     // 2. Piece type-destination histories
     // 3. Low ply histories (based on node counts)
-    Turn turn = m_position.board().turn();
     auto piece = static_cast<PieceType>(m_position.board().get_piece_at(move.from()));
     return m_histories.butterfly_score(move, m_position.get_turn())
          + m_histories.piece_type_score(move, piece)

@@ -560,8 +560,6 @@ namespace Search
         // Node data
         constexpr bool PvNode = ST != NON_PV;
         const bool RootSearch = ST == ROOT;
-        const bool Reduced = data.reductions() > 0;
-        const bool Extended = data.extensions() > 0;
         const bool HasExcludedMove = data.excluded_move() != MOVE_NULL;
         const bool IsCheck = position.is_check();
         const Turn Turn = position.get_turn();
