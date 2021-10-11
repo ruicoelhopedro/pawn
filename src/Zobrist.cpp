@@ -1,5 +1,6 @@
 #include "Zobrist.hpp"
 #include "Types.hpp"
+#include "Move.hpp"
 
 namespace Zobrist
 {
@@ -9,6 +10,7 @@ namespace Zobrist
         Hash rnd_black_move;
         Hash rnd_castle_side_turn[NUM_COLORS][NUM_CASTLE_SIDES];
         Hash rnd_ep_file[8];
+        Hash rnd_move_hash[NUM_SQUARES * NUM_SQUARES];
     }
 
 
@@ -27,6 +29,9 @@ namespace Zobrist
 
         for (int i = 0; i < 8; i++)
             randoms::rnd_ep_file[i] = get_rnd_number();
+
+        for (int i = 0; i < NUM_SQUARES*NUM_SQUARES; i++)
+            randoms::rnd_move_hash[i] = get_rnd_number();
     }
 
 
@@ -61,5 +66,11 @@ namespace Zobrist
     Hash get_ep_file(int file)
     {
         return randoms::rnd_ep_file[file];
+    }
+
+
+    Hash get_move_hash(Move move)
+    {
+        return randoms::rnd_move_hash[move.from() | move.to() << 6];
     }
 }

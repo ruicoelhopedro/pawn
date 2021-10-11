@@ -5,6 +5,7 @@
 #include "MoveOrder.hpp"
 #include "Search.hpp"
 #include "Evaluation.hpp"
+#include "Zobrist.hpp"
 #include <atomic>
 #include <chrono>
 #include <vector>
@@ -600,7 +601,8 @@ namespace Search
         Score tt_static_eval = SCORE_NONE;
         TranspositionEntry* entry = nullptr;
         EntryType tt_type = EntryType::EXACT;
-        bool tt_hit = ttable.query(position.hash(), &entry);
+        Hash hash = HasExcludedMove ? position.hash() ^ Zobrist::get_move_hash(data.excluded_move()) : position.hash();
+        bool tt_hit = ttable.query(hash, &entry);
         if (tt_hit)
         {
             tt_type = entry->type();
@@ -913,13 +915,14 @@ namespace Search
                 best_score = SCORE_DRAW;
         }
 
-        // TT store (except on partial searches and at root in non-main threads)
-        if (data.excluded_move() == MOVE_NULL && !(RootSearch && data.thread() != 0))
+        // TT store (except at root in non-main threads)
+        if (!(RootSearch && data.thread() != 0))
         {
+            Hash hash = HasExcludedMove ? position.hash() ^ Zobrist::get_move_hash(data.excluded_move()) : position.hash();
             EntryType type = best_score >= beta                  ? EntryType::LOWER_BOUND
                            : (PvNode && best_score > alpha_init) ? EntryType::EXACT
                            :                                       EntryType::UPPER_BOUND;
-            ttable.store(TranspositionEntry(position.hash(), depth, score_to_tt(best_score, Ply), best_move, type, data.static_eval()), RootSearch);
+            ttable.store(TranspositionEntry(hash, depth, score_to_tt(best_score, Ply), best_move, type, data.static_eval()), RootSearch);
         }
 
         return best_score;
