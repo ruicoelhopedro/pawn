@@ -108,7 +108,7 @@ class MoveOrder
 
 
     template<bool CAPTURES>
-    MoveList threshold_moves(MoveList& list, Score threshold)
+    MoveList threshold_moves(MoveList& list, int threshold)
     {
         Move* pos = list.begin();
         for (auto list_move = list.begin(); list_move != list.end(); list_move++)
@@ -131,10 +131,10 @@ class MoveOrder
         for (auto move = list.begin(); move != list.end(); move++)
         {
             Move* best_move = list.begin();
-            Score best_score = move_score<CAPTURES>(*best_move);
+            int best_score = move_score<CAPTURES>(*best_move);
             for (auto other = best_move + 1; other != list.end(); other++)
             {
-                Score score = move_score<CAPTURES>(*other);
+                int score = move_score<CAPTURES>(*other);
                 if (score > best_score)
                 {
                     best_move = other;
@@ -152,6 +152,6 @@ public:
 
     Move next_move();
 
-    Score capture_score(Move move) const;
-    Score quiet_score(Move move) const;
+    int capture_score(Move move) const;
+    int quiet_score(Move move) const;
 };

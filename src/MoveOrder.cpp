@@ -125,10 +125,10 @@ bool MoveOrder::hash_move(Move& move)
 
 
 
-Score MoveOrder::capture_score(Move move) const
+int MoveOrder::capture_score(Move move) const
 {
     // MVV-LVA
-    constexpr Score piece_score[] = { 10, 30, 31, 50, 90, 1000 };
+    constexpr int piece_score[] = { 10, 30, 31, 50, 90, 1000 };
     Piece from = m_position.board().get_piece_at(move.from());
     Piece to = (move.is_ep_capture()) ? PAWN : m_position.board().get_piece_at(move.to());
     return piece_score[to] - piece_score[from];
@@ -136,7 +136,7 @@ Score MoveOrder::capture_score(Move move) const
 
 
 
-Score MoveOrder::quiet_score(Move move) const
+int MoveOrder::quiet_score(Move move) const
 {
     // Quiets are scored based on:
     // 1. Butterfly histories
