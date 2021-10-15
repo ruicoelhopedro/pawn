@@ -799,6 +799,7 @@ namespace Search
 
             // Make the move
             Score score;
+            bool captureOrPromotion = move.is_capture() || move.is_promotion();
             PieceType piece = static_cast<PieceType>(position.board().get_piece_at(move.from()));
             position.make_move(move);
             nodes_searched++;
@@ -808,14 +809,10 @@ namespace Search
             bool do_full_search = true;
             if (depth > 4 &&
                 move_number > 3 &&
-                !move.is_capture() &&
-                !move.is_promotion() &&
-                !position.is_check() &&
-                !IsCheck &&
-                !(data.flags() & EXTENDED) &&
+                (!PvNode || !captureOrPromotion) &&
                 data.thread() % 3 < 2)
             {
-                int reduction = 3 + (move_number - 4) / 8;
+                int reduction = 3 + (move_number - 4) / 8 - captureOrPromotion - PvNode;
                 Depth new_depth = reduce(depth, 1 + reduction);
 
                 // Reduced depth search
