@@ -807,11 +807,13 @@ namespace Search
 
             // Late move reductions
             bool do_full_search = true;
+            bool didLMR = false;
             if (depth > 4 &&
                 move_number > 3 &&
                 (!PvNode || !captureOrPromotion) &&
                 data.thread() % 3 < 2)
             {
+                didLMR = true;
                 int reduction = 3 + (move_number - 4) / 8 - captureOrPromotion - PvNode;
                 Depth new_depth = reduce(depth, 1 + reduction);
 
@@ -822,10 +824,6 @@ namespace Search
 
                 // Only carry a full search if this reduced move fails high
                 do_full_search = score >= alpha;
-
-                // Add a bonus for this move on fail high
-                if (do_full_search)
-                    data.histories().add_bonus(move, Turn, piece, depth);
             }
 
             // Check extensions
@@ -869,6 +867,13 @@ namespace Search
             // Timeout?
             if (depth > 2 && timeout())
                 return SCORE_NONE;
+
+            // Update stats after passed LMR
+            if (didLMR && do_full_search)
+            {
+                int bonus = score > best_score ? depth : -depth;
+                data.histories().add_bonus(move, Turn, piece, bonus);
+            }
 
             // New best move
             if (score > best_score)
