@@ -2,8 +2,8 @@ BIN_NAME=pawn
 BUILD_DIR=build
 SRC_DIR=src
 
-CXXFLAGS=-Wall -std=c++14 -O3 -march=native
-LDFLAGS=-pthread
+CXXFLAGS=-Wall -std=c++14 -O3 -march=native -flto
+LDFLAGS=-pthread -flto
 
 SRC_FILES = $(shell find $(SRC_DIR) -name *.cpp)
 OBJ_FILES = $(SRC_FILES:%.cpp=$(BUILD_DIR)/%.o)
