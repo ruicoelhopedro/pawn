@@ -152,25 +152,25 @@ MixedScore piece(const Board& board, Bitboard occupancy, Bitboard filter, Bitboa
         }
     }
 
+    // General placement terms
+    b = board.get_pieces<TURN, PIECE_TYPE>();
+    // Behind enemy lines?
+    placement += MixedScore(5, 4) * nominal_moves * (b & safe_squares_from_pawns).count();
+
     // Set-wise terms
     MixedScore group_scores(0, 0);
-    b = board.get_pieces<TURN, PIECE_TYPE>();
     if (PIECE_TYPE == KNIGHT)
     {
-        // Behind enemy lines?
-        placement += MixedScore(25, 20) * (b & safe_squares_from_pawns).count();
         // Defended by pawns?
         placement += MixedScore(5, 1) * (b & our_pawn_attacks).count();
-        // Additional bonus if both previous conditions apply
+        // Additional bonus if behind enemy lines and defended by pawns
         placement += MixedScore(25, 10) * (b & safe_squares_from_pawns & our_pawn_attacks).count();
     }
     else if (PIECE_TYPE == BISHOP)
     {
-        // Behind enemy lines?
-        placement += MixedScore(25, 20) * (b & safe_squares_from_pawns).count();
         // Defended by pawns?
         placement += MixedScore(5, 1) * (b & our_pawn_attacks).count();
-        // Additional bonus if both previous conditions apply
+        // Additional bonus if behind enemy lines and defended by pawns
         placement += MixedScore(25, 10) * (b & safe_squares_from_pawns & our_pawn_attacks).count();
 
         // Bishop pair?
@@ -260,7 +260,7 @@ MixedScore king_safety(const Board& board)
 
     constexpr MixedScore pawn_shelter[10] = { MixedScore(-100,   0), MixedScore(-25,   0), MixedScore( 0,   0),
                                               MixedScore(  25,   0), MixedScore( 35,  -5), MixedScore(40,  -5),
-                                              MixedScore(  40, -10), MixedScore( 41, -15), MixedScore(42, -20), 
+                                              MixedScore(  40, -10), MixedScore( 41, -15), MixedScore(42, -20),
                                               MixedScore(  43, -25) };
 
     constexpr MixedScore king_attacks[5] = { MixedScore(0, 0), MixedScore(10, 5), MixedScore(50, 0), MixedScore(100, 0), MixedScore(200, 0) };
@@ -309,9 +309,9 @@ MixedScore king_safety(const Board& board)
     int white_attacked = 0;
     int black_attacked = 0;
     while (white_mask)
-        white_attacked += board.attackers<BLACK>(white_mask.bitscan_forward_reset(), occupancy).count();
+        white_attacked += board.attackers_battery<BLACK>(white_mask.bitscan_forward_reset(), occupancy).count();
     while (black_mask)
-        black_attacked += board.attackers<WHITE>(black_mask.bitscan_forward_reset(), occupancy).count();
+        black_attacked += board.attackers_battery<WHITE>(black_mask.bitscan_forward_reset(), occupancy).count();
 
     MixedScore king_threats = king_attacks[std::min(4, white_attacked / 2)] - king_attacks[std::min(4, black_attacked / 2)];
 
