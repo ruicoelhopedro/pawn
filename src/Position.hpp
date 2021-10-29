@@ -485,10 +485,8 @@ public:
     template<Turn TURN>
     Bitboard attackers_battery(Square square, Bitboard occupancy) const
     {
-        Bitboard bishop_queens = get_pieces<TURN, BISHOP>() | get_pieces<TURN, QUEEN>();
-        Bitboard rook_queens   = get_pieces<TURN,   ROOK>() | get_pieces<TURN, QUEEN>();
-        Bitboard bishops = occupancy ^ bishop_queens;
-        Bitboard rooks   = occupancy ^ rook_queens;
+        Bitboard bishops = get_pieces<TURN, BISHOP>() | get_pieces<TURN, QUEEN>();
+        Bitboard rooks   = get_pieces<TURN,   ROOK>() | get_pieces<TURN, QUEEN>();
         return (Bitboards::get_attacks_pawns<~TURN>(square)                 & get_pieces<TURN, PAWN  >()) |
                (Bitboards::get_attacks<KNIGHT>(square, occupancy)           & get_pieces<TURN, KNIGHT>()) |
                (Bitboards::get_attacks<BISHOP>(square, occupancy ^ bishops) & bishops)                    |

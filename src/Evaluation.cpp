@@ -313,7 +313,7 @@ MixedScore king_safety(const Board& board)
     while (black_mask)
         black_attacked += board.attackers_battery<WHITE>(black_mask.bitscan_forward_reset(), occupancy).count();
 
-    MixedScore king_threats = king_attacks[std::min(4, white_attacked / 2)] - king_attacks[std::min(4, black_attacked / 2)];
+    MixedScore king_threats = king_attacks[std::min(4, black_attacked)] - king_attacks[std::min(4, white_attacked)];
 
 
     // King out in the open?
