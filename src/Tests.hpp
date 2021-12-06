@@ -32,7 +32,7 @@ namespace Tests
     int perft_tests();
 
 
-    template<bool USE_ORDER, bool TT, bool LEGALITY>
+    template<Depth REDUCTION, bool USE_ORDER, bool TT, bool LEGALITY, bool VALIDITY>
     int perft_techniques_tests()
     {
         auto tests = test_suite();
@@ -45,8 +45,8 @@ namespace Tests
         for (auto& test : tests)
         {
             Position pos(test.fen());
-            auto result_base = Search::perft<false>(pos, test.depth() - 1);
-            auto result_test = Search::template perft<false, USE_ORDER, TT, LEGALITY>(pos, test.depth() - 1);
+            auto result_base = Search::perft<false>(pos, test.depth() - REDUCTION);
+            auto result_test = Search::template perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(pos, test.depth() - REDUCTION);
             if (result_base == result_test)
             {
                 std::cout << "[ OK ] " << test.fen() << " (" << result_test << ")" << std::endl;
@@ -65,7 +65,4 @@ namespace Tests
         std::cout << "\nFailed/total tests: " << n_failed << "/" << tests.size() << std::endl;
         return n_failed;
     }
-
-
-    int legality_tests();
 }

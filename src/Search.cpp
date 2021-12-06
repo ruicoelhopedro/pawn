@@ -9,12 +9,13 @@
 #include <atomic>
 #include <chrono>
 #include <vector>
+#include <memory>
 
 namespace Search
 {
     bool thinking = false;
     int64_t nodes_searched;
-    Position* base_position;
+    std::unique_ptr<Position> base_position;
     std::vector<std::thread> threads;
     std::chrono::steady_clock::time_point start_time;
     std::chrono::steady_clock::time_point end_time;
@@ -53,8 +54,8 @@ namespace Search
         if (m_flags & EXTENDED)
             result.m_extensions++;
         // Other parameters
-        result.m_static_eval = SCORE_NONE;
         result.m_ply++;
+        result.m_static_eval = SCORE_NONE;
         result.m_excluded_move = MOVE_NULL;
         // New pv location
         result.m_prev_pv++;
@@ -564,7 +565,7 @@ namespace Search
         const bool HasExcludedMove = data.excluded_move() != MOVE_NULL;
         const bool IsCheck = position.is_check();
         const Turn Turn = position.get_turn();
-        const Depth Ply = position.ply();
+        const Depth Ply = data.ply();
 
         if (PvNode)
         {
@@ -694,7 +695,7 @@ namespace Search
         Move quiet_list[NUM_MAX_MOVES];
         MoveList quiets_searched(quiet_list);
         Move hash_move = (data.in_pv() && data.pv_move() != MOVE_NULL) ? data.pv_move() : tt_move;
-        MoveOrder orderer = MoveOrder(position, depth, hash_move, data.histories(), data.last_move());
+        MoveOrder orderer = MoveOrder(position, Ply, depth, hash_move, data.histories(), data.last_move());
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;
@@ -763,7 +764,8 @@ namespace Search
 
             // Singular extensions: when the stored TT value fails high, we carry a reduced search on the remaining moves
             // If all moves fail low then we extend the TT move
-            if (!RootSearch && tt_hit &&
+            if (!RootSearch && 
+                tt_hit &&
                 depth > 8 &&
                 !HasExcludedMove &&
                 !IsCheck &&
@@ -791,7 +793,7 @@ namespace Search
                 }
                 else if (singularBeta >= beta)
                 {
-                    // Multi-cut prunning: assuming our TT move fails high, at least one more move also fails high
+                    // Multi-cut pruning: assuming our TT move fails high, at least one more move also fails high
                     // So we can probably safely prune the entire tree
                     return singularBeta;
                 }
@@ -868,7 +870,7 @@ namespace Search
             if (depth > 2 && timeout())
                 return SCORE_NONE;
 
-            // Update stats after passed LMR
+            // Update histories after passed LMR
             if (didLMR && do_full_search)
             {
                 int bonus = score > best_score ? depth : -depth;
@@ -892,7 +894,7 @@ namespace Search
             if (Ply < NUM_LOW_PLY)
                 data.histories().update_low_ply(move, Ply, piece, move_nodes / 10000);
 
-            // Prunning
+            // Pruning
             if (alpha >= beta)
             {
                 if (!move.is_capture())
@@ -938,7 +940,7 @@ namespace Search
         constexpr bool PvNode = ST == PV;
         const bool IsCheck = position.is_check();
         const Turn Turn = position.get_turn();
-        const Depth Ply = position.ply();
+        const Depth Ply = data.ply();
 
         if (PvNode)
         {
@@ -951,7 +953,7 @@ namespace Search
         if (position.is_draw(true))
             return SCORE_DRAW;
 
-        // Mate distance prunning: don't bother searching if we are deeper than the shortest mate up to this point
+        // Mate distance pruning: don't bother searching if we are deeper than the shortest mate up to this point
         alpha = std::max(alpha, static_cast<Score>(-SCORE_MATE + Ply));
         beta = std::min(beta, static_cast<Score>(SCORE_MATE - Ply + 1));
         if (alpha >= beta)
@@ -1015,7 +1017,7 @@ namespace Search
         Move move;
         int n_moves = 0;
         Move best_move = MOVE_NULL;
-        MoveOrder orderer = MoveOrder(position, 0, tt_move, data.histories(), MOVE_NULL, true);
+        MoveOrder orderer = MoveOrder(position, Ply, 0, tt_move, data.histories(), MOVE_NULL, true);
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;
@@ -1039,7 +1041,7 @@ namespace Search
                 // Regular non-PV node search
                 score = -quiescence<NON_PV>(position, -alpha - 1, -alpha, curr_data);
                 // Redo a PV node search if move not refuted
-                if (score > alpha && score < beta)
+                if (PvNode && score > alpha && score < beta)
                     score = -quiescence<PV>(position, -beta, -alpha, curr_data);
             }
             position.unmake_move();

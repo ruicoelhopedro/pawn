@@ -4,6 +4,21 @@
 #include <vector>
 
 
+namespace ComputedFields
+{
+    int distance[NUM_SQUARES][NUM_SQUARES];
+}
+
+
+void init_types()
+{
+    // Distance arrays
+    for (Square i = 0; i < NUM_SQUARES; i++)
+        for (Square j = 0; j < NUM_SQUARES; j++)
+            ComputedFields::distance[i][j] = std::max(abs(rank(i) - rank(j)), abs(file(i) - file(j)));
+}
+
+
 std::string get_square(Square square)
 {
     constexpr char ranks[8] = { '1', '2', '3', '4', '5', '6', '7', '8' };

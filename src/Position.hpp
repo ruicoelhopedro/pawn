@@ -3,6 +3,8 @@
 #include "Types.hpp"
 #include "Bitboard.hpp"
 #include "Move.hpp"
+#include "Zobrist.hpp"
+#include "PieceSquareTables.hpp"
 #include <algorithm>
 #include <string>
 
@@ -27,7 +29,7 @@ class Board
     Hash m_hash;
     Bitboard m_checkers;
     MixedScore m_eval1;
-    uint8_t m_phase;
+    int m_phase;
     BoardPieces m_board_pieces[NUM_SQUARES];
 
 protected:
@@ -255,6 +257,41 @@ protected:
     void update_checkers();
 
 
+    template<bool IS_NEW>
+    void set_piece(Piece piece, Turn turn, Square square)
+    {
+        PieceType pt = static_cast<PieceType>(piece);
+        m_pieces[piece][turn].set(square);
+        m_hash ^= Zobrist::get_piece_turn_square(pt, turn, square);
+        m_board_pieces[square] = get_board_piece(piece, turn);
+        m_eval1 += piece_square(piece, square, turn) * turn_to_color(turn);
+        if (IS_NEW)
+        {
+            m_eval1 += piece_value[piece] * turn_to_color(turn);
+            m_phase -= Phases::Pieces[piece];
+        }
+    }
+
+
+    template<bool IS_NEW>
+    void pop_piece(Piece piece, Turn turn, Square square)
+    {
+        PieceType pt = static_cast<PieceType>(piece);
+        m_pieces[piece][turn].reset(square);
+        m_hash ^= Zobrist::get_piece_turn_square(pt, turn, square);
+        m_board_pieces[square] = NO_PIECE;
+        m_eval1 -= piece_square(piece, square, turn) * turn_to_color(turn);
+        if (IS_NEW)
+        {
+            m_eval1 -= piece_value[piece] * turn_to_color(turn);
+            m_phase += Phases::Pieces[piece];
+        }
+    }
+
+
+    void unset_castling(CastleSide side, Turn turn);
+
+
     template<Turn TURN>
     void update_checkers()
     {
@@ -434,9 +471,9 @@ public:
     void generate_moves(MoveList& list, MoveGenType type) const;
 
 
-    inline Piece get_piece_at(Square square) const
+    inline PieceType get_piece_at(Square square) const
     {
-        return static_cast<Piece>(m_board_pieces[square] / 2);
+        return static_cast<PieceType>(get_piece(m_board_pieces[square]));
     }
 
 
@@ -486,12 +523,12 @@ public:
     Bitboard attackers_battery(Square square, Bitboard occupancy) const
     {
         Bitboard bishops = get_pieces<TURN, BISHOP>() | get_pieces<TURN, QUEEN>();
-        Bitboard rooks   = get_pieces<TURN,   ROOK>() | get_pieces<TURN, QUEEN>();
+        Bitboard rooks = get_pieces<TURN, ROOK>() | get_pieces<TURN, QUEEN>();
         return (Bitboards::get_attacks_pawns<~TURN>(square)                 & get_pieces<TURN, PAWN  >()) |
                (Bitboards::get_attacks<KNIGHT>(square, occupancy)           & get_pieces<TURN, KNIGHT>()) |
                (Bitboards::get_attacks<BISHOP>(square, occupancy ^ bishops) & bishops)                    |
                (Bitboards::get_attacks<ROOK  >(square, occupancy ^ rooks)   & rooks)                      |
-               (Bitboards::get_attacks<KING  >(square, occupancy)           & get_pieces<TURN,   KING>());
+               (Bitboards::get_attacks<KING  >(square, occupancy)           & get_pieces<TURN, KING>());
     }
 
 
@@ -570,9 +607,6 @@ public:
     uint8_t phase() const;
 
 
-    bool insufficient_material() const;
-
-
     bool legal(Move move) const;
 
 
@@ -586,23 +620,11 @@ public:
 };
 
 
-struct MoveInfo
-{
-    Move move;
-    bool extended;
-    bool reduced;
-};
-
-
 
 class Position
 {
     std::vector<Board> m_boards;
     MoveStack m_stack;
-    int m_pos;
-    int m_extensions;
-    std::vector<MoveInfo> m_moves;
-    bool m_reduced;
 
 public:
     Position();
@@ -623,7 +645,7 @@ public:
     MoveList generate_moves(MoveGenType type);
 
 
-    void make_move(Move move, bool extension = false);
+    void make_move(Move move);
 
 
     void unmake_move();
@@ -647,16 +669,7 @@ public:
     MoveList move_list() const;
 
 
-    int num_extensions() const;
-
-
     void set_init_ply();
-
-
-    Depth ply() const;
-
-
-    bool reduced() const;
 };
 
 

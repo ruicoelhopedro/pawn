@@ -6,22 +6,18 @@
 // IO operators
 std::ostream& operator<<(std::ostream& out, const Bitboard& bb)
 {
-    for (int i = 7; i >= 0; i--)
+    for (int rank = 7; rank >= 0; rank--)
     {
-        for (int j = 0; j < 8; j++)
-        {
-            int index = i * 8 + j;
-            if (bb.test(index))
-                out << " x";
-            else
-                out << " .";
-        }
+        for (int file = 0; file < 8; file++)
+            out << (bb.test(make_square(rank, file)) ? " x" : " .");
         out << "\n";
     }
     return out;
 }
 
+
 constexpr int Bitboard::index64[64];
+
 
 namespace Bitboards
 {
@@ -37,6 +33,7 @@ namespace Bitboards
     MagicBitboard rook_magics[NUM_SQUARES];
     Bitboard between_squares[NUM_SQUARES][NUM_SQUARES];
 
+
     void init_bitboards()
     {
         build_diagonals();
@@ -50,10 +47,12 @@ namespace Bitboards
         build_between_bbs();
     }
 
+
     Bitboard between(Square s1, Square s2)
     {
         return between_squares[s1][s2];
     }
+
 
     void build_diagonals()
     {
@@ -80,12 +79,14 @@ namespace Bitboards
         }
     }
 
+
     void build_ranks_files()
     {
         for (int i = 0; i < 8; i++)
             for (int j = 0; j < 8; j++)
                 ranks_files[j + 8 * i] = ranks[i] | files[j];
     }
+
 
     void build_pseudo_attacks(Square square)
     {
@@ -102,6 +103,7 @@ namespace Bitboards
         pseudo_attacks[KING][square] = pseudo_attacks_kings(square);
     }
 
+
     Bitboard pseudo_attacks_knights(Square square)
     {
         Bitboard result = empty;
@@ -117,24 +119,24 @@ namespace Bitboards
         return result;
     }
 
+
     Bitboard pseudo_attacks_bishops(Square square)
     {
-        auto result = diagonals[square];
-        result.reset(square);
-        return result;
+        return diagonals[square] ^ Bitboard::from_single_bit(square);
     }
+
 
     Bitboard pseudo_attacks_rooks(Square square)
     {
-        auto result = ranks_files[square];
-        result.reset(square);
-        return result;
+        return ranks_files[square] ^ Bitboard::from_single_bit(square);
     }
+
 
     Bitboard pseudo_attacks_queens(Square square)
     {
         return diagonals[square] ^ ranks_files[square];
     }
+
 
     Bitboard pseudo_attacks_kings(Square square)
     {
@@ -148,11 +150,13 @@ namespace Bitboards
         return result;
     }
 
+
     template<>
     Bitboard get_attacks<BISHOP>(Square square, Bitboard occupancy)
     {
         return bishop_magics[square].get_moveboard(occupancy);
     }
+
 
     template<>
     Bitboard get_attacks<ROOK>(Square square, Bitboard occupancy)
@@ -160,12 +164,14 @@ namespace Bitboards
         return rook_magics[square].get_moveboard(occupancy);
     }
 
+
     template<>
     Bitboard get_attacks<QUEEN>(Square square, Bitboard occupancy)
     {
         return bishop_magics[square].get_moveboard(occupancy) |
-            rook_magics[square].get_moveboard(occupancy);
+                 rook_magics[square].get_moveboard(occupancy);
     }
+
 
     void build_castle_squares()
     {
@@ -198,21 +204,22 @@ namespace Bitboards
         castle_target_square[BLACK][QUEENSIDE] = SQUARE_C8;
     }
 
+
     void build_between_bbs()
     {
-        for (int i = 0; i < NUM_SQUARES; i++)
-            for (int j = 0; j < NUM_SQUARES; j++)
+        for (Square i = 0; i < NUM_SQUARES; i++)
+            for (Square j = 0; j < NUM_SQUARES; j++)
                 if (diagonals[i].test(j))
-                    between_squares[i][j] = get_attacks<BISHOP>(static_cast<Square>(i), Bitboard::from_single_bit(j))&
-                    get_attacks<BISHOP>(static_cast<Square>(j), Bitboard::from_single_bit(i));
+                    between_squares[i][j] = get_attacks<BISHOP>(i, Bitboard::from_single_bit(j)) &
+                                            get_attacks<BISHOP>(j, Bitboard::from_single_bit(i));
                 else if (ranks_files[i].test(j))
-                    between_squares[i][j] = get_attacks<ROOK  >(static_cast<Square>(i), Bitboard::from_single_bit(j))&
-                    get_attacks<ROOK  >(static_cast<Square>(j), Bitboard::from_single_bit(i));
+                    between_squares[i][j] = get_attacks<ROOK  >(i, Bitboard::from_single_bit(j)) &
+                                            get_attacks<ROOK  >(j, Bitboard::from_single_bit(i));
     }
 
 
 
-
+    // Magic Bitboards
 
     MagicBitboard::MagicBitboard(uint64_t magic, Bitboard blockmask, const std::vector<Bitboard>& blockboards, const std::vector<Bitboard>& moveboards)
         : m_bits(blockmask.count()), m_magic(magic), m_blockmask(blockmask), m_moveboards(moveboards.size())
@@ -220,10 +227,14 @@ namespace Bitboards
         for (unsigned int i = 0; i < moveboards.size(); i++)
             m_moveboards[get_index(blockboards[i])] = moveboards[i];
     }
+
+
     int MagicBitboard::get_index(Bitboard blockboard) const
     {
         return (blockboard.to_uint64() * m_magic) >> (64 - m_bits);
     }
+
+
     Bitboard MagicBitboard::get_moveboard(Bitboard occupancy) const
     {
         Bitboard blockboard = occupancy & m_blockmask;
@@ -232,7 +243,7 @@ namespace Bitboards
 
 
 
-
+    // Magic Helpers
 
     Bitboard magic_helpers::blockmask_rook(Square square)
     {
@@ -243,12 +254,14 @@ namespace Bitboards
         return cross;
     }
 
+
     Bitboard magic_helpers::blockmask_bishop(Square square)
     {
         Bitboard edges = Bitboards::a_file | Bitboards::h_file | Bitboards::rank_1 | Bitboards::rank_8;
         Bitboard cross = pseudo_attacks_bishops(square);
         return cross & (~edges);
     }
+
 
     Bitboard magic_helpers::moveboard_rook(Square square, Bitboard blockboard)
     {
@@ -274,6 +287,7 @@ namespace Bitboards
         return result;
     }
 
+
     Bitboard magic_helpers::moveboard_bishop(Square square, Bitboard blockboard)
     {
         int di[4] = { -1, -1, 1, 1 };
@@ -298,6 +312,7 @@ namespace Bitboards
         return result;
     }
 
+
     std::vector<Bitboard> magic_helpers::gen_blockboards(Bitboard blockmask)
     {
         int n_bits = blockmask.count();
@@ -315,6 +330,7 @@ namespace Bitboards
 
         return result;
     }
+
 
     uint64_t magic_helpers::gen_magic(Bitboard blockmask, std::vector<Bitboard> blockboards)
     {
@@ -345,6 +361,7 @@ namespace Bitboards
         return result;
     }
 
+
     uint64_t magic_helpers::random_uint64()
     {
         uint64_t u1 = rand() & 0xFFFF;
@@ -353,6 +370,8 @@ namespace Bitboards
         uint64_t u4 = rand() & 0xFFFF;
         return u1 | (u2 << 16) | (u3 << 32) | (u4 << 48);
     }
+
+
     uint64_t magic_helpers::random_uint64_fewbits()
     {
         return random_uint64() & random_uint64() & random_uint64();
@@ -376,6 +395,7 @@ namespace Bitboards
                 magic = magic_helpers::bishop_magics[square];
             Bitboards::bishop_magics[square] = MagicBitboard(magic, blockmask, blockboards, moveboards);
         }
+
         // Rooks
         for (int square = 0; square < 64; square++)
         {

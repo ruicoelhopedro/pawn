@@ -24,5 +24,7 @@ namespace UCI
     void ucinewgame(Stream& stream);
     void isready(Stream& stream);
 
+    void test();
+
     Move move_from_uci(Position& position, std::string move_str);
 }

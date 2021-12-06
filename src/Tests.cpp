@@ -184,37 +184,4 @@ namespace Tests
         std::cout << "\nFailed/total tests: " << n_failed << "/" << tests.size() << std::endl;
         return n_failed;
     }
-
-
-    int legality_tests()
-    {
-        auto tests = test_suite();
-
-        int n_failed = 0;
-        for (auto& test : tests)
-        {
-            Position pos(test.fen());
-
-            auto moves = pos.generate_moves(MoveGenType::LEGAL);
-            int reference = moves.lenght();
-
-            int result = 0;
-            for (uint16_t number = 0; number < UINT16_MAX; number++)
-                if (pos.board().legal(Move::from_int(number)))
-                    result++;
-
-            if (result == reference)
-            {
-                std::cout << "[ OK ] " << test.fen() << " (" << result << ")" << std::endl;
-            }
-            else
-            {
-                std::cout << "[FAIL] " << test.fen() << " (ref " << reference << ", new " << result << ")" << std::endl;
-                n_failed++;
-            }
-        }
-
-        std::cout << "\nFailed/total tests: " << n_failed << "/" << tests.size() << std::endl;
-        return n_failed;
-    }
 }

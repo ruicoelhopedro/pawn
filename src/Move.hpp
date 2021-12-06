@@ -42,32 +42,7 @@ public:
     constexpr Hash hash() const { return (m_move & 0b111111111111) | ((m_move & 0b11000000000000000) >> 3); }
     constexpr Hash to_int() const { return m_move; }
 
-    std::string to_uci() const
-    {
-        if (from() == to())
-            return "0000";
-
-        if (is_promotion())
-        {
-            // Promotion
-            std::string promo_code;
-            Piece piece = promo_piece();
-            if (piece == 1)
-                promo_code = "n";
-            else if (piece == 2)
-                promo_code = "b";
-            else if (piece == 3)
-                promo_code = "r";
-            else if (piece == 4)
-                promo_code = "q";
-            return get_square(from()) + get_square(to()) + promo_code;
-        }
-        else
-        {
-            // Regular move
-            return get_square(from()) + get_square(to());
-        }
-    }
+    std::string to_uci() const;
 
     constexpr bool operator==(const Move& other) const { return m_move == other.m_move; }
     constexpr bool operator!=(const Move& other) const { return m_move != other.m_move; }

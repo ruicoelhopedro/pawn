@@ -143,7 +143,7 @@ namespace Search
 
     extern bool thinking;
     extern int64_t nodes_searched;
-    extern Position* base_position;
+    extern std::unique_ptr<Position> base_position;
     extern std::vector<std::thread> threads;
     extern std::chrono::steady_clock::time_point start_time;
     extern std::chrono::steady_clock::time_point end_time;
@@ -197,7 +197,7 @@ namespace Search
     bool legality_tests(Position& position, MoveList& move_list);
 
 
-    template<bool OUTPUT, bool USE_ORDER = false, bool TT = false, bool LEGALITY = false>
+    template<bool OUTPUT, bool USE_ORDER = false, bool TT = false, bool LEGALITY = false, bool VALIDITY = false>
     int64_t perft(Position& position, Depth depth)
     {
         // TT lookup
@@ -209,12 +209,15 @@ namespace Search
         int64_t n_nodes = 0;
         auto move_list = position.generate_moves(MoveGenType::LEGAL);
 
+        if (VALIDITY && !position.board().is_valid())
+            return 0;
+
         // Move counting
         if (USE_ORDER)
         {
             // Use move orderer (slower but the actual method used during search)
             Move move;
-            MoveOrder orderer = MoveOrder(position, depth, MOVE_NULL, Histories(), MOVE_NULL);
+            MoveOrder orderer = MoveOrder(position, 0, depth, MOVE_NULL, Histories(), MOVE_NULL);
             while ((move = orderer.next_move()) != MOVE_NULL)
             {
                 if (LEGALITY && !legality_tests(position, move_list))
@@ -224,7 +227,7 @@ namespace Search
                 if (depth > 1)
                 {
                     position.make_move(move);
-                    count = perft<false, USE_ORDER, TT>(position, depth - 1);
+                    count = perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(position, depth - 1);
                     position.unmake_move();
                 }
                 n_nodes += count;
@@ -245,7 +248,7 @@ namespace Search
                         return 0;
 
                     position.make_move(move);
-                    count = perft<false, USE_ORDER, TT>(position, depth - 1);
+                    count = perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(position, depth - 1);
                     position.unmake_move();
 
                     n_nodes += count;
