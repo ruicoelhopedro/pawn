@@ -5,35 +5,78 @@
 #include "Transpositions.hpp"
 #include "PieceSquareTables.hpp"
 #include <iostream>
+#include <cstring>
+
+
+HistoryContext::HistoryContext(Histories& hist, Board board, Depth ply, Depth depth, Move prev_move)
+    : m_hist(hist), m_board(board), m_ply(ply), m_depth(depth), m_prev_move(prev_move)
+{
+}
+
+
+void HistoryContext::add_bonus(Move move, int bonus)
+{
+    m_hist.add_bonus(move, m_board.turn(), static_cast<PieceType>(m_board.get_piece_at(move.from())), m_ply, bonus);
+}
+
+
+void HistoryContext::fail_high(Move move)
+{
+    m_hist.fail_high(move, m_prev_move, m_board.turn(), m_depth, m_ply, static_cast<PieceType>(m_board.get_piece_at(move.from())));
+}
+
+
+void HistoryContext::update_low_ply(Move move, int bonus)
+{
+    m_hist.update_low_ply(move, m_ply, static_cast<PieceType>(m_board.get_piece_at(move.from())), bonus);
+}
+
+
+
+bool HistoryContext::is_killer(Move move) const
+{
+    return m_hist.is_killer(move, m_ply);
+}
+
+
+int HistoryContext::butterfly_score(Move move) const
+{
+    return m_hist.butterfly_score(move, m_board.turn());
+}
+
+
+int HistoryContext::piece_type_score(Move move) const
+{
+    return m_hist.piece_type_score(move, static_cast<PieceType>(m_board.get_piece_at(move.from())));
+}
+
+
+int HistoryContext::low_ply_score(Move move) const
+{
+    return m_hist.low_ply_score(move, static_cast<PieceType>(m_board.get_piece_at(move.from())), m_ply);
+}
+
+
+Move HistoryContext::countermove() const
+{
+    return m_hist.countermove(m_prev_move);
+}
+
+
+Move HistoryContext::get_killer(int index) const
+{
+    return m_hist.get_killer(index, m_ply);
+}
+
 
 
 Histories::Histories()
 {
-    for (int i = 0; i < NUM_COLORS; i++)
-        for (int j = 0; j < NUM_SQUARES; j++)
-            for (int k = 0; k < NUM_SQUARES; k++)
-                m_butterfly[i][j][k] = 0;
-
-    for (int i = 0; i < NUM_PIECE_TYPES; i++)
-        for (int j = 0; j < NUM_SQUARES; j++)
-            m_piece_type[i][j] = 0;
-
-    for (int i = 0; i < NUM_KILLERS; i++)
-        for (int j = 0; j < NUM_MAX_DEPTH; j++)
-            m_killers[i][j] = MOVE_NULL;
-
-    for (int i = 0; i < NUM_SQUARES; i++)
-        for (int j = 0; j < NUM_SQUARES; j++)
-            m_countermoves[i][j] = MOVE_NULL;
-
-    for (int i = 0; i < NUM_LOW_PLY; i++)
-        for (int j = 0; j < NUM_PIECE_TYPES; j++)
-            for (int k = 0; k < NUM_SQUARES; k++)
-                m_low_ply_history[i][j][k] = 0;
+    clear();
 }
 
 
-void Histories::add_bonus(Move move, Turn turn, PieceType piece, int bonus)
+void Histories::add_bonus(Move move, Turn turn, PieceType piece, Depth ply, int bonus)
 {
     m_butterfly[turn][move.from()][move.to()] += bonus;
     m_piece_type[piece][move.to()] += bonus;
@@ -102,10 +145,36 @@ int Histories::low_ply_score(Move move, PieceType piece, Depth ply) const
 }
 
 
-MoveOrder::MoveOrder(Position& pos, Depth ply, Depth depth, Move hash_move, const Histories& histories, Move prev_move, bool quiescence)
-    : m_position(pos), m_ply(ply), m_depth(depth), m_hash_move(hash_move), m_histories(histories),
-      m_prev_move(prev_move), m_quiescence(quiescence), m_stage(MoveStage::HASH),
-      m_countermove(MOVE_NULL), m_killer(MOVE_NULL)
+void Histories::clear()
+{
+    for (int i = 0; i < NUM_COLORS; i++)
+        for (int j = 0; j < NUM_SQUARES; j++)
+            for (int k = 0; k < NUM_SQUARES; k++)
+                m_butterfly[i][j][k] = 0;
+                
+    for (int i = 0; i < NUM_PIECE_TYPES; i++)
+        for (int j = 0; j < NUM_SQUARES; j++)
+            m_piece_type[i][j] = 0;
+
+    for (int i = 0; i < NUM_KILLERS; i++)
+        for (int j = 0; j < NUM_MAX_DEPTH; j++)
+            m_killers[i][j] = MOVE_NULL;
+
+    for (int i = 0; i < NUM_SQUARES; i++)
+        for (int j = 0; j < NUM_SQUARES; j++)
+            m_countermoves[i][j] = MOVE_NULL;
+
+    for (int i = 0; i < NUM_LOW_PLY; i++)
+        for (int j = 0; j < NUM_PIECE_TYPES; j++)
+            for (int k = 0; k < NUM_SQUARES; k++)
+                m_low_ply_history[i][j][k] = 0;
+}
+
+
+
+MoveOrder::MoveOrder(Position& pos, Move hash_move, const HistoryContext& histories, bool quiescence)
+    : m_position(pos), m_hash_move(hash_move), m_histories(histories), m_quiescence(quiescence), 
+      m_stage(MoveStage::HASH), m_countermove(MOVE_NULL), m_killer(MOVE_NULL)
 {
 }
 
@@ -142,10 +211,9 @@ int MoveOrder::quiet_score(Move move) const
     // 1. Butterfly histories
     // 2. Piece type-destination histories
     // 3. Low ply histories (based on node counts)
-    auto piece = static_cast<PieceType>(m_position.board().get_piece_at(move.from()));
-    return m_histories.butterfly_score(move, m_position.get_turn())
-         + m_histories.piece_type_score(move, piece)
-         + m_histories.low_ply_score(move, piece, m_ply);
+    return m_histories.butterfly_score(move)
+         + m_histories.piece_type_score(move)
+         + m_histories.low_ply_score(move);
 }
 
 
@@ -183,7 +251,7 @@ Move MoveOrder::next_move()
         else if (m_stage == MoveStage::COUNTERMOVES)
         {
             ++m_stage;
-            Move candidate = m_histories.countermove(m_prev_move);
+            Move candidate = m_histories.countermove();
             if (candidate != m_hash_move &&
                 m_position.board().legal(candidate))
             {
@@ -197,7 +265,7 @@ Move MoveOrder::next_move()
             m_killer = MOVE_NULL;
             for (int i = 0; i < NUM_KILLERS; i++)
             {
-                Move candidate = m_histories.get_killer(i, m_ply);
+                Move candidate = m_histories.get_killer(i);
                 if (candidate != m_hash_move &&
                     candidate != m_countermove &&
                     m_position.board().legal(candidate))

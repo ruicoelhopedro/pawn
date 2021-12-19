@@ -161,6 +161,48 @@ namespace Tests
     }
 
 
+    std::vector<std::string> bench_suite()
+    {
+        std::vector<std::string> bench;
+
+        bench.push_back("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        bench.push_back("r2q1b1r/ppp1ppp1/n1k2n1p/3p4/P4P2/2NP3P/1PPKP1BP/R1BQ3R b - f3 0 8");
+        bench.push_back("rnbqkbnr/Pp1ppppp/8/8/2P5/4B3/PP2PPPP/RN1QKBNR b KQkq - 0 4");
+        bench.push_back("3r1r2/2q2p1k/p3b3/1p6/4Pp1P/P1Nn2P1/1PP5/R4R1K b - h3 0 4");
+        bench.push_back("8/Pk6/8/8/8/8/6Kp/8 w - - 0 1");
+        bench.push_back("7k/3p4/8/8/3P4/8/8/K7 b - - 0 1");
+        bench.push_back("k7/B7/1B6/1B6/8/8/8/K6b w - - 0 1");
+        bench.push_back("5Q2/8/8/8/3b4/5Q2/Q7/K1k5 w - - 0 1");
+        bench.push_back("8/8/5k2/8/8/8/8/KN4Q1 w - - 0 1");
+        bench.push_back("1k1r4/pp1b1R2/3q2pp/4p3/2B5/4Q3/PPP2B2/2K5 b - - 0 1");
+        bench.push_back("3r1k2/4npp1/1ppr3p/p6P/P2PPPP1/1NR5/5K2/2R5 w - - 0 1");
+        bench.push_back("2q1rr1k/3bbnnp/p2p1pp1/2pPp3/PpP1P1P1/1P2BNNP/2BQ1PRK/7R b - - 0 1");
+        bench.push_back("rnbqkb1r/p3pppp/1p6/2ppP3/3N4/2P5/PPP1QPPP/R1B1KB1R w KQkq - 0 1");
+        bench.push_back("r1b2rk1/2q1b1pp/p2ppn2/1p6/3QP3/1BN1B3/PPP3PP/R4RK1 w - - bm 0 1");
+        bench.push_back("2r3k1/pppR1pp1/4p3/4P1P1/5P2/1P4K1/P1P5/8 w - - 0 1");
+        bench.push_back("1nk1r1r1/pp2n1pp/4p3/q2pPp1N/b1pP1P2/B1P2R2/2P1B1PP/R2Q2K1 w - - 0 1");
+        bench.push_back("4b3/p3kp2/6p1/3pP2p/2pP1P2/4K1P1/P3N2P/8 w - - 0 1");
+        bench.push_back("2kr1bnr/pbpq4/2n1pp2/3p3p/3P1P1B/2N2N1Q/PPP3PP/2KR1B1R w - - 0 1");
+        bench.push_back("3rr1k1/pp3pp1/1qn2np1/8/3p4/PP1R1P2/2P1NQPP/R1B3K1 b - - 0 1");
+        bench.push_back("2r1nrk1/p2q1ppp/bp1p4/n1pPp3/P1P1P3/2PBB1N1/4QPPP/R4RK1 w - - 0 1");
+        bench.push_back("r3r1k1/ppqb1ppp/8/4p1NQ/8/2P5/PP3PPP/R3R1K1 b - - 0 1");
+        bench.push_back("r2q1rk1/4bppp/p2p4/2pP4/3pP3/3Q4/PP1B1PPP/R3R1K1 w - - 0 1");
+        bench.push_back("rnb2r1k/pp2p2p/2pp2p1/q2P1p2/8/1Pb2NP1/PB2PPBP/R2Q1RK1 w - - bm 0 1");
+        bench.push_back("2r3k1/1p2q1pp/2b1pr2/p1pp4/6Q1/1P1PP1R1/P1PN2PP/5RK1 w - - 0 1");
+        bench.push_back("r1bqkb1r/4npp1/p1p4p/1p1pP1B1/8/1B6/PPPN1PPP/R2Q1RK1 w kq - 0 1");
+        bench.push_back("r2q1rk1/1ppnbppp/p2p1nb1/3Pp3/2P1P1P1/2N2N1P/PPB1QP2/R1B2RK1 b - - 0 1");
+        bench.push_back("r1bq1rk1/pp2ppbp/2np2p1/2n5/P3PP2/N1P2N2/1PB3PP/R1B1QRK1 b - - 0 1");
+        bench.push_back("3rr3/2pq2pk/p2p1pnp/8/2QBPP2/1P6/P5PP/4RRK1 b - - 0 1");
+        bench.push_back("r4k2/pb2bp1r/1p1qp2p/3pNp2/3P1P2/2N3P1/PPP1Q2P/2KRR3 w - - 0 1");
+        bench.push_back("3rn2k/ppb2rpp/2ppqp2/5N2/2P1P3/1P5Q/PB3PPP/3RR1K1 w - - 0 1");
+        bench.push_back("2r2rk1/1bqnbpp1/1p1ppn1p/pP6/N1P1P3/P2B1N1P/1B2QPP1/R2R2K1 b - - 0 1");
+        bench.push_back("r1bqk2r/pp2bppp/2p5/3pP3/P2Q1P2/2N1B3/1PP3PP/R4RK1 b kq - 0 1");
+        bench.push_back("r2qnrnk/p2b2b1/1p1p2pp/2pPpp2/1PP1P3/PRNBB3/3QNPPP/5RK1 w - - 0 1");
+
+        return bench;
+    }
+
+
     int perft_tests()
     {
         auto tests = test_suite();
@@ -183,5 +225,55 @@ namespace Tests
 
         std::cout << "\nFailed/total tests: " << n_failed << "/" << tests.size() << std::endl;
         return n_failed;
+    }
+
+
+    void bench_tests(Depth depth, const std::vector<std::string>& tests)
+    {
+        // Set target depth
+        Search::Parameters::limits = Search::Limits();
+        Search::Parameters::limits.depth = depth;
+
+        // Prepare search thread
+        Search::SearchThread thread(0);
+
+        // Prepare some data
+        int index = 0;
+        int64_t n_nodes = 0;
+        int n_tests = tests.size();
+        auto start_time = std::chrono::steady_clock::now();
+
+        // Run each position
+        for (auto& test : tests)
+        {
+            // Prepare search
+            index++;
+            ttable.clear();
+            Search::nodes_searched = 0;
+            thread.data().nodes_searched() = 0;
+            thread.set_position(Position(test));
+            std::cout << "\nPosition " << index << "/" << n_tests << ": " << test << std::endl;
+
+            // Run the search
+            Search::status = Search::ThreadStatus::SEARCHING;
+            Search::update_time();
+            thread.start_search();
+            Search::status = Search::ThreadStatus::WAITING;
+
+            // Update node counts
+            n_nodes += thread.data().nodes_searched();
+            std::cout << std::endl;
+        }
+
+        // Node counts and nps
+        double elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start_time).count() / 1e9;
+        int64_t nps = n_nodes / elapsed;
+
+        // Final output
+        std::cout << std::endl;
+        std::cout << "-----------------------------" << std::endl;
+        std::cout << "Nodes searched:    " << n_nodes << std::endl;
+        std::cout << "Time elapsed (s):  " << elapsed << std::endl;
+        std::cout << "Nodes per second:  " << nps << std::endl;
     }
 }

@@ -120,7 +120,7 @@ public:
         *move = *(--m_end);
     }
 
-    int lenght() const
+    int length() const
     {
         return m_end - m_moves;
     }

@@ -28,6 +28,13 @@ std::string Move::to_uci() const
 
 std::ostream& operator<<(std::ostream& out, const Move& move)
 {
+    // Null move
+    if (move == MOVE_NULL)
+    {
+        out << "0000";
+        return out;
+    }
+
     // From
     out << static_cast<char>('a' + file(move.from()));
     out << static_cast<char>('1' + rank(move.from()));
@@ -50,7 +57,7 @@ std::ostream& operator<<(std::ostream& out, const Move& move)
 
 std::ostream& operator<<(std::ostream& out, const MoveList& list)
 {
-    if (list.lenght() > 0)
+    if (list.length() > 0)
     {
         out << list.m_moves[0];
         for (Move* i = (list.m_moves + 1); i < list.m_end; i++)

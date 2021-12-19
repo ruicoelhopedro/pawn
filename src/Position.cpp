@@ -65,8 +65,8 @@ Board::Board(std::string fen)
     char c, c2;
     std::istringstream ss(fen);
 
-    // Default initialisation
-    std::memset(m_pieces, 0, sizeof(m_pieces));
+    // Default initialisation (this is not correct for board_pieces, sets everything as white pawns)
+    std::memset(this, 0, sizeof(Board));
 
     // Read position
     Square square = SQUARE_A8;
@@ -85,7 +85,6 @@ Board::Board(std::string fen)
         m_turn = (c == 'w') ? WHITE : BLACK;
 
     // Castling rights
-    std::memset(m_castling_rights, 0, sizeof(m_castling_rights));
     while (ss.get(c) && !isspace(c))
         m_castling_rights[fen_castle_side(c)][isupper(c) ? WHITE : BLACK] = true;
 
@@ -96,12 +95,10 @@ Board::Board(std::string fen)
             m_enpassant_square = make_square(c2 - '1', c - 'a');
 
     // Half-move clock
-    m_half_move_clock = 1;
     if (ss)
         ss >> m_half_move_clock;
 
     // Full-move clock
-    m_full_move_clock = 0;
     if (ss)
         ss >> m_full_move_clock;
 
@@ -374,7 +371,7 @@ bool Board::is_valid() const
             return false;
 
     // Material and phase evaluation
-    int phase = Phases::Total;
+    uint8_t phase = Phases::Total;
     auto eval = MixedScore(0, 0);
     for (Piece piece = PAWN; piece < NUM_PIECE_TYPES; piece++)
         for (Turn turn : { WHITE, BLACK })
@@ -493,14 +490,14 @@ Square Board::least_valuable(Bitboard bb) const
 
 Score Board::see(Move move, int threshold) const
 {
-    // Static-Exchange evaluation with prunning
-    constexpr Score piece_score[] = { 0, 10, 30, 30, 50, 90, 1000 };
+    // Static-Exchange evaluation with pruning
+    constexpr int piece_score[] = { 0, 100, 300, 300, 500, 900, 10000 };
 
     Square target = move.to();
 
     // Make the initial capture
     Piece last_attacker = get_piece_at(move.from());
-    Score gain = piece_score[1 + (move.is_ep_capture() ? PAWN : get_piece_at(target))] - threshold / 10;
+    int gain = piece_score[1 + (move.is_ep_capture() ? PAWN : get_piece_at(target))] - threshold;
     Bitboard from_bb = Bitboard::from_square(move.from());
     Bitboard occupancy = get_pieces() ^ from_bb;
     Turn side_to_move = ~m_turn;
@@ -513,7 +510,7 @@ Score Board::see(Move move, int threshold) const
         // If the side to move is already ahead they can stop the capture sequence,
         // so we can prune the remaining iterations
         if (color * gain > 0)
-            return 10 * gain;
+            return gain;
 
         // Get least valuable attacker
         Square attacker = least_valuable(attacks_target);
@@ -530,7 +527,7 @@ Score Board::see(Move move, int threshold) const
         attacks_target = attackers(target, occupancy, side_to_move) & occupancy;
     }
 
-    return 10 * gain;
+    return gain;
 }
 
 
@@ -761,13 +758,13 @@ void Position::set_init_ply()
 
 std::ostream& operator<<(std::ostream& out, const Board& board)
 {
-    out << "   +---------------------------------+\n";
+    out << "   +------------------------+\n";
     for (int rank = 7; rank >= 0; rank--)
     {
         out << " " << rank + 1 << " |";
         for (int file = 0; file < 8; file++)
         {
-            out << "  ";
+            out << " ";
             BoardPieces pc = board.m_board_pieces[make_square(rank, file)];
             if (pc == BoardPieces::NO_PIECE)
                 out << '.';
@@ -775,12 +772,12 @@ std::ostream& operator<<(std::ostream& out, const Board& board)
                 out << fen_piece(pc);
             out << " ";
         }
-        out << " |\n";
+        out << "|\n";
         if (rank > 0)
-            out << "   |                                 |\n";
+            out << "   |                        |\n";
     }
-    out << "   +---------------------------------+\n";
-    out << "      A   B   C   D   E   F   G   H   \n";
+    out << "   +------------------------+\n";
+    out << "     A  B  C  D  E  F  G  H \n";
 
     out << "\n";
     out << "FEN: " << board.to_fen() << "\n";

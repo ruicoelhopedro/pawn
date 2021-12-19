@@ -29,7 +29,7 @@ class Board
     Hash m_hash;
     Bitboard m_checkers;
     MixedScore m_eval1;
-    int m_phase;
+    uint8_t m_phase;
     BoardPieces m_board_pieces[NUM_SQUARES];
 
 protected:

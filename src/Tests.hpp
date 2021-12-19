@@ -29,7 +29,13 @@ namespace Tests
     std::vector<PerftTest> test_suite();
 
 
+    std::vector<std::string> bench_suite();
+
+
     int perft_tests();
+
+
+    void bench_tests(Depth depth, const std::vector<std::string>& tests);
 
 
     template<Depth REDUCTION, bool USE_ORDER, bool TT, bool LEGALITY, bool VALIDITY>

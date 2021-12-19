@@ -147,13 +147,12 @@ class MixedScore
     Score eg;
 
 public:
-    inline constexpr MixedScore() : mg(0), eg(0) {}
     inline constexpr MixedScore(Score smg, Score seg) : mg(smg), eg(seg) {}
 
     inline constexpr Score middlegame() const { return mg; }
     inline constexpr Score endgame() const { return eg; }
 
-    inline constexpr Score tapered(int phase_entry) const
+    inline constexpr Score tapered(uint8_t phase_entry) const
     {
         int phase = (phase_entry * 256 + (Phases::Total / 2)) / Phases::Total;
         return ((mg * (256 - phase)) + (eg * phase)) / 256;

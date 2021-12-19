@@ -18,13 +18,16 @@ namespace UCI
     }
 
 
-    void main_loop()
+    void main_loop(std::string args)
     {
         std::string token;
         while (token != "quit")
         {
             std::string cmd;
-            std::getline(std::cin, cmd);
+            if (args == "")
+                std::getline(std::cin, cmd);
+            else
+                cmd = args;
             Stream stream(cmd);
 
             // Read the first token
@@ -58,11 +61,22 @@ namespace UCI
                 evaluation(*Search::base_position, true);
             else if (token == "test")
                 test();
+            else if (token == "tt")
+                tt_query();
+            else if (token == "bench")
+                bench(stream);
 
             // Unknown commands
             else if (token != "")
                 std::cout << "Unknown command " << token << std::endl;
+
+            // Quit if a single command has been passed
+            if (args != "")
+                break;
         }
+
+        // Ensure search threads are stopped on exit
+        Search::stop_search_threads();
     }
 
 
@@ -110,7 +124,7 @@ namespace UCI
             else if (name == "MultiPV")
                 Search::Parameters::multiPV = std::min(std::max(std::stoi(value), 1), 255);
             else if (name == "Threads")
-                Search::Parameters::n_threads = std::min(std::max(std::stoi(value), 1), 512);
+                Search::set_num_threads(std::min(std::max(std::stoi(value), 1), 512));
             else if (name == "Ponder")
                 Search::Parameters::ponder = (value == "true");
             else
@@ -163,7 +177,6 @@ namespace UCI
             return;
         }
 
-        Search::end_time = std::chrono::steady_clock::now() + std::chrono::milliseconds(INT32_MAX);
         Search::update_time();
         Search::start_search_threads();
     }
@@ -202,10 +215,11 @@ namespace UCI
         else if (token == "fen")
         {
             // Build FEN string
-            std::string fen;
+            std::stringstream ss;
             while (stream >> token && token != "moves")
-                fen += token + " ";
-            pos = Position(fen);
+                ss << token << " ";
+
+            pos = Position(ss.str());
         }
         else
             return;
@@ -217,6 +231,10 @@ namespace UCI
             pos.make_move(move);
             pos.set_init_ply();
         }
+
+        // Update positions in search threads
+        for (auto& thread : Search::threads)
+            thread->set_position(pos);
     }
 
 
@@ -232,6 +250,7 @@ namespace UCI
     void ucinewgame(Stream& stream)
     {
         ttable.clear();
+        Search::set_num_threads(Search::Parameters::n_threads);
     }
 
 
@@ -241,6 +260,7 @@ namespace UCI
         // Mandatory readyok output when all set
         std::cout << "readyok" << std::endl;
     }
+
 
 
     void test()
@@ -274,6 +294,52 @@ namespace UCI
             }
 
         std::cout << "Tests passed" << std::endl;
+    }
+
+
+
+    void tt_query()
+    {
+        const Position& pos = *Search::base_position;
+        TranspositionEntry* entry;
+        if (ttable.query(pos.hash(), &entry))
+        {
+            if (entry->is_empty())
+            {
+                std::cout << "Empty entry" << std::endl;
+            }
+            else
+            {
+                Color color = turn_to_color(pos.board().turn());
+                std::cout << "--------------------------------" << std::endl;
+                std::cout << " Score:        ";
+                if (entry->type() != EntryType::EXACT)
+                    std::cout << (entry->type() == EntryType::LOWER_BOUND ? ">= " : "<= ");
+                std::cout << color * entry->score() << " (White)" << std::endl;
+                std::cout << " Depth:        " << static_cast<int>(entry->depth()) << std::endl;
+                std::cout << " Move:         " << entry->hash_move() << std::endl;
+                std::cout << " Static eval:  " << color * entry->static_eval() << " (White)" << std::endl;
+                std::cout << " Hash:         " << std::hex << entry->hash() << std::dec << std::endl;
+                std::cout << "--------------------------------" << std::endl;
+            }
+        }
+        else
+        {
+            std::cout << "No TT entry for this position" << std::endl;
+        }
+        std::cout << std::endl;
+    }
+
+
+
+    void bench(Stream& stream)
+    {
+        auto tests = Tests::bench_suite();
+        Depth depth = 11;
+        int token;
+        if (stream >> token)
+            depth = token;
+        Tests::bench_tests(depth, tests);
     }
 
 
