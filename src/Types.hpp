@@ -52,13 +52,13 @@ enum PieceType : int8_t
 
 enum BoardPieces : int8_t
 {
-    NO_PIECE = 2 * PIECE_NONE,
-    W_PAWN = 2 * PAWN,
-    W_KNIGHT = 2 * KNIGHT,
-    W_BISHOP = 2 * BISHOP,
-    W_ROOK = 2 * ROOK,
-    W_QUEEN = 2 * QUEEN,
-    W_KING = 2 * KING,
+    NO_PIECE = 0,
+    W_PAWN = 2 * PAWN + 1,
+    W_KNIGHT = 2 * KNIGHT + 1,
+    W_BISHOP = 2 * BISHOP + 1,
+    W_ROOK = 2 * ROOK + 1,
+    W_QUEEN = 2 * QUEEN + 1,
+    W_KING = 2 * KING + 1,
     B_PAWN = W_PAWN + 1,
     B_KNIGHT = W_KNIGHT + 1,
     B_BISHOP = W_BISHOP + 1,
@@ -215,9 +215,9 @@ constexpr Turn operator~(const Turn& other) { return (other == WHITE) ? BLACK : 
 constexpr Color operator-(const Color& other) { return static_cast<Color>(-static_cast<int>(other)); }
 
 
-constexpr BoardPieces get_board_piece(Piece piece, Turn turn) { return static_cast<BoardPieces>(2 * piece + turn); }
-constexpr Piece get_piece(BoardPieces bpc) { return static_cast<Piece>(bpc / 2); }
-constexpr Turn get_turn(BoardPieces bpc) { return (bpc % 2 == 0) ? WHITE : BLACK; }
+constexpr BoardPieces get_board_piece(Piece piece, Turn turn) { return static_cast<BoardPieces>(2 * piece + turn + 1); }
+constexpr Piece get_piece(BoardPieces bpc) { return static_cast<Piece>((bpc - 1) / 2); }
+constexpr Turn get_turn(BoardPieces bpc) { return ((bpc - 1) % 2 == 0) ? WHITE : BLACK; }
 
 
 constexpr bool is_mate(const Score& score)
