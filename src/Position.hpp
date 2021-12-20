@@ -248,9 +248,6 @@ protected:
     }
 
 
-    void init();
-
-
     Hash generate_hash() const;
 
 
@@ -289,7 +286,13 @@ protected:
     }
 
 
-    void unset_castling(CastleSide side, Turn turn);
+    template<bool CAN_CASTLE>
+    void set_castling(CastleSide side, Turn turn)
+    {
+        if (m_castling_rights[side][turn] != CAN_CASTLE)
+            m_hash ^= Zobrist::get_castle_side_turn(side, turn);
+        m_castling_rights[side][turn] = CAN_CASTLE;
+    }
 
 
     template<Turn TURN>

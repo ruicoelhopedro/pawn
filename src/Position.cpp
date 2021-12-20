@@ -60,13 +60,15 @@ Board::Board()
 
 
 Board::Board(std::string fen)
-    : m_eval1(0, 0)
+    : m_hash(0),
+      m_eval1(0, 0),
+      m_phase(Phases::Total)
 {
     char c, c2;
     std::istringstream ss(fen);
 
-    // Default initialisation (this is not correct for board_pieces, sets everything as white pawns)
-    std::memset(this, 0, sizeof(Board));
+    // Default initialisation for updated fields
+    std::memset(m_board_pieces, 0, sizeof(m_board_pieces));
 
     // Read position
     Square square = SQUARE_A8;
@@ -77,7 +79,7 @@ Board::Board(std::string fen)
         else if (c == '/')
             square -= 16;
         else
-            m_pieces[fen_piece(c)][isupper(c) ? WHITE : BLACK].set(square++);
+            set_piece<true>(fen_piece(c), isupper(c) ? WHITE : BLACK, square++);
     }
 
     // Side to move
@@ -85,8 +87,9 @@ Board::Board(std::string fen)
         m_turn = (c == 'w') ? WHITE : BLACK;
 
     // Castling rights
+    std::memset(m_castling_rights, 0, sizeof(m_castling_rights));
     while (ss.get(c) && !isspace(c))
-        m_castling_rights[fen_castle_side(c)][isupper(c) ? WHITE : BLACK] = true;
+        set_castling<true>(fen_castle_side(c), isupper(c) ? WHITE : BLACK);
 
     // Ep square
     m_enpassant_square = SQUARE_NULL;
@@ -95,14 +98,22 @@ Board::Board(std::string fen)
             m_enpassant_square = make_square(c2 - '1', c - 'a');
 
     // Half-move clock
+    m_half_move_clock = 0;
     if (ss)
         ss >> m_half_move_clock;
 
     // Full-move clock
+    m_full_move_clock = 0;
     if (ss)
         ss >> m_full_move_clock;
 
-    init();
+    // Update remaining hash: turn and ep square
+    if (m_turn == Turn::BLACK)
+        m_hash ^= Zobrist::get_black_move();
+    if (m_enpassant_square != SQUARE_NULL)
+        m_hash ^= Zobrist::get_ep_file(file(m_enpassant_square));
+
+    update_checkers();
 }
 
 
@@ -189,39 +200,6 @@ Hash Board::generate_hash() const
 }
 
 
-void Board::init()
-{
-    // Pieces
-    for (Square square = 0; square < NUM_SQUARES; square++)
-        m_board_pieces[square] = NO_PIECE;
-    for (Piece piece = PAWN; piece < NUM_PIECE_TYPES; piece++)
-        for (Turn turn : { WHITE, BLACK })
-        {
-            Bitboard bb = get_pieces(turn, piece);
-            while (bb)
-                m_board_pieces[bb.bitscan_forward_reset()] = get_board_piece(piece, turn);
-        }
-
-    // Generate hash
-    m_hash = generate_hash();
-
-    // Checkers
-    update_checkers();
-
-    // Material and phase evaluation
-    m_phase = Phases::Total;
-    for (Piece piece = PAWN; piece < NUM_PIECE_TYPES; piece++)
-        for (Turn turn : { WHITE, BLACK })
-        {
-            Bitboard bb = get_pieces(turn, piece);
-            m_eval1 += piece_value[piece] * bb.count() * turn_to_color(turn);
-            m_phase -= bb.count() * Phases::Pieces[piece];
-            while (bb)
-                m_eval1 += piece_square(piece, bb.bitscan_forward_reset(), turn) * turn_to_color(turn);
-        }
-}
-
-
 void Board::update_checkers()
 {
     if (m_turn == WHITE)
@@ -237,14 +215,6 @@ void Board::generate_moves(MoveList& list, MoveGenType type) const
         generate_moves<WHITE>(list, type);
     else
         generate_moves<BLACK>(list, type);
-}
-
-
-void Board::unset_castling(CastleSide side, Turn turn)
-{
-    if (m_castling_rights[side][turn])
-        m_hash ^= Zobrist::get_castle_side_turn(side, turn);
-    m_castling_rights[side][turn] = false;
 }
 
 
@@ -268,15 +238,15 @@ Board Board::make_move(Move move) const
     if (piece == KING)
     {
         for (auto side : { KINGSIDE, QUEENSIDE })
-            result.unset_castling(side, m_turn);
+            result.set_castling<false>(side, m_turn);
     }
     else if (piece == ROOK)
     {
         // Initial rook positions
         if (move.from() == (m_turn == WHITE ? SQUARE_H1 : SQUARE_H8))
-            result.unset_castling(KINGSIDE, m_turn);
+            result.set_castling<false>(KINGSIDE, m_turn);
         if (move.from() == (m_turn == WHITE ? SQUARE_A1 : SQUARE_A8))
-            result.unset_castling(QUEENSIDE, m_turn);
+            result.set_castling<false>(QUEENSIDE, m_turn);
     }
 
     // Remove moving piece
@@ -300,9 +270,9 @@ Board Board::make_move(Move move) const
 
         // Castling: check if any rook has been captured
         if (move.to() == (m_turn == WHITE ? SQUARE_H8 : SQUARE_H1))
-            result.unset_castling(KINGSIDE, ~m_turn);
+            result.set_castling<false>(KINGSIDE, ~m_turn);
         if (move.to() == (m_turn == WHITE ? SQUARE_A8 : SQUARE_A1))
-            result.unset_castling(QUEENSIDE, ~m_turn);
+            result.set_castling<false>(QUEENSIDE, ~m_turn);
     }
     else if (move.is_double_pawn_push())
     {
