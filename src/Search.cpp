@@ -1014,7 +1014,7 @@ namespace Search
             // Update low-ply history
             move_nodes = data.nodes_searched() - move_nodes;
             if (Ply < NUM_LOW_PLY)
-                hist.update_low_ply(move, move_nodes / 100);
+                hist.update_low_ply(move, move_nodes / 10000);
 
             // Pruning
             if (alpha >= beta)
