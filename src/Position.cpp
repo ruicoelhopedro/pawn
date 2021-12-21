@@ -89,7 +89,8 @@ Board::Board(std::string fen)
     // Castling rights
     std::memset(m_castling_rights, 0, sizeof(m_castling_rights));
     while (ss.get(c) && !isspace(c))
-        set_castling<true>(fen_castle_side(c), isupper(c) ? WHITE : BLACK);
+        if (fen_castle_side(c) != NO_SIDE)
+            set_castling<true>(fen_castle_side(c), isupper(c) ? WHITE : BLACK);
 
     // Ep square
     m_enpassant_square = SQUARE_NULL;
@@ -339,6 +340,10 @@ bool Board::is_valid() const
         }
         else if (!m_pieces[get_piece_at(square)][get_turn(m_board_pieces[square])].test(square))
             return false;
+
+    // Hash consistency
+    if (m_hash != generate_hash())
+        return false;
 
     // Material and phase evaluation
     uint8_t phase = Phases::Total;
