@@ -606,7 +606,6 @@ Bitboard Board::sliders() const
 Position::Position()
     : m_boards(1), m_stack(NUM_MAX_DEPTH)
 {
-    m_boards.reserve(NUM_MAX_DEPTH);
 }
 
 
