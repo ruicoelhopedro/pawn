@@ -7,6 +7,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <iomanip>
 
 
 namespace UCI
@@ -17,16 +18,20 @@ namespace UCI
     }
 
 
-    void main_loop()
+    void main_loop(std::string args)
     {
         std::string token;
         while (token != "quit")
         {
             std::string cmd;
-            std::getline(std::cin, cmd);
+            if (args == "")
+                std::getline(std::cin, cmd);
+            else
+                cmd = args;
             Stream stream(cmd);
 
             // Read the first token
+            token.clear();
             stream >> token;
 
             // Switch on the received token
@@ -55,21 +60,23 @@ namespace UCI
             else if (token == "eval")
                 evaluation(*Search::base_position, true);
             else if (token == "test")
-            {
-                int t1 = Tests::perft_tests();
-                int t2 = Tests::perft_techniques_tests<false, true, false>();
-                int t3 = Tests::perft_techniques_tests<true, false, false>();
-                int t4 = Tests::perft_techniques_tests<true,  true, false>();
-                int t5 = Tests::perft_techniques_tests<false, false, true>();
+                test();
+            else if (token == "tt")
+                tt_query();
+            else if (token == "bench")
+                bench(stream);
 
-                std::cout << "\nTest summary" << std::endl;
-                std::cout << "  Perft:        " << t1 << " failed cases" << std::endl;
-                std::cout << "  TT:           " << t2 << " failed cases" << std::endl;
-                std::cout << "  Orderer:      " << t3 << " failed cases" << std::endl;
-                std::cout << "  TT + Orderer: " << t4 << " failed cases" << std::endl;
-                std::cout << "  Legality:     " << t5 << " failed cases" << std::endl;
-            }
+            // Unknown commands
+            else if (token != "")
+                std::cout << "Unknown command " << token << std::endl;
+
+            // Quit if a single command has been passed
+            if (args != "")
+                break;
         }
+
+        // Ensure search threads are stopped on exit
+        Search::stop_search_threads();
     }
 
 
@@ -117,7 +124,7 @@ namespace UCI
             else if (name == "MultiPV")
                 Search::Parameters::multiPV = std::min(std::max(std::stoi(value), 1), 255);
             else if (name == "Threads")
-                Search::Parameters::n_threads = std::min(std::max(std::stoi(value), 1), 512);
+                Search::set_num_threads(std::min(std::max(std::stoi(value), 1), 512));
             else if (name == "Ponder")
                 Search::Parameters::ponder = (value == "true");
             else
@@ -170,7 +177,6 @@ namespace UCI
             return;
         }
 
-        Search::end_time = std::chrono::steady_clock::now() + std::chrono::milliseconds(INT32_MAX);
         Search::update_time();
         Search::start_search_threads();
     }
@@ -209,10 +215,11 @@ namespace UCI
         else if (token == "fen")
         {
             // Build FEN string
-            std::string fen;
+            std::stringstream ss;
             while (stream >> token && token != "moves")
-                fen += token + " ";
-            pos = Position(fen);
+                ss << token << " ";
+
+            pos = Position(ss.str());
         }
         else
             return;
@@ -224,6 +231,10 @@ namespace UCI
             pos.make_move(move);
             pos.set_init_ply();
         }
+
+        // Update positions in search threads
+        for (auto& thread : Search::threads)
+            thread->set_position(pos);
     }
 
 
@@ -239,6 +250,7 @@ namespace UCI
     void ucinewgame(Stream& stream)
     {
         ttable.clear();
+        Search::set_num_threads(Search::Parameters::n_threads);
     }
 
 
@@ -247,6 +259,87 @@ namespace UCI
     {
         // Mandatory readyok output when all set
         std::cout << "readyok" << std::endl;
+    }
+
+
+
+    void test()
+    {
+        constexpr int NUM_TESTS = 6;
+        int results[NUM_TESTS];
+
+        results[0] = Tests::perft_tests();
+        results[1] = Tests::perft_techniques_tests<2, false, false, false, true>();
+        results[2] = Tests::perft_techniques_tests<2, false,  true, false, false>();
+        results[3] = Tests::perft_techniques_tests<2,  true, false, false, false>();
+        results[4] = Tests::perft_techniques_tests<2,  true,  true, false, false>();
+        results[5] = Tests::perft_techniques_tests<3, false, false,  true, false>();
+
+        std::cout << "\nTest summary" << std::endl;
+        std::cout << "---------------------------------" << std::endl;
+        std::cout << "  Perft:        " << std::setw(4) << results[0] << " failed cases" << std::endl;
+        std::cout << "  Validity:     " << std::setw(4) << results[1] << " failed cases" << std::endl;
+        std::cout << "  TT:           " << std::setw(4) << results[2] << " failed cases" << std::endl;
+        std::cout << "  Orderer:      " << std::setw(4) << results[3] << " failed cases" << std::endl;
+        std::cout << "  TT + Orderer: " << std::setw(4) << results[4] << " failed cases" << std::endl;
+        std::cout << "  Legality:     " << std::setw(4) << results[5] << " failed cases" << std::endl;
+        std::cout << "---------------------------------" << std::endl;
+
+        // Final test results
+        for (int i = 0; i < NUM_TESTS; i++)
+            if (results[i] > 0)
+            {
+                std::cout << "Tests failed" << std::endl;
+                return;
+            }
+
+        std::cout << "Tests passed" << std::endl;
+    }
+
+
+
+    void tt_query()
+    {
+        const Position& pos = *Search::base_position;
+        TranspositionEntry* entry;
+        if (ttable.query(pos.hash(), &entry))
+        {
+            if (entry->is_empty())
+            {
+                std::cout << "Empty entry" << std::endl;
+            }
+            else
+            {
+                Color color = turn_to_color(pos.board().turn());
+                std::cout << "--------------------------------" << std::endl;
+                std::cout << " Score:        ";
+                if (entry->type() != EntryType::EXACT)
+                    std::cout << (entry->type() == EntryType::LOWER_BOUND ? ">= " : "<= ");
+                std::cout << color * entry->score() << " (White)" << std::endl;
+                std::cout << " Depth:        " << static_cast<int>(entry->depth()) << std::endl;
+                std::cout << " Move:         " << entry->hash_move() << std::endl;
+                std::cout << " Static eval:  " << color * entry->static_eval() << " (White)" << std::endl;
+                std::cout << " Hash:         " << std::hex << entry->hash() << std::dec << std::endl;
+                std::cout << "--------------------------------" << std::endl;
+            }
+        }
+        else
+        {
+            std::cout << "No TT entry for this position" << std::endl;
+        }
+        std::cout << std::endl;
+    }
+
+
+
+    void bench(Stream& stream)
+    {
+        auto tests = Tests::bench_suite();
+        Depth depth = 11;
+        int token;
+        if (stream >> token)
+            depth = token;
+        Tests::bench_tests(depth, tests);
     }
 
 

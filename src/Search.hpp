@@ -8,11 +8,20 @@
 #include <memory>
 #include <thread>
 #include <vector>
+#include <mutex>
+#include <condition_variable>
 
 namespace Search
 {
     constexpr int PV_LENGTH = NUM_MAX_MOVES;
     constexpr int TOTAL_PV_LENGTH = (PV_LENGTH * PV_LENGTH + PV_LENGTH) / 2;
+
+    enum class ThreadStatus
+    {
+        WAITING,
+        SEARCHING,
+        QUITTING
+    };
 
     struct PvContainer
     {
@@ -38,7 +47,8 @@ namespace Search
             : searchmoves(0)
         {
             ponder = infinite = false;
-            time[WHITE] = time[BLACK] = incr[WHITE] = incr[BLACK] = 0;
+            time[WHITE] = time[BLACK] = -1;
+            incr[WHITE] = incr[BLACK] = 0;
             mate = 0;
             depth = NUM_MAX_DEPTH;
             movestogo = movetime = INT32_MAX;
@@ -127,24 +137,40 @@ namespace Search
 
     class SearchThread
     {
+        int m_id;
         std::unique_ptr<Histories> m_histories;
         std::unique_ptr<PvContainer> m_pv;
         int64_t m_nodes_searched;
         Depth m_seldepth;
         SearchData m_data;
+        Position m_position;
+        ThreadStatus m_local_status;
+
+        ThreadStatus receive_signal();
 
     public:
         SearchThread(int id);
 
+        void thread_loop();
+
+        void set_position(const Position& pos);
+
+        void start_search();
+
         Histories& histories();
         SearchData& data();
+        ThreadStatus status() const;
+
+        std::thread thread;
     };
 
 
-    extern bool thinking;
+    extern ThreadStatus status;
     extern int64_t nodes_searched;
     extern Position* base_position;
-    extern std::vector<std::thread> threads;
+    extern std::mutex mutex;
+    extern std::condition_variable cvar;
+    extern std::vector<std::unique_ptr<SearchThread>> threads;
     extern std::chrono::steady_clock::time_point start_time;
     extern std::chrono::steady_clock::time_point end_time;
 
@@ -162,10 +188,19 @@ namespace Search
     bool timeout();
 
 
+    void signal_threads(ThreadStatus signal);
+
+
+    void set_num_threads(int n_threads);
+
+
     void start_search_threads();
 
 
     void stop_search_threads();
+
+
+    void kill_search_threads();
 
 
     void go_perft(Depth depth);
@@ -197,7 +232,7 @@ namespace Search
     bool legality_tests(Position& position, MoveList& move_list);
 
 
-    template<bool OUTPUT, bool USE_ORDER = false, bool TT = false, bool LEGALITY = false>
+    template<bool OUTPUT, bool USE_ORDER = false, bool TT = false, bool LEGALITY = false, bool VALIDITY = false>
     int64_t perft(Position& position, Depth depth)
     {
         // TT lookup
@@ -209,12 +244,17 @@ namespace Search
         int64_t n_nodes = 0;
         auto move_list = position.generate_moves(MoveGenType::LEGAL);
 
+        if (VALIDITY && !position.board().is_valid())
+            return 0;
+
         // Move counting
         if (USE_ORDER)
         {
             // Use move orderer (slower but the actual method used during search)
             Move move;
-            MoveOrder orderer = MoveOrder(position, 0, depth, MOVE_NULL, Histories(), MOVE_NULL);
+            Histories hists;
+            HistoryContext hc(hists, position.board(), 0, depth, MOVE_NULL);
+            MoveOrder orderer = MoveOrder(position, MOVE_NULL, hc);
             while ((move = orderer.next_move()) != MOVE_NULL)
             {
                 if (LEGALITY && !legality_tests(position, move_list))
@@ -224,7 +264,7 @@ namespace Search
                 if (depth > 1)
                 {
                     position.make_move(move);
-                    count = perft<false, USE_ORDER, TT>(position, depth - 1);
+                    count = perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(position, depth - 1);
                     position.unmake_move();
                 }
                 n_nodes += count;
@@ -245,7 +285,7 @@ namespace Search
                         return 0;
 
                     position.make_move(move);
-                    count = perft<false, USE_ORDER, TT>(position, depth - 1);
+                    count = perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(position, depth - 1);
                     position.unmake_move();
 
                     n_nodes += count;
@@ -256,7 +296,7 @@ namespace Search
             }
             else
             {
-                n_nodes = move_list.lenght();
+                n_nodes = move_list.length();
                 if (OUTPUT)
                     for (auto move : move_list)
                         std::cout << move.to_uci() << ": " << 1 << std::endl;

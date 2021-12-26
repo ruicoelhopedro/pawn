@@ -271,6 +271,32 @@ public:
         else
             return (*this) >> -dir;
     }
+    template<Direction DIR>
+    constexpr Bitboard safe_shift() const noexcept
+    {
+        constexpr Bitboard rank_1(0xFFULL);
+        constexpr Bitboard a_file(0x101010101010101ULL);
+        constexpr Bitboard h_file = a_file << 7;
+        constexpr Bitboard rank_8 = rank_1 << (8 * 7);
+
+        Bitboard bb = *this;
+        Direction side = DIR % 8;
+        Direction updown = DIR / 8;
+        if (side >= 1)
+            bb &= ~h_file;
+        else if (side <= -1)
+            bb &= ~a_file;
+
+        if (updown >= 1)
+            bb &= ~rank_8;
+        else if (updown <= -1)
+            bb &= ~rank_1;
+
+        if (DIR > 0)
+            return bb << DIR;
+        else
+            return bb >> -DIR;
+    }
 
 
     // Fill
@@ -293,6 +319,12 @@ public:
         return result;
     }
 
+    constexpr Bitboard fill_file() const
+    {
+        constexpr Direction Up = 8;
+        return this->fill<Up>().fill<-Up>();
+    }
+
 
     // Flip
     constexpr Bitboard vertical_flip() const
@@ -300,9 +332,9 @@ public:
         constexpr Bitboard k1(0x00FF00FF00FF00FF);
         constexpr Bitboard k2(0x0000FFFF0000FFFF);
         Bitboard result = *this;
-        result = ((result >> 8)& k1) | ((result & k1) << 8);
-        result = ((result >> 16)& k2) | ((result & k2) << 16);
-        result = (result >> 32) | (result << 32);
+        result = ((result >>  8) & k1) | ((result & k1) <<  8);
+        result = ((result >> 16) & k2) | ((result & k2) << 16);
+        result =  (result >> 32)       |  (result       << 32);
         return result;
     }
     constexpr Bitboard horizontal_flip() const
@@ -311,12 +343,13 @@ public:
         constexpr Bitboard k2(0x3333333333333333);
         constexpr Bitboard k4(0x0f0f0f0f0f0f0f0f);
         Bitboard result = *this;
-        result = ((result >> 1)& k1) + (Bitboard(2) * (result & k1));
-        result = ((result >> 2)& k2) + (Bitboard(4) * (result & k2));
-        result = ((result >> 4)& k4) + (Bitboard(16) * (result & k4));
+        result = ((result >> 1) & k1) + (Bitboard( 2) * (result & k1));
+        result = ((result >> 2) & k2) + (Bitboard( 4) * (result & k2));
+        result = ((result >> 4) & k4) + (Bitboard(16) * (result & k4));
         return result;
     }
 };
+
 
 // IO operators
 std::ostream& operator<<(std::ostream& out, const Bitboard& bb);
@@ -351,7 +384,7 @@ namespace Bitboards
     constexpr Bitboard ranks[8] = { rank_1, rank_2, rank_3, rank_4,
                                     rank_5, rank_6, rank_7, rank_8 };
 
-    constexpr Bitboard square_color[NUM_COLORS] = { 0xAA55AA55AA55AA55ULL, ~0xAA55AA55AA55AA55ULL };
+    constexpr Bitboard square_color[NUM_COLORS] = { ~0xAA55AA55AA55AA55ULL, 0xAA55AA55AA55AA55ULL };
 
     constexpr Bitboard zone1 = (d_file | e_file) & (rank_4 | rank_5);
     constexpr Bitboard zone2 = (c_file | d_file | e_file | f_file)
@@ -415,6 +448,16 @@ namespace Bitboards
         return pawn_attacks[TURN][square];
     }
 
+
+    template <Turn TURN>
+    Bitboard get_attacks_pawns(Bitboard pawns)
+    {
+        constexpr Direction Up = TURN == WHITE ? 8 : -8;
+        constexpr Direction Left = -1;
+        constexpr Direction Right = 1;
+        return (pawns & ~Bitboards::a_file).shift<Up + Left >() |
+               (pawns & ~Bitboards::h_file).shift<Up + Right>();
+    }
 
     Bitboard between(Square s1, Square s2);
 

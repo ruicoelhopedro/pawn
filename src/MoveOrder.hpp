@@ -36,7 +36,7 @@ class Histories
 public:
     Histories();
 
-    void add_bonus(Move move, Turn turn, PieceType piece, int bonus);
+    void add_bonus(Move move, Turn turn, PieceType piece, Depth ply, int bonus);
     void fail_high(Move move, Move prev_move, Turn turn, Depth depth, Depth ply, PieceType piece);
     void update_low_ply(Move move, Depth ply, PieceType piece, int value);
 
@@ -46,22 +46,47 @@ public:
     int low_ply_score(Move move, PieceType piece, Depth ply) const;
     Move countermove(Move move) const;
     Move get_killer(int index, Depth ply) const;
+
+    void clear();
+};
+
+
+class HistoryContext
+{
+    Histories& m_hist;
+    Board m_board;
+    Depth m_ply;
+    Depth m_depth;
+    Move m_prev_move;
+
+public:
+    HistoryContext(Histories& hist, Board board, Depth ply, Depth depth, Move prev_move);
+
+    void add_bonus(Move move, int bonus);
+    void fail_high(Move move);
+    void update_low_ply(Move move, int bonus);
+
+    bool is_killer(Move move) const;
+    int butterfly_score(Move move) const;
+    int piece_type_score(Move move) const;
+    int low_ply_score(Move move) const;
+    Move countermove() const;
+    Move get_killer(int index) const;
 };
 
 
 class MoveOrder
 {
     Position& m_position;
-    Depth m_ply;
-    Depth m_depth;
     Move m_hash_move;
-    const Histories& m_histories;
-    Move m_prev_move;
+    const HistoryContext& m_histories;
     bool m_quiescence;
     MoveList m_moves;
     MoveStage m_stage;
     Move m_countermove;
     Move m_killer;
+    Move* m_curr;
+    int m_last_score;
 
     bool hash_move(Move& move);
 
@@ -100,11 +125,24 @@ class MoveOrder
 
             list_move++;
         }
+
+        m_last_score = curr_score;
         
         // Pop the move and return
         move = *curr_move;
         m_moves.pop(curr_move);
         return true;
+    }
+
+
+    bool next_move(Move& move)
+    {
+        // Do we have any move?
+        if (m_moves.begin() == m_moves.end())
+            return false;
+
+        move = *m_curr;
+        return (m_curr++) != m_moves.end();
     }
 
 
@@ -149,7 +187,7 @@ class MoveOrder
 
 
 public:
-    MoveOrder(Position& pos, Depth ply, Depth depth, Move hash_move, const Histories& histories, Move prev_move, bool quiescence = false);
+    MoveOrder(Position& pos, Move hash_move, const HistoryContext& histories, bool quiescence = false);
 
     Move next_move();
 
