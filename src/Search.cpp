@@ -713,8 +713,9 @@ namespace Search
         if (depth <= 0)
             return quiescence<ST>(position, alpha, beta, data);
 
-        // Early check for draw
-        if (position.is_draw(!RootSearch))
+        // Early check for draw or maximum depth reached
+        if (position.is_draw(!RootSearch) ||
+            Ply >= NUM_MAX_PLY)
             return SCORE_DRAW;
 
         // TT lookup
@@ -1072,8 +1073,9 @@ namespace Search
             data.seldepth() = std::max(data.seldepth(), Ply);
         }
 
-        // Early check for draw
-        if (position.is_draw(true))
+        // Early check for draw or maximum depth reached
+        if (position.is_draw(true) ||
+            Ply >= NUM_MAX_PLY)
             return SCORE_DRAW;
 
         // Mate distance pruning: don't bother searching if we are deeper than the shortest mate up to this point
