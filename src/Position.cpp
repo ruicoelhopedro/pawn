@@ -346,7 +346,7 @@ bool Board::is_valid() const
         return false;
 
     // Material and phase evaluation
-    uint8_t phase = Phases::Total;
+    int8_t phase = Phases::Total;
     auto eval = MixedScore(0, 0);
     for (Piece piece = PAWN; piece < NUM_PIECE_TYPES; piece++)
         for (Turn turn : { WHITE, BLACK })
@@ -512,7 +512,7 @@ MixedScore Board::material_eval() const
 }
 
 
-uint8_t Board::phase() const
+int8_t Board::phase() const
 {
     return m_phase;
 }

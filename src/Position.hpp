@@ -29,7 +29,7 @@ class Board
     Hash m_hash;
     Bitboard m_checkers;
     MixedScore m_eval1;
-    uint8_t m_phase;
+    int8_t m_phase;
     BoardPieces m_board_pieces[NUM_SQUARES];
 
 protected:
@@ -607,7 +607,7 @@ public:
     MixedScore material_eval() const;
 
 
-    uint8_t phase() const;
+    int8_t phase() const;
 
 
     bool legal(Move move) const;
