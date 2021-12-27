@@ -268,6 +268,7 @@ namespace Search
         while (m_local_status != ThreadStatus::QUITTING)
         {
             // Wait for a signal
+            m_local_status = ThreadStatus::WAITING;
             m_local_status = receive_signal();
 
             // Begin search
@@ -377,6 +378,7 @@ namespace Search
         int remaining = threads.size();
         while (remaining > 0)
         {
+            cvar.notify_all();
             remaining = threads.size();
             for (auto& thread : threads)
                 if (thread->status() == status)
@@ -429,11 +431,14 @@ namespace Search
         for (auto& thread : threads)
         {
             while (true)
+            {
+                cvar.notify_all();
                 if (thread->thread.joinable())
                 {
                     thread->thread.join();
                     break;
                 }
+            }
         }
     }
 
@@ -552,6 +557,9 @@ namespace Search
                 // Even in this case, output a score and bestmove
                 std::cout << "info depth 0 score " << (position.is_check() ? "mate 0" : "cp 0") << std::endl;
                 std::cout << "bestmove " << MOVE_NULL << std::endl;
+                
+                 // Stop the search
+                std::unique_lock<std::mutex> lock(mutex);
                 status = ThreadStatus::WAITING;
             }
             return SCORE_NONE;
@@ -669,6 +677,9 @@ namespace Search
             if (pondermove != MOVE_NULL)
                 std::cout << " ponder " << pondermove;
             std::cout << std::endl;
+
+            // Stop the search
+            std::unique_lock<std::mutex> lock(mutex);
             status = ThreadStatus::WAITING;
         }
 
