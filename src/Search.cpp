@@ -768,6 +768,7 @@ namespace Search
         }
 
         // Position static evaluation (when not in check)
+        bool improving = false;
         Score static_eval = SCORE_NONE;
         if (!IsCheck)
         {
@@ -780,6 +781,12 @@ namespace Search
                 static_eval = -data.previous(1)->static_eval();
             else
                 static_eval = turn_to_color(Turn) * evaluation(position);
+            
+            // Set improving flag
+            if (Ply >= 2 && data.previous(2)->static_eval() != SCORE_NONE)
+                improving = data.static_eval() > data.previous(2)->static_eval();
+            else if (Ply >= 4)
+                improving = data.static_eval() > data.previous(4)->static_eval();
         }
         data.static_eval() = static_eval;
 
@@ -791,9 +798,9 @@ namespace Search
             static_eval = tt_score;
 
         // Futility pruning
-        if (!PvNode && depth < 5 && !IsCheck && !is_mate(static_eval))
+        if (!PvNode && depth < 8 && !IsCheck && !is_mate(static_eval))
         {
-            Score margin = 200 * depth;
+            Score margin = 200 * depth - 100 * improving;
             if (static_eval - margin >= beta)
                 return static_eval;
         }
@@ -804,7 +811,7 @@ namespace Search
             data.last_move() != MOVE_NULL &&
             position.board().non_pawn_material(Turn))
         {
-            int reduction = 3 + (static_eval - beta) / 200;
+            int reduction = 3 + (static_eval - beta) / 200 + improving;
             Depth new_depth = reduce(depth, 1 + reduction);
             SearchData curr_data = data.next(MOVE_NULL) | REDUCED;
             position.make_null_move();
