@@ -54,15 +54,16 @@ public:
 class HistoryContext
 {
     Histories& m_hist;
-    Board m_board;
+    const Board& m_board;
     Depth m_ply;
     Depth m_depth;
     Move m_prev_move;
 
 public:
-    HistoryContext(Histories& hist, Board board, Depth ply, Depth depth, Move prev_move);
+    HistoryContext(Histories& hist, const Board& board, Depth ply, Depth depth, Move prev_move);
 
     void add_bonus(Move move, int bonus);
+    void add_bonus(Move move, Depth ply, PieceType piece, int bonus);
     void fail_high(Move move);
     void update_low_ply(Move move, int bonus);
 
@@ -77,7 +78,7 @@ public:
 
 class MoveOrder
 {
-    Position& m_position;
+    const Position& m_position;
     Move m_hash_move;
     const HistoryContext& m_histories;
     bool m_quiescence;

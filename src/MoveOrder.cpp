@@ -8,7 +8,7 @@
 #include <cstring>
 
 
-HistoryContext::HistoryContext(Histories& hist, Board board, Depth ply, Depth depth, Move prev_move)
+HistoryContext::HistoryContext(Histories& hist, const Board& board, Depth ply, Depth depth, Move prev_move)
     : m_hist(hist), m_board(board), m_ply(ply), m_depth(depth), m_prev_move(prev_move)
 {
 }
@@ -17,6 +17,12 @@ HistoryContext::HistoryContext(Histories& hist, Board board, Depth ply, Depth de
 void HistoryContext::add_bonus(Move move, int bonus)
 {
     m_hist.add_bonus(move, m_board.turn(), static_cast<PieceType>(m_board.get_piece_at(move.from())), m_ply, bonus);
+}
+
+
+void HistoryContext::add_bonus(Move move, Depth ply, PieceType piece, int bonus)
+{
+    m_hist.add_bonus(move, m_board.turn(), piece, ply, bonus);
 }
 
 

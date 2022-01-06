@@ -636,6 +636,15 @@ public:
     Position(std::string fen);
 
 
+    void update_from(std::string fen);
+
+
+    void update_from(const Position& pos);
+
+
+    void reset_startpos();
+
+
     bool is_draw(bool unique) const;
 
 
@@ -673,6 +682,9 @@ public:
 
 
     void set_init_ply();
+
+
+    void prepare();
 };
 
 

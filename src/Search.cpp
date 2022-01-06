@@ -244,8 +244,8 @@ namespace Search
           m_pv(std::make_unique<PvContainer>()),
           m_nodes_searched(0),
           m_seldepth(0),
-          m_local_status(ThreadStatus::WAITING),
-          m_data(*m_histories, id, m_nodes_searched, m_seldepth, m_pv->pv, m_pv->prev_pv)
+          m_data(*m_histories, id, m_nodes_searched, m_seldepth, m_pv->pv, m_pv->prev_pv),
+          m_local_status(ThreadStatus::WAITING)
     {
         for (int i = 0; i < TOTAL_PV_LENGTH; i++)
             m_pv->pv[i] = MOVE_NULL;
@@ -280,7 +280,7 @@ namespace Search
 
     void SearchThread::set_position(const Position& pos)
     {
-        m_position = pos;
+        m_position.update_from(pos);
     }
 
 
@@ -569,7 +569,6 @@ namespace Search
         Move pondermove = MOVE_NULL;
 
         // Iterative deepening
-        position.set_init_ply();
         data.histories().clear();
         for (int iDepth = 1;
              iDepth < NUM_MAX_DEPTH && (iDepth <= Parameters::limits.depth || Parameters::ponder);
@@ -850,7 +849,7 @@ namespace Search
             SearchData curr_data = data.next(move);
             uint64_t move_nodes = data.nodes_searched();
 
-            // In multiPV mode do not search previous PV root nodes
+            // In multiPV mode do not search previous PV root moves
             if (RootSearch && Parameters::multiPV > 1)
             {
                 bool found = false;
@@ -887,7 +886,7 @@ namespace Search
                 }
                 else
                 {
-                    if (n_moves > 3 + depth * depth)
+                    if (depth < 7 && n_moves > 3 + depth * depth)
                         continue;
 
                     if (depth < 5 && orderer.quiet_score(move) < -3000 * (depth - 1))
@@ -990,10 +989,10 @@ namespace Search
                     // Regular non-PV node search
                     score = -negamax<NON_PV>(position, curr_depth - 1, -alpha - 1, -alpha, curr_data);
                     // Redo a PV node search if move not refuted
-                    if (score > alpha && score < beta)
+                    if (PvNode && score > alpha && score < beta)
                     {
                         // But before add a bonus to the move
-                        hist.add_bonus(move, depth);
+                        hist.add_bonus(move, Ply, piece, depth);
                         score = -negamax<PV>(position, curr_depth - 1, -beta, -alpha, curr_data);
                     }
                 }
@@ -1010,7 +1009,7 @@ namespace Search
             if (didLMR && do_full_search)
             {
                 int bonus = score > best_score ? depth : -depth;
-                hist.add_bonus(move, bonus);
+                hist.add_bonus(move, Ply, piece, bonus);
             }
 
             // New best move

@@ -206,7 +206,7 @@ namespace UCI
 
         if (token == "startpos")
         {
-            pos = Position();
+            pos.reset_startpos();
 
             // Check if moves token has been passed
             if (stream >> token && token != "moves")
@@ -219,7 +219,7 @@ namespace UCI
             while (stream >> token && token != "moves")
                 ss << token << " ";
 
-            pos = Position(ss.str());
+            pos.update_from(ss.str());
         }
         else
             return;
@@ -231,6 +231,9 @@ namespace UCI
             pos.make_move(move);
             pos.set_init_ply();
         }
+
+        // After all moves are pushed, prepare the position for search
+        pos.prepare();
 
         // Update positions in search threads
         for (auto& thread : Search::threads)
