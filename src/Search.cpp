@@ -731,6 +731,7 @@ namespace Search
 
         // TT lookup
         Score alpha_init = alpha;
+        Depth tt_depth = 0;
         Move tt_move = MOVE_NULL;
         Score tt_score = SCORE_NONE;
         Score tt_static_eval = SCORE_NONE;
@@ -741,12 +742,13 @@ namespace Search
         if (tt_hit)
         {
             tt_type = entry->type();
+            tt_depth = entry->depth();
             tt_score = score_from_tt(entry->score(), Ply);
             tt_move = entry->hash_move();
             tt_static_eval = entry->static_eval();
 
             // TT cutoff in non-PV nodes
-            if (!PvNode && entry->depth() >= depth &&
+            if (!PvNode && tt_depth >= depth &&
                 ((tt_type == EntryType::EXACT) ||
                  (tt_type == EntryType::UPPER_BOUND && tt_score <= alpha) ||
                  (tt_type == EntryType::LOWER_BOUND && tt_score >= beta)))
@@ -904,12 +906,12 @@ namespace Search
                 !HasExcludedMove &&
                 !IsCheck &&
                 move == tt_move &&
-                entry->depth() >= depth - 3 &&
-                entry->type() == EntryType::LOWER_BOUND &&
+                tt_depth >= depth - 3 &&
+                tt_type == EntryType::LOWER_BOUND &&
                 !is_mate(tt_score) &&
                 data.extensions() < 3)
             {
-                Value singularBeta = entry->score() - 2 * depth;
+                Value singularBeta = tt_score - 2 * depth;
                 Depth singularDepth = (depth - 1) / 2;
 
                 // Search with the move excluded
