@@ -23,6 +23,7 @@ constexpr int NUM_CASTLE_SIDES = 2;
 constexpr int NUM_MAX_MOVES = 256;
 constexpr Depth NUM_MAX_DEPTH = 200;
 constexpr Depth NUM_MAX_PLY = 250;
+constexpr int NUM_BOARDS = 400;
 
 
 enum Turn : int8_t

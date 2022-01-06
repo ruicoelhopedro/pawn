@@ -606,6 +606,7 @@ Bitboard Board::sliders() const
 Position::Position()
     : m_boards(1), m_stack(NUM_MAX_DEPTH)
 {
+    m_boards.reserve(NUM_BOARDS);
 }
 
 
@@ -613,6 +614,33 @@ Position::Position(std::string fen)
     : Position()
 {
     m_boards[0] = Board(fen);
+}
+
+
+void Position::reset_startpos()
+{
+    m_boards.clear();
+    m_boards.push_back(Board());
+}
+
+
+void Position::update_from(std::string fen)
+{
+    m_boards.clear();
+    m_boards.push_back(Board(fen));
+}
+
+
+void Position::update_from(const Position& pos)
+{
+    m_boards.clear();
+    // Resize if needed
+    if (m_boards.capacity() < pos.m_boards.capacity())
+        m_boards.reserve(pos.m_boards.capacity());
+    // Push moves
+    for (const auto& board : pos.m_boards)
+        m_boards.push_back(board);
+    m_stack.reset_pos();
 }
 
 
@@ -727,6 +755,15 @@ MoveList Position::move_list() const
 void Position::set_init_ply()
 {
     m_stack.reset_pos();
+}
+
+
+void Position::prepare()
+{
+    m_stack.reset_pos();
+
+    if (m_boards.capacity() < m_boards.size() + NUM_MAX_PLY)
+        m_boards.reserve(m_boards.size() + 2 * NUM_MAX_PLY);
 }
 
 

@@ -244,8 +244,8 @@ namespace Search
           m_pv(std::make_unique<PvContainer>()),
           m_nodes_searched(0),
           m_seldepth(0),
-          m_local_status(ThreadStatus::WAITING),
-          m_data(*m_histories, id, m_nodes_searched, m_seldepth, m_pv->pv, m_pv->prev_pv)
+          m_data(*m_histories, id, m_nodes_searched, m_seldepth, m_pv->pv, m_pv->prev_pv),
+          m_local_status(ThreadStatus::WAITING)
     {
         for (int i = 0; i < TOTAL_PV_LENGTH; i++)
             m_pv->pv[i] = MOVE_NULL;
@@ -280,7 +280,7 @@ namespace Search
 
     void SearchThread::set_position(const Position& pos)
     {
-        m_position = pos;
+        m_position.update_from(pos);
     }
 
 
@@ -344,7 +344,7 @@ namespace Search
         if (limits.time[turn] >= 0)
         {
             // Number of expected remaining moves
-            int n_expected_moves = std::max(1, std::min(50, limits.movestogo));
+            int n_expected_moves = limits.movestogo != INT32_MAX ? limits.movestogo : 25;
             int time_remaining = limits.time[turn] + limits.incr[turn] * n_expected_moves;
 
             // This move will use 1/n_expected_moves of the remaining time
@@ -569,7 +569,6 @@ namespace Search
         Move pondermove = MOVE_NULL;
 
         // Iterative deepening
-        position.set_init_ply();
         data.histories().clear();
         for (int iDepth = 1;
              iDepth < NUM_MAX_DEPTH && (iDepth <= Parameters::limits.depth || Parameters::ponder);
@@ -731,6 +730,7 @@ namespace Search
 
         // TT lookup
         Score alpha_init = alpha;
+        Depth tt_depth = 0;
         Move tt_move = MOVE_NULL;
         Score tt_score = SCORE_NONE;
         Score tt_static_eval = SCORE_NONE;
@@ -741,12 +741,13 @@ namespace Search
         if (tt_hit)
         {
             tt_type = entry->type();
+            tt_depth = entry->depth();
             tt_score = score_from_tt(entry->score(), Ply);
             tt_move = entry->hash_move();
             tt_static_eval = entry->static_eval();
 
             // TT cutoff in non-PV nodes
-            if (!PvNode && entry->depth() >= depth &&
+            if (!PvNode && tt_depth >= depth &&
                 ((tt_type == EntryType::EXACT) ||
                  (tt_type == EntryType::UPPER_BOUND && tt_score <= alpha) ||
                  (tt_type == EntryType::LOWER_BOUND && tt_score >= beta)))
@@ -754,7 +755,6 @@ namespace Search
                 // Update histories for quiet TT moves
                 if (tt_move != MOVE_NULL && !tt_move.is_capture() && !tt_move.is_promotion())
                 {
-                    PieceType piece = static_cast<PieceType>(position.board().get_piece_at(tt_move.from()));
                     if (tt_score >= beta)
                         hist.fail_high(tt_move);
                     else
@@ -855,7 +855,7 @@ namespace Search
             SearchData curr_data = data.next(move);
             uint64_t move_nodes = data.nodes_searched();
 
-            // In multiPV mode do not search previous PV root nodes
+            // In multiPV mode do not search previous PV root moves
             if (RootSearch && Parameters::multiPV > 1)
             {
                 bool found = false;
@@ -883,7 +883,7 @@ namespace Search
                           << " currmovenumber " << n_moves << std::endl;
 
             // Shallow depth prunings
-            if (!RootSearch && position.board().non_pawn_material(Turn) && !IsCheck && best_score > -SCORE_MATE_FOUND)
+            if (!PvNode && position.board().non_pawn_material(Turn) && !IsCheck && best_score > -SCORE_MATE_FOUND)
             {
                 if (move.is_capture() || move.is_promotion())
                 {
@@ -892,7 +892,7 @@ namespace Search
                 }
                 else
                 {
-                    if (n_moves > 3 + depth * depth)
+                    if (depth < 7 && n_moves > 3 + depth * depth)
                         continue;
 
                     if (depth < 5 && orderer.quiet_score(move) < -3000 * (depth - 1))
@@ -911,12 +911,12 @@ namespace Search
                 !HasExcludedMove &&
                 !IsCheck &&
                 move == tt_move &&
-                entry->depth() >= depth - 3 &&
-                entry->type() == EntryType::LOWER_BOUND &&
+                tt_depth >= depth - 3 &&
+                tt_type == EntryType::LOWER_BOUND &&
                 !is_mate(tt_score) &&
                 data.extensions() < 3)
             {
-                Value singularBeta = entry->score() - 2 * depth;
+                Value singularBeta = tt_score - 2 * depth;
                 Depth singularDepth = (depth - 1) / 2;
 
                 // Search with the move excluded
@@ -932,7 +932,7 @@ namespace Search
                     curr_data |= EXTENDED;
                     curr_depth++;
                 }
-                else if (singularBeta >= beta)
+                else if (!PvNode && singularBeta >= beta)
                 {
                     // Multi-cut pruning: assuming our TT move fails high, at least one more move also fails high
                     // So we can probably safely prune the entire tree
@@ -995,10 +995,10 @@ namespace Search
                     // Regular non-PV node search
                     score = -negamax<NON_PV>(position, curr_depth - 1, -alpha - 1, -alpha, curr_data);
                     // Redo a PV node search if move not refuted
-                    if (score > alpha && score < beta)
+                    if (PvNode && score > alpha && score < beta)
                     {
                         // But before add a bonus to the move
-                        hist.add_bonus(move, depth);
+                        hist.add_bonus(move, Ply, piece, depth);
                         score = -negamax<PV>(position, curr_depth - 1, -beta, -alpha, curr_data);
                     }
                 }
@@ -1015,7 +1015,7 @@ namespace Search
             if (didLMR && do_full_search)
             {
                 int bonus = score > best_score ? depth : -depth;
-                hist.add_bonus(move, bonus);
+                hist.add_bonus(move, Ply, piece, bonus);
             }
 
             // New best move
