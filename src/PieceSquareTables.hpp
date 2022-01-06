@@ -1,5 +1,6 @@
 #pragma once
 #include "Types.hpp"
+#include <iostream>
 
 using S = MixedScore;
 
@@ -82,7 +83,7 @@ constexpr MixedScore piece_square(Piece piece, Square square, Turn turn)
     // Correct piece position for table lookup
     int sq_rank = (turn == WHITE) ? rank(square) : (7 - rank(square));
     if (piece == PAWN)
-        return psq_table_pawns[sq_rank - 1][file(square)];
+        return sq_rank < 7 ? psq_table_pawns[sq_rank - 1][file(square)] : MixedScore(0, 0);
     else
         return psq_table[piece - 1][sq_rank][horizontal_distance(square)];
 }
