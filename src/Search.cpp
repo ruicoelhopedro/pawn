@@ -344,7 +344,7 @@ namespace Search
         if (limits.time[turn] >= 0)
         {
             // Number of expected remaining moves
-            int n_expected_moves = std::max(1, std::min(50, limits.movestogo));
+            int n_expected_moves = limits.movestogo != INT32_MAX ? limits.movestogo : 25;
             int time_remaining = limits.time[turn] + limits.incr[turn] * n_expected_moves;
 
             // This move will use 1/n_expected_moves of the remaining time
