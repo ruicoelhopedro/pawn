@@ -755,7 +755,6 @@ namespace Search
                 // Update histories for quiet TT moves
                 if (tt_move != MOVE_NULL && !tt_move.is_capture() && !tt_move.is_promotion())
                 {
-                    PieceType piece = static_cast<PieceType>(position.board().get_piece_at(tt_move.from()));
                     if (tt_score >= beta)
                         hist.fail_high(tt_move);
                     else
