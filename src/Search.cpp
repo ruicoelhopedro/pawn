@@ -876,7 +876,7 @@ namespace Search
                           << " currmovenumber " << n_moves << std::endl;
 
             // Shallow depth prunings
-            if (!RootSearch && position.board().non_pawn_material(Turn) && !IsCheck && best_score > -SCORE_MATE_FOUND)
+            if (!PvNode && position.board().non_pawn_material(Turn) && !IsCheck && best_score > -SCORE_MATE_FOUND)
             {
                 if (move.is_capture() || move.is_promotion())
                 {
@@ -925,7 +925,7 @@ namespace Search
                     curr_data |= EXTENDED;
                     curr_depth++;
                 }
-                else if (singularBeta >= beta)
+                else if (!PvNode && singularBeta >= beta)
                 {
                     // Multi-cut pruning: assuming our TT move fails high, at least one more move also fails high
                     // So we can probably safely prune the entire tree
