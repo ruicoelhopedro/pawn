@@ -144,7 +144,7 @@ namespace Search
         Depth m_seldepth;
         SearchData m_data;
         Position m_position;
-        ThreadStatus m_local_status;
+        std::atomic<ThreadStatus> m_local_status;
 
         ThreadStatus receive_signal();
 
@@ -165,8 +165,8 @@ namespace Search
     };
 
 
-    extern ThreadStatus status;
-    extern int64_t nodes_searched;
+    extern std::atomic<ThreadStatus> status;
+    extern std::atomic_int64_t nodes_searched;
     extern Position* base_position;
     extern std::mutex mutex;
     extern std::condition_variable cvar;
@@ -177,7 +177,6 @@ namespace Search
 
     namespace Parameters
     {
-        extern Depth depth;
         extern int multiPV;
         extern int n_threads;
         extern Limits limits;
@@ -215,7 +214,7 @@ namespace Search
     void get_pv(Position& position, Depth depth, MoveList& pv);
 
 
-    Score aspiration_search(Position& position, Score init_score, Depth depth, Color color, SearchData& data);
+    Score aspiration_search(Position& position, Score init_score, Depth depth, SearchData& data);
 
 
     Score iter_deepening(Position& position, SearchData& data);
