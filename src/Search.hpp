@@ -11,24 +11,10 @@
 #include <mutex>
 #include <condition_variable>
 
+class Thread;
+
 namespace Search
 {
-    constexpr int PV_LENGTH = NUM_MAX_MOVES;
-    constexpr int TOTAL_PV_LENGTH = (PV_LENGTH * PV_LENGTH + PV_LENGTH) / 2;
-
-    enum class ThreadStatus
-    {
-        WAITING,
-        SEARCHING,
-        QUITTING
-    };
-
-    struct PvContainer
-    {
-        Move pv[TOTAL_PV_LENGTH];
-        Move prev_pv[PV_LENGTH];
-    };
-
     struct Limits
     {
         std::vector<Move> searchmoves;
@@ -41,7 +27,6 @@ namespace Search
         int mate;
         int movetime;
         bool infinite;
-        int64_t end_time;
 
         Limits()
             : searchmoves(0)
@@ -51,11 +36,47 @@ namespace Search
             incr[WHITE] = incr[BLACK] = 0;
             mate = 0;
             depth = NUM_MAX_DEPTH;
-            movestogo = movetime = INT32_MAX;
-            end_time = INT64_MAX;
+            movestogo = movetime = -1;
             nodes = INT64_MAX;
         }
     };
+
+
+    class Time
+    {
+        bool m_ponder;
+        bool m_managed;
+        int m_movetime;
+        std::chrono::steady_clock::time_point m_start;
+        std::chrono::steady_clock::time_point m_end;
+
+        int diff(std::chrono::steady_clock::time_point a, std::chrono::steady_clock::time_point b) const;
+
+    public:
+        Time(bool ponder = false);
+        Time(int movetime_ms, bool ponder = false);
+
+        void ponderhit();
+
+        int elapsed() const;
+        int remaining() const;
+        bool time_management() const;
+        bool pondering() const;
+    };
+
+
+    class MultiPVData
+    {
+        Move moves[NUM_MAX_MOVES];
+
+    public:
+        Move bestmove;
+        Score score;
+        MoveList pv;
+    
+        MultiPVData();
+    };
+
 
     enum SearchType
     {
@@ -93,7 +114,7 @@ namespace Search
         Histories& m_histories;
         const SearchData* m_prev;
         Move m_excluded_move;
-        int m_thread_id;
+        Thread& m_thread;
         Score m_static_eval;
         Move m_move;
         Move* m_pv;
@@ -101,32 +122,36 @@ namespace Search
         bool m_isPv;
 
     public:
-        SearchData(Histories& histories, int thread_id, int64_t& nodes_searched, Depth& seldepth, Move* pv, Move* prev_pv);
+        SearchData(Thread& thread);
 
         SearchData next(Move move) const;
 
-        Histories& histories() const;
+        int ply() const;
         int reductions() const;
         int extensions() const;
-        int ply() const;
-        Move excluded_move() const;
-        int thread() const;
-        Score& static_eval();
-        Score static_eval() const;
-        Move last_move() const;
-        SearchFlags flags() const;
-        const SearchData* previous(int distance = 1) const;
-        int64_t& nodes_searched();
-        Depth& seldepth();
         bool in_pv() const;
-        Move* pv();
         Move pv_move();
+        Move last_move() const;
+        Move excluded_move() const;
+        Move* pv();
+        Score static_eval() const;
+        Score& static_eval();
+        Depth& seldepth();
+        Thread& thread() const;
+        int64_t& nodes_searched();
+        Histories& histories() const;
+        SearchFlags flags() const;
+        const Time& time() const;
+
+        const SearchData* previous(int distance = 1) const;
 
         void exclude(Move move);
 
         void update_pv(Move best_move, Move* new_pv);
         void accept_pv();
         void clear_pv();
+
+        bool timeout() const;
 
         SearchData& operator|=(SearchFlags flag);
         SearchData& operator^=(SearchFlags flag);
@@ -135,83 +160,21 @@ namespace Search
     };
 
 
-    class SearchThread
-    {
-        int m_id;
-        std::unique_ptr<Histories> m_histories;
-        std::unique_ptr<PvContainer> m_pv;
-        int64_t m_nodes_searched;
-        Depth m_seldepth;
-        SearchData m_data;
-        Position m_position;
-        std::atomic<ThreadStatus> m_local_status;
-
-        ThreadStatus receive_signal();
-
-    public:
-        SearchThread(int id);
-
-        void thread_loop();
-
-        void set_position(const Position& pos);
-
-        void start_search();
-
-        Histories& histories();
-        SearchData& data();
-        ThreadStatus status() const;
-
-        std::thread thread;
-    };
-
-
-    extern std::atomic<ThreadStatus> status;
-    extern std::atomic_int64_t nodes_searched;
-    extern Position* base_position;
-    extern std::mutex mutex;
-    extern std::condition_variable cvar;
-    extern std::vector<std::unique_ptr<SearchThread>> threads;
-    extern std::chrono::steady_clock::time_point start_time;
-    extern std::chrono::steady_clock::time_point end_time;
-
-
     namespace Parameters
     {
         extern int multiPV;
         extern int n_threads;
-        extern Limits limits;
         extern bool ponder;
     }
-
-
-    bool timeout();
-
-
-    void signal_threads(ThreadStatus signal);
-
-
-    void set_num_threads(int n_threads);
-
-
-    void start_search_threads();
-
-
-    void stop_search_threads();
-
-
-    void kill_search_threads();
 
 
     void go_perft(Depth depth);
 
 
-    void thread_search(int id);
+    Time update_time(const Position& position, Limits limits);
 
 
-    void update_time();
-
-
-    void get_pv(Position& position, Depth depth, MoveList& pv);
+    void get_pv(SearchData& data, MoveList& pv);
 
 
     Score aspiration_search(Position& position, Score init_score, Depth depth, SearchData& data);

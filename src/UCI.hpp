@@ -25,6 +25,7 @@ namespace UCI
     void isready(Stream& stream);
 
     void test();
+    void perft(Stream& stream);
     void tt_query();
     void bench(Stream& stream);
 

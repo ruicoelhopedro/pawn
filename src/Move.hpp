@@ -239,3 +239,14 @@ public:
         return *this;
     }
 };
+
+
+constexpr int PV_LENGTH = NUM_MAX_MOVES;
+constexpr int TOTAL_PV_LENGTH = (PV_LENGTH * PV_LENGTH + PV_LENGTH) / 2;
+
+struct PvContainer
+{
+    Move pv[TOTAL_PV_LENGTH];
+    Move prev_pv[PV_LENGTH];
+};
+

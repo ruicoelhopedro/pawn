@@ -4,6 +4,7 @@
 #include "Zobrist.hpp"
 #include "Search.hpp"
 #include "UCI.hpp"
+#include "Thread.hpp"
 #include <chrono>
 #include <sstream>
 
@@ -13,8 +14,7 @@ int main(int argc, char** argv)
     Bitboards::init_bitboards();
     Zobrist::build_rnd_hashes();
     ttable = TranspositionTable<TranspositionEntry>(16);
-    Search::base_position = new Position();
-    Search::set_num_threads(1);
+    pool = new ThreadPool();
 
     // Handle passed arguments
     std::stringstream ss;
@@ -23,6 +23,6 @@ int main(int argc, char** argv)
             ss << argv[i] << ' ';
 
     UCI::main_loop(ss.str());
-
-    Search::kill_search_threads();
+    
+    delete pool;
 }

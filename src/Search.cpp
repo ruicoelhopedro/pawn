@@ -6,23 +6,13 @@
 #include "Search.hpp"
 #include "Evaluation.hpp"
 #include "Zobrist.hpp"
+#include "Thread.hpp"
 #include <atomic>
 #include <chrono>
 #include <vector>
 
 namespace Search
 {
-    std::atomic<ThreadStatus> status;
-    std::atomic_int64_t nodes_searched;
-    Position* base_position;
-    std::mutex mutex;
-    std::condition_variable cvar;
-    std::vector<std::unique_ptr<SearchThread>> threads;
-    std::chrono::steady_clock::time_point start_time;
-    std::chrono::steady_clock::time_point end_time;
-    std::vector<Move> multiPV_roots;
-    std::vector<Score> multiPV_scores;
-    std::vector<MoveList> multiPV_lists;
 
 
     namespace Parameters
@@ -34,13 +24,82 @@ namespace Search
     }
 
 
-    SearchData::SearchData(Histories& histories, int thread_id, int64_t& nodes_searched, Depth& seldepth, Move* pv, Move* prev_pv)
-        : m_ply(0), m_nodes_searched(nodes_searched), m_seldepth(seldepth), m_flags(NONE),
-          m_reductions(0), m_extensions(0), m_histories(histories), m_prev(nullptr),
-          m_excluded_move(MOVE_NULL), m_thread_id(thread_id), m_static_eval(SCORE_NONE),
-          m_move(MOVE_NULL), m_pv(pv), m_prev_pv(prev_pv), m_isPv(true)
+    Time::Time(bool ponder)
+        : m_ponder(ponder),
+          m_managed(false),
+          m_movetime(-1)
+    {
+        m_start = std::chrono::steady_clock::now();
+    }
+
+    Time::Time(int movetime_ms, bool ponder)
+        : m_ponder(ponder),
+          m_managed(true),
+          m_movetime(movetime_ms)
+    {
+        m_start = std::chrono::steady_clock::now();
+        m_end = m_start + std::chrono::milliseconds(movetime_ms);
+    }
+
+    void Time::ponderhit()
+    {
+        m_ponder = false;
+        if (m_managed)
+            m_end = std::chrono::steady_clock::now() + std::chrono::milliseconds(m_movetime);
+    }
+
+    int Time::diff(std::chrono::steady_clock::time_point a, std::chrono::steady_clock::time_point b) const
+    {
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(a - b).count() / 1000000;
+    }
+
+    int Time::elapsed() const
+    {
+        return diff(std::chrono::steady_clock::now(), m_start);
+    }
+
+    int Time::remaining() const
+    {
+        return (m_managed && !m_ponder) ? diff(m_end, std::chrono::steady_clock::now()) : INT32_MAX;
+    }
+
+    bool Time::pondering() const { return m_ponder; }
+
+
+    MultiPVData::MultiPVData()
+        : bestmove(MOVE_NULL),
+          score(-SCORE_NONE),
+          pv(moves)
     {
     }
+
+
+    SearchData::SearchData(Thread& thread)
+        : m_ply(0), m_nodes_searched(thread.m_nodes_searched), m_seldepth(thread.m_seldepth),
+          m_flags(NONE), m_reductions(0), m_extensions(0), m_histories(thread.m_histories),
+          m_prev(nullptr), m_excluded_move(MOVE_NULL), m_thread(thread),
+          m_static_eval(SCORE_NONE), m_move(MOVE_NULL), m_pv(thread.m_pv.pv),
+          m_prev_pv(thread.m_pv.prev_pv), m_isPv(true)
+    {
+    }
+
+
+    int SearchData::reductions() const { return m_reductions; }
+    int SearchData::extensions() const { return m_extensions; }
+    int SearchData::ply() const { return m_ply; }
+    bool SearchData::in_pv() const { return m_isPv; }
+    Move SearchData::excluded_move() const { return m_excluded_move; }
+    Move SearchData::last_move() const { return m_move; }
+    Move* SearchData::pv() { return m_pv; }
+    Move SearchData::pv_move() { return m_isPv ? *m_prev_pv : MOVE_NULL; }
+    Score SearchData::static_eval() const { return m_static_eval; }
+    Score& SearchData::static_eval() { return m_static_eval; }
+    Depth& SearchData::seldepth() { return m_seldepth; }
+    Thread& SearchData::thread() const { return m_thread; }
+    int64_t& SearchData::nodes_searched() { return m_nodes_searched; }
+    Histories& SearchData::histories() const { return m_histories; }
+    SearchFlags SearchData::flags() const { return m_flags; }
+    const Time& SearchData::time() const { return m_thread.m_time; }
 
 
     SearchData SearchData::next(Move move) const
@@ -66,59 +125,8 @@ namespace Search
         return result;
     }
 
-
-    Histories& SearchData::histories() const
-    {
-        return m_histories;
-    }
-
-
-    int SearchData::reductions() const
-    {
-        return m_reductions;
-    }
-
-
-    int SearchData::extensions() const
-    {
-        return m_extensions;
-    }
-
-
-    int SearchData::ply() const
-    {
-        return m_ply;
-    }
-
-
-    Move SearchData::excluded_move() const
-    {
-        return m_excluded_move;
-    }
-
-
-    int SearchData::thread() const
-    {
-        return m_thread_id;
-    }
-
-
-    Score& SearchData::static_eval()
-    {
-        return m_static_eval;
-    }
-
-
-    Score SearchData::static_eval() const
-    {
-        return m_static_eval;
-    }
-
-
-    Move SearchData::last_move() const
-    {
-        return m_move;
-    }
+    
+    void SearchData::exclude(Move move) { m_excluded_move = move; }
 
 
     const SearchData* SearchData::previous(int distance) const
@@ -127,42 +135,6 @@ namespace Search
         for (int i = 0; i < distance; i++)
             curr = curr->m_prev;
         return curr;
-    }
-
-
-    int64_t& SearchData::nodes_searched()
-    {
-        return m_nodes_searched;
-    }
-
-
-    Depth& SearchData::seldepth()
-    {
-        return m_seldepth;
-    }
-
-
-    bool SearchData::in_pv() const
-    {
-        return m_isPv;
-    }
-
-
-    Move* SearchData::pv()
-    {
-        return m_pv;
-    }
-
-
-    Move SearchData::pv_move()
-    {
-        return m_isPv ? *m_prev_pv : MOVE_NULL;
-    }
-
-
-    void SearchData::exclude(Move move)
-    {
-        m_excluded_move = move;
     }
 
 
@@ -201,11 +173,6 @@ namespace Search
     }
 
 
-    SearchFlags SearchData::flags() const
-    {
-        return m_flags;
-    }
-
 
     SearchData& SearchData::operator|=(SearchFlags flag)
     {
@@ -238,93 +205,22 @@ namespace Search
 
 
 
-    SearchThread::SearchThread(int id)
-        : m_id(id),
-          m_histories(std::make_unique<Histories>()),
-          m_pv(std::make_unique<PvContainer>()),
-          m_nodes_searched(0),
-          m_seldepth(0),
-          m_data(*m_histories, id, m_nodes_searched, m_seldepth, m_pv->pv, m_pv->prev_pv),
-          m_local_status(ThreadStatus::WAITING)
+    bool SearchData::timeout() const
     {
-        for (int i = 0; i < TOTAL_PV_LENGTH; i++)
-            m_pv->pv[i] = MOVE_NULL;
-        for (int i = 0; i < PV_LENGTH; i++)
-            m_pv->prev_pv[i] = MOVE_NULL;
-    }
-
-
-    ThreadStatus SearchThread::receive_signal()
-    {
-        std::unique_lock<std::mutex> lock(mutex);
-        cvar.wait(lock, [this]() { return Search::status != m_local_status; });
-        return Search::status;
-    }
-
-
-    void SearchThread::thread_loop()
-    {
-        m_local_status = ThreadStatus::WAITING;
-        while (m_local_status != ThreadStatus::QUITTING)
-        {
-            // Wait for a signal
-            m_local_status = ThreadStatus::WAITING;
-            m_local_status = receive_signal();
-
-            // Begin search
-            if (m_local_status == ThreadStatus::SEARCHING)
-                iter_deepening(m_position, m_data);
-        }
-    }
-
-
-    void SearchThread::set_position(const Position& pos)
-    {
-        m_position.update_from(pos);
-    }
-
-
-    void SearchThread::start_search()
-    {
-        ThreadStatus stored_status = m_local_status;
-        m_local_status = ThreadStatus::SEARCHING;
-        iter_deepening(m_position, m_data);
-        m_local_status = stored_status;
-    }
-
-
-    Histories& SearchThread::histories()
-    {
-        return *m_histories;
-    }
-
-
-    SearchData& SearchThread::data()
-    {
-        return m_data;
-    }
-
-
-    ThreadStatus SearchThread::status() const
-    {
-        return m_local_status;
-    }
-
-
-
-    bool timeout()
-    {
-        if (status.load(std::memory_order_relaxed) != ThreadStatus::SEARCHING)
+        // Aborted search
+        if (m_thread.m_pool.status().load(std::memory_order_relaxed) != ThreadStatus::SEARCHING)
             return true;
 
         // Never timeout in ponder mode
-        if (Parameters::limits.ponder)
+        if (m_thread.m_limits.ponder)
             return false;
 
-        if (std::chrono::steady_clock::now() > end_time)
+        // Remaining time
+        if (time().remaining() <= 0)
             return true;
 
-        if (nodes_searched > Parameters::limits.nodes)
+        // Approximate number of nodes
+        if (m_nodes_searched > m_thread.m_limits.nodes / Parameters::n_threads)
             return true;
 
         return false;
@@ -332,128 +228,33 @@ namespace Search
 
 
 
-    void update_time()
+    Time update_time(const Position& position, Limits limits)
     {
-        auto& limits = Parameters::limits;
-        Turn turn = base_position->get_turn();
+        Turn turn = position.get_turn();
 
-        // We use the initial movetime as reference
-        int movetime = limits.movetime;
+        // Fixed movetime
+        if (limits.movetime >= 0)
+            return Time(limits.movetime, limits.ponder);
 
         // With clock time
         if (limits.time[turn] >= 0)
         {
             // Number of expected remaining moves
-            int n_expected_moves = std::max(1, std::min(50, limits.movestogo));
+            int n_expected_moves = limits.movestogo >= 0 ? std::min(50, limits.movestogo) : 50;
             int time_remaining = limits.time[turn] + limits.incr[turn] * n_expected_moves;
 
             // This move will use 1/n_expected_moves of the remaining time
-            movetime = std::min(movetime, time_remaining / n_expected_moves);
+            int movetime = time_remaining / n_expected_moves;
+            return Time(movetime, limits.ponder);
         }
 
-        // Update end time accordingly
-        start_time = std::chrono::steady_clock::now();
-        if (!limits.ponder)
-            end_time = start_time + std::chrono::milliseconds(movetime);
+        // No time management
+        return Time(limits.ponder);
     }
 
 
 
-    int time_elapsed()
-    {
-        return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start_time).count() / 1e6;
-    }
-
-
-
-    void signal_threads(ThreadStatus signal)
-    {
-        {
-            std::unique_lock<std::mutex> lock(mutex);
-            status = signal;
-        }
-        cvar.notify_all();
-
-        // Wait until we are sure all threads received the signal
-        int remaining = threads.size();
-        while (remaining > 0)
-        {
-            cvar.notify_all();
-            remaining = threads.size();
-            for (auto& thread : threads)
-                if (thread->status() == status)
-                    remaining--;
-        }
-    }
-
-
-
-    void set_num_threads(int n_threads)
-    {
-        Parameters::n_threads = n_threads;
-
-        // Ensure all threads stop
-        kill_search_threads();
-
-        // Spawn new threads
-        threads.resize(n_threads);
-        status = ThreadStatus::WAITING;
-        for (int i = 0; i < n_threads; i++)
-        {
-            threads[i] = std::make_unique<SearchThread>(i);
-            auto& st = *threads[i];
-            st.set_position(*base_position);
-            st.thread = std::thread(&SearchThread::thread_loop, &st);
-        }
-    }
-
-
-
-    void start_search_threads()
-    {
-        nodes_searched = 0;
-        signal_threads(ThreadStatus::SEARCHING);
-    }
-
-
-
-    void stop_search_threads()
-    {
-        signal_threads(ThreadStatus::WAITING);
-    }
-
-
-
-    void kill_search_threads()
-    {
-        signal_threads(ThreadStatus::QUITTING);
-
-        for (auto& thread : threads)
-        {
-            while (true)
-            {
-                cvar.notify_all();
-                if (thread->thread.joinable())
-                {
-                    thread->thread.join();
-                    break;
-                }
-            }
-        }
-    }
-
-
-
-    void go_perft(Depth depth)
-    {
-        Position position = *base_position;
-        int64_t n_nodes = perft<true>(position, depth);
-        std::cout << "\nNodes searched: " << n_nodes << std::endl;
-    }
-
-
-
-    void get_pv(Position& position, SearchData& data, MoveList& pv)
+    void get_pv(SearchData& data, MoveList& pv)
     {
         pv.clear();
         Move* pos = data.pv();
@@ -487,7 +288,7 @@ namespace Search
         Score final_score = negamax<ROOT>(position, depth, alpha, beta, data);
 
         // Increase window in the failed side exponentially
-        while ((final_score <= alpha || final_score >= beta) && !(depth > 1 && timeout()))
+        while ((final_score <= alpha || final_score >= beta) && !(depth > 1 && data.timeout()))
         {
             bool upperbound = final_score <= alpha;
             Score bound = upperbound ? alpha : beta;
@@ -497,7 +298,7 @@ namespace Search
                 r_window *= 2;
 
             // Output some information
-            if (data.thread() == 0 && time_elapsed() > 3000)
+            if (data.thread().is_main() && data.time().elapsed() > 3000)
             {
                 std::cout << "info";
                 std::cout << " depth " << static_cast<int>(depth);
@@ -537,13 +338,10 @@ namespace Search
         Score score = -SCORE_INFINITE;
         Turn turn = position.get_turn();
         std::chrono::steady_clock::time_point begin_time = std::chrono::steady_clock::now();
-        bool main_thread = data.thread() == 0;
-        if (main_thread)
-        {
-            multiPV_roots.resize(maxPV);
-            multiPV_scores.resize(maxPV);
-            multiPV_lists.resize(maxPV);
-        }
+        Thread& thread = data.thread();
+        bool main_thread = thread.is_main();
+        auto& time = thread.time();
+        auto& limits = thread.limits();
 
         // Check aborted search
         auto moves = position.generate_moves(MoveGenType::LEGAL);
@@ -556,7 +354,8 @@ namespace Search
                 std::cout << "bestmove " << MOVE_NULL << std::endl;
                 
                  // Stop the search
-                status = ThreadStatus::WAITING;
+                if (thread.pool().status() == ThreadStatus::SEARCHING)
+                    thread.pool().stop();
             }
             return SCORE_NONE;
         }
@@ -564,52 +363,42 @@ namespace Search
         Move bestmove = MOVE_NULL;
         Move pondermove = MOVE_NULL;
 
-        // Iterative deepening
+        // Clear data
         data.histories().clear();
+        data.nodes_searched() = 0;
+
+        // Iterative deepening
         for (int iDepth = 1;
-             iDepth < NUM_MAX_DEPTH && (iDepth <= Parameters::limits.depth || Parameters::ponder);
+             iDepth < NUM_MAX_DEPTH && (iDepth <= limits.depth || time.pondering());
              iDepth++)
         {
             // Set depth timer
             std::chrono::steady_clock::time_point depth_begin = std::chrono::steady_clock::now();
 
             // Reset counters and multiPV data
-            if (main_thread)
-            {
-                data.seldepth() = 0;
-                for (int iPv = 0; iPv < maxPV; iPv++)
-                {
-                    multiPV_roots[iPv] = MOVE_NULL;
-                    multiPV_lists[iPv] = pv_stack.list(iPv);
-                }
-            }
+            data.seldepth() = 0;
 
             // MultiPV loop
-            for (int iPv = 0; iPv < maxPV; iPv++)
+            for (auto& multiPV : thread.multiPVs())
             {
                 // Carry the aspirated search
-                Score curr_score = aspiration_search(position, score, iDepth + data.thread() / 2, data);
-
-                // Store the score for the first PV as initial value for the next aspirated search
-                if (iPv == 0)
-                    score = curr_score;
+                Score prev_score = multiPV.score;
+                Depth depth = iDepth + thread.id() / 2;
+                Score curr_score = aspiration_search(position, prev_score, depth, data);
 
                 // Timeout?
-                if (iDepth > 1 && timeout())
+                if (iDepth > 1 && data.timeout())
                     break;
 
                 // Store PV results
                 data.accept_pv();
-                if (main_thread)
-                {
-                    get_pv(position, data, multiPV_lists[iPv]);
-                    multiPV_scores[iPv] = curr_score;
-                    multiPV_roots[iPv] = *multiPV_lists[iPv].begin();
-                }
+                get_pv(data, multiPV.pv);
+                multiPV.score = curr_score;
+                multiPV.bestmove = *multiPV.pv.begin();
             }
 
             // Timeout?
-            if (iDepth > 1 && timeout())
+            if (iDepth > 1 && data.timeout())
                 break;
 
             // Additional tasks for main thread: output information, bestmove and check if we need to stop
@@ -621,41 +410,43 @@ namespace Search
                 double elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(depth_end - begin_time).count() / 1e9;
 
                 // Output information
-                int64_t nodes = nodes_searched.load(std::memory_order_acquire);
-                for (int iPv = 0; iPv < maxPV; iPv++)
+                int64_t nodes = thread.pool().nodes_searched();
+                int iPv = 0;
+                for (auto& multiPV : thread.multiPVs())
                 {
+                    iPv++;
                     std::cout << "info";
                     std::cout << " depth " << iDepth;
                     std::cout << " seldepth " << static_cast<int>(data.seldepth());
-                    std::cout << " multipv " << iPv + 1;
-                    if (is_mate(multiPV_scores[iPv]))
-                        std::cout << " score mate " << mate_in(multiPV_scores[iPv]);
+                    std::cout << " multipv " << iPv;
+                    if (is_mate(multiPV.score))
+                        std::cout << " score mate " << mate_in(multiPV.score);
                     else
-                        std::cout << " score cp " << multiPV_scores[iPv];
+                        std::cout << " score cp " << multiPV.score;
                     std::cout << " nodes " << nodes;
                     std::cout << " nps " << static_cast<int>(nodes / elapsed);
                     std::cout << " hashfull " << ttable.hashfull();
                     std::cout << " time " << std::max(1, static_cast<int>(elapsed * 1000));
-                    std::cout << " pv " << multiPV_lists[iPv];
+                    std::cout << " pv " << multiPV.pv;
                     std::cout << std::endl;
                 }
 
                 // Update best and ponder moves
-                auto best_pv = multiPV_lists[0];
+                auto best_pv = thread.multiPVs().front().pv;
                 auto move_ptr = best_pv.begin();
                 bestmove = *move_ptr;
                 pondermove = (best_pv.length() > 1) ? *(move_ptr + 1) : MOVE_NULL;
 
                 // Additional time stopping conditions
-                score = multiPV_scores[0];
+                score = thread.multiPVs().front().score;
                 bool time_management = Parameters::limits.time[turn] >= 0;
                 if (time_management &&
                     !Parameters::limits.ponder &&
                     !Parameters::limits.infinite)
                 {
-                    double remaining = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - std::chrono::steady_clock::now()).count() / 1e9;
+                    double remaining = data.time().remaining() / 1e3;
                     // Best move mate or do we expect not to have time for one more iteration?
-                    if (abs(score) > SCORE_MATE_FOUND ||
+                    if (is_mate(score) ||
                         (remaining > 0 && remaining < time_depth * 1.5))
                         break;
                 }
@@ -677,7 +468,8 @@ namespace Search
             std::cout << std::endl;
 
             // Stop the search
-            status = ThreadStatus::WAITING;
+            if (thread.pool().status() == ThreadStatus::SEARCHING)
+                thread.pool().stop();
         }
 
         return score;
@@ -705,7 +497,7 @@ namespace Search
         }
 
         // Timeout?
-        if (depth > 1 && timeout())
+        if (depth > 1 && data.timeout())
             return SCORE_NONE;
 
         // Mate distance prunning: don't bother searching if we are deeper than the shortest mate up to this point
@@ -806,7 +598,6 @@ namespace Search
             Depth new_depth = reduce(depth, 1 + reduction);
             SearchData curr_data = data.next(MOVE_NULL) | REDUCED;
             position.make_null_move();
-            nodes_searched.fetch_add(1, std::memory_order_relaxed);
             data.nodes_searched()++;
             Score null = -negamax<NON_PV>(position, new_depth, -beta, -beta + 1, curr_data);
             position.unmake_null_move();
@@ -850,8 +641,8 @@ namespace Search
             if (RootSearch && Parameters::multiPV > 1)
             {
                 bool found = false;
-                for (auto root_moves : multiPV_roots)
-                    found |= (root_moves == move);
+                for (auto multiPV : data.thread().multiPVs())
+                    found |= (multiPV.bestmove == move);
                 if (found)
                     continue;
             }
@@ -867,8 +658,8 @@ namespace Search
             }
 
             // Output some information during search
-            if (RootSearch && data.thread() == 0 &&
-                time_elapsed() > 3000)
+            if (RootSearch && data.thread().is_main() &&
+                data.time().elapsed() > 3000)
                 std::cout << "info depth " << static_cast<int>(depth)
                           << " currmove " << move.to_uci()
                           << " currmovenumber " << n_moves << std::endl;
@@ -936,7 +727,6 @@ namespace Search
             bool captureOrPromotion = move.is_capture() || move.is_promotion();
             PieceType piece = static_cast<PieceType>(position.board().get_piece_at(move.from()));
             position.make_move(move);
-            nodes_searched.fetch_add(1, std::memory_order_relaxed);
             data.nodes_searched()++;
 
             // Late move reductions
@@ -945,7 +735,7 @@ namespace Search
             if (depth > 4 &&
                 move_number > 3 &&
                 (!PvNode || !captureOrPromotion) &&
-                data.thread() % 3 < 2)
+                data.thread().id() % 3 < 2)
             {
                 didLMR = true;
                 int reduction = 3 + (move_number - 4) / 8 - captureOrPromotion - PvNode;
@@ -999,7 +789,7 @@ namespace Search
             position.unmake_move();
 
             // Timeout?
-            if (depth > 2 && timeout())
+            if (depth > 2 && data.timeout())
                 return SCORE_NONE;
 
             // Update histories after passed LMR
@@ -1052,7 +842,7 @@ namespace Search
         }
 
         // TT store (except at root in non-main threads)
-        if (!(RootSearch && data.thread() != 0))
+        if (!(RootSearch && !data.thread().is_main()))
         {
             Hash hash = HasExcludedMove ? position.hash() ^ Zobrist::get_move_hash(data.excluded_move()) : position.hash();
             EntryType type = best_score >= beta                  ? EntryType::LOWER_BOUND
@@ -1163,7 +953,6 @@ namespace Search
             // PVS
             Score score;
             position.make_move(move);
-            nodes_searched.fetch_add(1, std::memory_order_relaxed);
             data.nodes_searched()++;
             auto curr_data = data.next(move);
             if (PvNode && best_move == MOVE_NULL)

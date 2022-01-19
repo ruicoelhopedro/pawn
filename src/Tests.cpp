@@ -3,6 +3,7 @@
 #include "Search.hpp"
 #include "Tests.hpp"
 #include "Types.hpp"
+#include "Thread.hpp"
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -231,17 +232,14 @@ namespace Tests
     void bench_tests(Depth depth, const std::vector<std::string>& tests)
     {
         // Set target depth
-        Search::Parameters::limits = Search::Limits();
-        Search::Parameters::limits.depth = depth;
-
-        // Prepare search thread
-        Search::SearchThread thread(0);
+        Search::Limits limits;
+        limits.depth = depth;
 
         // Prepare some data
         int index = 0;
         int64_t n_nodes = 0;
         int n_tests = tests.size();
-        auto start_time = std::chrono::steady_clock::now();
+        Search::Time total_time;
 
         // Run each position
         for (auto& test : tests)
@@ -249,24 +247,21 @@ namespace Tests
             // Prepare search
             index++;
             ttable.clear();
-            Search::nodes_searched = 0;
-            thread.data().nodes_searched() = 0;
-            thread.set_position(Position(test));
+            pool->position().update_from(test);
+            pool->update_position_threads();
             std::cout << "\nPosition " << index << "/" << n_tests << ": " << test << std::endl;
 
             // Run the search
-            Search::status = Search::ThreadStatus::SEARCHING;
-            Search::update_time();
-            thread.start_search();
-            Search::status = Search::ThreadStatus::WAITING;
+            Search::Time time;
+            pool->search(limits, time, true);
 
             // Update node counts
-            n_nodes += thread.data().nodes_searched();
+            n_nodes += pool->nodes_searched();
             std::cout << std::endl;
         }
 
         // Node counts and nps
-        double elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start_time).count() / 1e9;
+        double elapsed = total_time.elapsed() / 1e3;
         int64_t nps = n_nodes / elapsed;
 
         // Final output

@@ -1,6 +1,7 @@
 #include "Evaluation.hpp"
 #include "Search.hpp"
 #include "Tests.hpp"
+#include "Thread.hpp"
 #include "Transpositions.hpp"
 #include "Types.hpp"
 #include "UCI.hpp"
@@ -56,11 +57,13 @@ namespace UCI
 
             // Non-UCI commands
             else if (token == "board")
-                std::cout << Search::base_position->board() << std::endl;
+                std::cout << pool->position().board() << std::endl;
             else if (token == "eval")
-                evaluation(*Search::base_position, true);
+                evaluation(pool->position(), true);
             else if (token == "test")
                 test();
+            else if (token == "perft")
+                perft(stream);
             else if (token == "tt")
                 tt_query();
             else if (token == "bench")
@@ -76,7 +79,7 @@ namespace UCI
         }
 
         // Ensure search threads are stopped on exit
-        Search::stop_search_threads();
+        pool->kill_threads();
     }
 
 
@@ -122,9 +125,15 @@ namespace UCI
                 ttable.resize(Options::hash);
             }
             else if (name == "MultiPV")
+            {
                 Search::Parameters::multiPV = std::min(std::max(std::stoi(value), 1), 255);
+                pool->update_multiPV(Search::Parameters::multiPV);
+            }
             else if (name == "Threads")
-                Search::set_num_threads(std::min(std::max(std::stoi(value), 1), 512));
+            {
+                Search::Parameters::n_threads = std::min(std::max(std::stoi(value), 1), 512);
+                pool->resize(Search::Parameters::n_threads);
+            }
             else if (name == "Ponder")
                 Search::Parameters::ponder = (value == "true");
             else
@@ -137,14 +146,13 @@ namespace UCI
     void go(Stream& stream)
     {
         std::string token;
-        int perft_depth = 0;
-        auto& limits = Search::Parameters::limits;
+        Search::Limits limits;
 
         limits = Search::Limits();
         while (stream >> token)
             if (token == "searchmoves")
                 while (stream >> token)
-                    limits.searchmoves.push_back(move_from_uci(*Search::base_position, token));
+                    limits.searchmoves.push_back(move_from_uci(pool->position(), token));
             else if (token == "wtime")
                 stream >> limits.time[WHITE];
             else if (token == "btime")
@@ -167,39 +175,29 @@ namespace UCI
                 limits.infinite = true;
             else if (token == "ponder")
                 limits.ponder = true;
-            else if (token == "perft")
-                stream >> perft_depth;
 
-        // Check if perft search
-        if (perft_depth > 0)
-        {
-            Search::go_perft(perft_depth);
-            return;
-        }
-
-        Search::update_time();
-        Search::start_search_threads();
+        Search::Time time = Search::update_time(pool->position(), limits);
+        pool->search(limits, time);
     }
 
 
 
     void stop(Stream& stream)
     {
-        Search::stop_search_threads();
+        pool->stop();
     }
 
 
 
     void quit(Stream& stream)
     {
-        Search::stop_search_threads();
     }
 
 
 
     void position(Stream& stream)
     {
-        Position& pos = *Search::base_position;
+        Position& pos = pool->position();
 
         std::string token;
         stream >> token;
@@ -234,18 +232,14 @@ namespace UCI
 
         // After all moves are pushed, prepare the position for search
         pos.prepare();
-
-        // Update positions in search threads
-        for (auto& thread : Search::threads)
-            thread->set_position(pos);
+        pool->update_position_threads();
     }
 
 
 
     void ponderhit(Stream& stream)
     {
-        Search::Parameters::limits.ponder = false;
-        Search::update_time();
+        pool->ponderhit();
     }
 
 
@@ -253,7 +247,7 @@ namespace UCI
     void ucinewgame(Stream& stream)
     {
         ttable.clear();
-        Search::set_num_threads(Search::Parameters::n_threads);
+        //Search::set_num_threads(Search::Parameters::n_threads);
     }
 
 
@@ -301,9 +295,21 @@ namespace UCI
 
 
 
+    void perft(Stream& stream)
+    {
+        int depth;
+        if (stream >> depth)
+        {
+            int64_t nodes = Search::perft<true>(pool->position(), depth);
+            std::cout << "\nNodes searched: " << nodes << std::endl;
+        }
+    }
+
+
+
     void tt_query()
     {
-        const Position& pos = *Search::base_position;
+        const Position& pos = pool->position();
         TranspositionEntry* entry;
         if (ttable.query(pos.hash(), &entry))
         {
