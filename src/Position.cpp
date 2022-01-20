@@ -608,7 +608,6 @@ Bitboard Board::sliders() const
 Position::Position()
     : m_boards(1)
 {
-    m_boards.reserve(NUM_BOARDS);
 }
 
 

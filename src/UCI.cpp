@@ -117,7 +117,10 @@ namespace UCI
             else if (name == "MultiPV")
                 Search::Parameters::multiPV = std::min(std::max(std::stoi(value), 1), 255);
             else if (name == "Threads")
+            {
                 Search::Parameters::n_threads = std::min(std::max(std::stoi(value), 1), 512);
+                Search::position_threads.resize(Search::Parameters::n_threads);
+            }
             else if (name == "Ponder")
                 Search::Parameters::ponder = (value == "true");
             else

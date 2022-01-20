@@ -16,6 +16,7 @@ namespace Search
     int64_t nodes_searched;
     Position* base_position;
     std::vector<std::thread> threads;
+    std::vector<Position> position_threads;
     std::chrono::steady_clock::time_point start_time;
     std::chrono::steady_clock::time_point end_time;
     std::vector<Move> multiPV_roots;
@@ -344,9 +345,9 @@ namespace Search
 
     void thread_search(int id)
     {
-        Position position = *base_position;
+        position_threads[id].update_from(*base_position);
         auto thread_data = std::make_unique<SearchThread>(id);
-        iter_deepening(position, thread_data->data());
+        iter_deepening(position_threads[id], thread_data->data());
     }
 
 

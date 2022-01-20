@@ -12,6 +12,7 @@ int main()
     Zobrist::build_rnd_hashes();
     ttable = TranspositionTable<TranspositionEntry>(16);
     Search::base_position = new Position();
+    Search::position_threads.push_back(*Search::base_position);
 
     UCI::main_loop();
 }

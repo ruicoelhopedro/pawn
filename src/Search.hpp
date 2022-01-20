@@ -145,6 +145,7 @@ namespace Search
     extern int64_t nodes_searched;
     extern Position* base_position;
     extern std::vector<std::thread> threads;
+    extern std::vector<Position> position_threads;
     extern std::chrono::steady_clock::time_point start_time;
     extern std::chrono::steady_clock::time_point end_time;
 
