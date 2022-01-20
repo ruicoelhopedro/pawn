@@ -22,6 +22,8 @@ constexpr int NUM_CASTLE_SIDES = 2;
 
 constexpr int NUM_MAX_MOVES = 256;
 constexpr Depth NUM_MAX_DEPTH = 200;
+constexpr Depth NUM_MAX_PLY = 250;
+constexpr int NUM_BOARDS = 400;
 
 
 enum Turn : int8_t
@@ -52,13 +54,13 @@ enum PieceType : int8_t
 
 enum BoardPieces : int8_t
 {
-    NO_PIECE = 2 * PIECE_NONE,
-    W_PAWN = 2 * PAWN,
-    W_KNIGHT = 2 * KNIGHT,
-    W_BISHOP = 2 * BISHOP,
-    W_ROOK = 2 * ROOK,
-    W_QUEEN = 2 * QUEEN,
-    W_KING = 2 * KING,
+    NO_PIECE = 0,
+    W_PAWN = 2 * PAWN + 1,
+    W_KNIGHT = 2 * KNIGHT + 1,
+    W_BISHOP = 2 * BISHOP + 1,
+    W_ROOK = 2 * ROOK + 1,
+    W_QUEEN = 2 * QUEEN + 1,
+    W_KING = 2 * KING + 1,
     B_PAWN = W_PAWN + 1,
     B_KNIGHT = W_KNIGHT + 1,
     B_BISHOP = W_BISHOP + 1,
@@ -107,7 +109,8 @@ enum Squares : int8_t
 enum CastleSide
 {
     KINGSIDE = 0,
-    QUEENSIDE = 1
+    QUEENSIDE = 1,
+    NO_SIDE = 2
 };
 
 
@@ -146,7 +149,7 @@ public:
     inline constexpr Score middlegame() const { return mg; }
     inline constexpr Score endgame() const { return eg; }
 
-    inline constexpr Score tapered(uint8_t phase_entry) const
+    inline constexpr Score tapered(int8_t phase_entry) const
     {
         int phase = (phase_entry * 256 + (Phases::Total / 2)) / Phases::Total;
         return ((mg * (256 - phase)) + (eg * phase)) / 256;
@@ -194,6 +197,9 @@ constexpr int rank(Square square) { return square / 8; }
 constexpr int file(Square square) { return square % 8; }
 constexpr Square make_square(int rank, int file) { return file + 8 * rank; }
 
+template<Turn TURN>
+constexpr int rank_relative(Square square) { return TURN == WHITE ? rank(square) : 7 - rank(square); }
+
 
 constexpr Color turn_to_color(Turn turn) { return (turn == WHITE) ? WHITE_COLOR : BLACK_COLOR; }
 constexpr Turn color_to_turn(Color color) { return (color == WHITE_COLOR) ? WHITE : BLACK; }
@@ -206,24 +212,15 @@ constexpr Turn operator~(const Turn& other) { return (other == WHITE) ? BLACK : 
 constexpr Color operator-(const Color& other) { return static_cast<Color>(-static_cast<int>(other)); }
 
 
-constexpr BoardPieces get_board_piece(Piece piece, Turn turn) { return static_cast<BoardPieces>(2 * piece + turn); }
+constexpr BoardPieces get_board_piece(Piece piece, Turn turn) { return static_cast<BoardPieces>(2 * piece + turn + 1); }
+constexpr Piece get_piece(BoardPieces bpc) { return static_cast<Piece>((bpc - 1) / 2); }
+constexpr Turn get_turn(BoardPieces bpc) { return ((bpc - 1) % 2 == 0) ? WHITE : BLACK; }
 
 
 constexpr bool is_mate(const Score& score)
 {
     Score abs_score = (score >= 0 ? score : -score);
     return abs_score >= SCORE_MATE_FOUND && abs_score <= SCORE_MATE;
-}
-
-
-constexpr Score update_score(const Score& score, int depth = 1)
-{
-    // Non-mate score
-    if (!is_mate(score))
-        return score;
-
-    // Mate score -> subtract one depth in the correct side
-    return (score > 0) ? score - depth : score + depth;
 }
 
 
@@ -262,12 +259,6 @@ inline constexpr Square horizontal_distance(Square square)
 {
     int this_file = file(square);
     return std::min(this_file, 7 - this_file);
-}
-
-
-inline constexpr Square vertical_mirror(Square square)
-{
-    return file(square) + (7 - rank(square));
 }
 
 

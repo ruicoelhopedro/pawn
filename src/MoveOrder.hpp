@@ -53,6 +53,7 @@ class MoveOrder
 {
     Position& m_position;
     Depth m_depth;
+    Depth m_ply;
     Move m_hash_move;
     const Histories& m_histories;
     Move m_prev_move;
@@ -148,7 +149,7 @@ class MoveOrder
 
 
 public:
-    MoveOrder(Position& pos, Depth depth, Move hash_move, const Histories& histories, Move prev_move, bool quiescence = false);
+    MoveOrder(Position& pos, Depth depth, Depth ply, Move hash_move, const Histories& histories, Move prev_move, bool quiescence = false);
 
     Move next_move();
 

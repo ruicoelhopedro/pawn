@@ -432,7 +432,6 @@ namespace Search
         int maxPV = std::min(position.generate_moves(MoveGenType::LEGAL).lenght(), Parameters::multiPV);
 
         Score score = -SCORE_INFINITE;
-        MoveStack pv_stack(maxPV);
         Color color = turn_to_color(position.get_turn());
         std::chrono::steady_clock::time_point begin_time = std::chrono::steady_clock::now();
         bool main_thread = data.thread() == 0;
@@ -447,7 +446,6 @@ namespace Search
         Move pondermove = MOVE_NULL;
 
         // Iterative deepening
-        position.set_init_ply();
         for (int iDepth = 1;
              iDepth < NUM_MAX_DEPTH && (iDepth <= Parameters::limits.depth || Parameters::ponder);
              iDepth++)
@@ -463,7 +461,6 @@ namespace Search
                 for (int iPv = 0; iPv < maxPV; iPv++)
                 {
                     multiPV_roots[iPv] = MOVE_NULL;
-                    multiPV_lists[iPv] = pv_stack.list(iPv);
                 }
             }
 
@@ -564,7 +561,7 @@ namespace Search
         const bool HasExcludedMove = data.excluded_move() != MOVE_NULL;
         const bool IsCheck = position.is_check();
         const Turn Turn = position.get_turn();
-        const Depth Ply = position.ply();
+        const Depth Ply = data.ply();
 
         if (PvNode)
         {
@@ -694,7 +691,7 @@ namespace Search
         Move quiet_list[NUM_MAX_MOVES];
         MoveList quiets_searched(quiet_list);
         Move hash_move = (data.in_pv() && data.pv_move() != MOVE_NULL) ? data.pv_move() : tt_move;
-        MoveOrder orderer = MoveOrder(position, depth, hash_move, data.histories(), data.last_move());
+        MoveOrder orderer = MoveOrder(position, depth, Ply, hash_move, data.histories(), data.last_move());
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;
@@ -938,7 +935,7 @@ namespace Search
         constexpr bool PvNode = ST == PV;
         const bool IsCheck = position.is_check();
         const Turn Turn = position.get_turn();
-        const Depth Ply = position.ply();
+        const Depth Ply = data.ply();
 
         if (PvNode)
         {
@@ -1015,7 +1012,7 @@ namespace Search
         Move move;
         int n_moves = 0;
         Move best_move = MOVE_NULL;
-        MoveOrder orderer = MoveOrder(position, 0, tt_move, data.histories(), MOVE_NULL, true);
+        MoveOrder orderer = MoveOrder(position, 0, Ply, tt_move, data.histories(), MOVE_NULL, true);
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;

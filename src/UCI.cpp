@@ -200,7 +200,7 @@ namespace UCI
 
         if (token == "startpos")
         {
-            pos = Position();
+            pos.reset_startpos();
 
             // Check if moves token has been passed
             if (stream >> token && token != "moves")
@@ -209,10 +209,11 @@ namespace UCI
         else if (token == "fen")
         {
             // Build FEN string
-            std::string fen;
+            std::stringstream ss;
             while (stream >> token && token != "moves")
-                fen += token + " ";
-            pos = Position(fen);
+                ss << token << " ";
+
+            pos.update_from(ss.str());
         }
         else
             return;
@@ -220,10 +221,10 @@ namespace UCI
         // Push moves to the position
         Move move;
         while (stream >> token && (move = move_from_uci(pos, token)) != MOVE_NULL)
-        {
             pos.make_move(move);
-            pos.set_init_ply();
-        }
+
+        // After all moves are pushed, prepare the position for search
+        pos.prepare();
     }
 
 
