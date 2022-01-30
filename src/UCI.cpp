@@ -130,10 +130,7 @@ namespace UCI
                 pool->update_multiPV(Search::Parameters::multiPV);
             }
             else if (name == "Threads")
-            {
-                Search::Parameters::n_threads = std::min(std::max(std::stoi(value), 1), 512);
-                pool->resize(Search::Parameters::n_threads);
-            }
+                pool->resize(std::min(std::max(std::stoi(value), 1), 512));
             else if (name == "Ponder")
                 Search::Parameters::ponder = (value == "true");
             else

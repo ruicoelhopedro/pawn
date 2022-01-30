@@ -159,3 +159,6 @@ int64_t ThreadPool::nodes_searched() const
         total += thread->m_nodes_searched;
     return total;
 }
+
+
+int ThreadPool::size() const { return m_threads.size(); }

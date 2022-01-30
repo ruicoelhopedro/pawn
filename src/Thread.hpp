@@ -100,6 +100,8 @@ public:
     Position position() const;
     
     int64_t nodes_searched() const;
+
+    int size() const;
 };
 
 

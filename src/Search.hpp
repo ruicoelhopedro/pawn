@@ -163,7 +163,6 @@ namespace Search
     namespace Parameters
     {
         extern int multiPV;
-        extern int n_threads;
         extern bool ponder;
     }
 

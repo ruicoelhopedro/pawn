@@ -18,8 +18,6 @@ namespace Search
     namespace Parameters
     {
         int multiPV = 1;
-        int n_threads = 1;
-        Limits limits = Limits();
         bool ponder = false;
     }
 
@@ -220,7 +218,7 @@ namespace Search
             return true;
 
         // Approximate number of nodes
-        if (m_nodes_searched > m_thread.m_limits.nodes / Parameters::n_threads)
+        if (m_nodes_searched > m_thread.m_limits.nodes / pool->size())
             return true;
 
         return false;
@@ -439,10 +437,10 @@ namespace Search
 
                 // Additional time stopping conditions
                 score = thread.multiPVs().front().score;
-                bool time_management = Parameters::limits.time[turn] >= 0;
+                bool time_management = thread.limits().time[turn] >= 0;
                 if (time_management &&
-                    !Parameters::limits.ponder &&
-                    !Parameters::limits.infinite)
+                    !thread.limits().ponder &&
+                    !thread.limits().infinite)
                 {
                     double remaining = data.time().remaining() / 1e3;
                     // Best move mate or do we expect not to have time for one more iteration?
@@ -452,9 +450,9 @@ namespace Search
                 }
 
                 // Stopping condition for mate search
-                if (Parameters::limits.mate >= 1 &&
+                if (thread.limits().mate >= 1 &&
                     is_mate(score) &&
-                    mate_in(score) <= Parameters::limits.mate)
+                    mate_in(score) <= thread.limits().mate)
                     break;
             }
         }
@@ -648,10 +646,10 @@ namespace Search
             }
 
             // Only search for selected root moves if specified
-            if (RootSearch && Parameters::limits.searchmoves.size() != 0)
+            if (RootSearch && data.thread().limits().searchmoves.size() != 0)
             {
                 bool found = false;
-                for (auto root_moves : Parameters::limits.searchmoves)
+                for (auto root_moves : data.thread().limits().searchmoves)
                     found |= (root_moves == move);
                 if (!found)
                     continue;
