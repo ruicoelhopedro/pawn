@@ -64,49 +64,50 @@ Board::Board(std::string fen)
       m_eval1(0, 0),
       m_phase(Phases::Total)
 {
-    char c, c2;
-    std::istringstream ss(fen);
+    auto c = fen.cbegin();
 
-    // Default initialisation for updated fields
+    // Default initialisation for board pieces
     std::memset(m_board_pieces, 0, sizeof(m_board_pieces));
 
     // Read position
     Square square = SQUARE_A8;
-    while (ss.get(c) && !isspace(c))
+    while (c != fen.cend() && !isspace(*c))
     {
-        if (isdigit(c))
-            square += c - '0';
-        else if (c == '/')
+        if (isdigit(*c))
+            square += *c - '0';
+        else if (*c == '/')
             square -= 16;
         else
-            set_piece<true>(fen_piece(c), isupper(c) ? WHITE : BLACK, square++);
+            set_piece<true>(fen_piece(*c), isupper(*c) ? WHITE : BLACK, square++);
+
+        c++;
     }
 
     // Side to move
-    while (ss.get(c) && !isspace(c))
-        m_turn = (c == 'w') ? WHITE : BLACK;
+    while ((++c) != fen.cend() && !isspace(*c))
+        m_turn = (*c == 'w') ? WHITE : BLACK;
 
     // Castling rights
     std::memset(m_castling_rights, 0, sizeof(m_castling_rights));
-    while (ss.get(c) && !isspace(c))
-        if (fen_castle_side(c) != NO_SIDE)
-            set_castling<true>(fen_castle_side(c), isupper(c) ? WHITE : BLACK);
+    while ((++c) != fen.cend() && !isspace(*c))
+        if (fen_castle_side(*c) != NO_SIDE)
+            set_castling<true>(fen_castle_side(*c), isupper(*c) ? WHITE : BLACK);
 
     // Ep square
     m_enpassant_square = SQUARE_NULL;
-    while (ss.get(c) && !isspace(c))
-        if (c != '-' && ss.get(c2) && !isspace(c2))
-            m_enpassant_square = make_square(c2 - '1', c - 'a');
+    while ((++c) != fen.cend() && !isspace(*c))
+        if (*c != '-' && (++c) != fen.cend() && !isspace(*c))
+            m_enpassant_square = make_square(*c - '1', *(c-1) - 'a');
 
     // Half-move clock
     m_half_move_clock = 0;
-    if (ss)
-        ss >> m_half_move_clock;
+    while ((++c) != fen.cend() && !isspace(*c))
+        m_half_move_clock = m_half_move_clock * 10 + (*c - '0');
 
     // Full-move clock
     m_full_move_clock = 0;
-    if (ss)
-        ss >> m_full_move_clock;
+    while ((++c) != fen.cend() && !isspace(*c))
+        m_full_move_clock = m_full_move_clock * 10 + (*c - '0');
 
     // Update remaining hash: turn and ep square
     if (m_turn == Turn::BLACK)

@@ -213,11 +213,11 @@ namespace UCI
         else if (token == "fen")
         {
             // Build FEN string
-            std::stringstream ss;
+            std::string fen;
             while (stream >> token && token != "moves")
-                ss << token << " ";
+                fen += token + " ";
 
-            pos.update_from(ss.str());
+            pos.update_from(fen);
         }
         else
             return;
