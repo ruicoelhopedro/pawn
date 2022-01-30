@@ -71,4 +71,7 @@ namespace Tests
         std::cout << "\nFailed/total tests: " << n_failed << "/" << tests.size() << std::endl;
         return n_failed;
     }
+
+
+    int fen_tests();
 }

@@ -262,7 +262,7 @@ namespace UCI
 
     void test()
     {
-        constexpr int NUM_TESTS = 6;
+        constexpr int NUM_TESTS = 7;
         int results[NUM_TESTS];
 
         results[0] = Tests::perft_tests();
@@ -271,6 +271,7 @@ namespace UCI
         results[3] = Tests::perft_techniques_tests<2,  true, false, false, false>();
         results[4] = Tests::perft_techniques_tests<2,  true,  true, false, false>();
         results[5] = Tests::perft_techniques_tests<3, false, false,  true, false>();
+        results[6] = Tests::fen_tests();
 
         std::cout << "\nTest summary" << std::endl;
         std::cout << "---------------------------------" << std::endl;
@@ -280,6 +281,7 @@ namespace UCI
         std::cout << "  Orderer:      " << std::setw(4) << results[3] << " failed cases" << std::endl;
         std::cout << "  TT + Orderer: " << std::setw(4) << results[4] << " failed cases" << std::endl;
         std::cout << "  Legality:     " << std::setw(4) << results[5] << " failed cases" << std::endl;
+        std::cout << "  FEN Parsing:  " << std::setw(4) << results[6] << " failed cases" << std::endl;
         std::cout << "---------------------------------" << std::endl;
 
         // Final test results

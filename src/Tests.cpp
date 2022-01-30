@@ -144,13 +144,13 @@ namespace Tests
         tests.push_back(PerftTest("7k/8/8/1p6/P7/8/8/7K b - - 0 1", 6, 41874));
         tests.push_back(PerftTest("7k/8/1p6/8/8/P7/8/7K b - - 0 1", 6, 29679));
         tests.push_back(PerftTest("k7/7p/8/8/8/8/6P1/K7 b - - 0 1", 6, 55338));
-        tests.push_back(PerftTest("k7/6p1/8/8/8/8/7P/K7 b - - 0 1", 6, 55338));
+        tests.push_back(PerftTest("k7/6p1/8/8/8/8/7P/K7 b - - 64 54", 6, 55338));
         tests.push_back(PerftTest("3k4/3pp3/8/8/8/8/3PP3/3K4 b - - 0 1", 6, 199002));
         tests.push_back(PerftTest("8/Pk6/8/8/8/8/6Kp/8 w - - 0 1", 6, 1030499));
         tests.push_back(PerftTest("n1n5/1Pk5/8/8/8/8/5Kp1/5N1N w - - 0 1", 6, 37665329));
         tests.push_back(PerftTest("8/PPPk4/8/8/8/8/4Kppp/8 w - - 0 1", 6, 28859283));
         tests.push_back(PerftTest("n1n5/PPPk4/8/8/8/8/4Kppp/5N1N w - - 0 1", 6, 71179139));
-        tests.push_back(PerftTest("8/Pk6/8/8/8/8/6Kp/8 b - - 0 1", 6, 1030499));
+        tests.push_back(PerftTest("8/Pk6/8/8/8/8/6Kp/8 b - - 50 50", 6, 1030499));
         tests.push_back(PerftTest("n1n5/1Pk5/8/8/8/8/5Kp1/5N1N b - - 0 1", 6, 37665329));
         tests.push_back(PerftTest("8/PPPk4/8/8/8/8/4Kppp/8 b - - 0 1", 6, 28859283));
         tests.push_back(PerftTest("n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1", 6, 71179139));
@@ -270,5 +270,32 @@ namespace Tests
         std::cout << "Nodes searched:    " << n_nodes << std::endl;
         std::cout << "Time elapsed (s):  " << elapsed << std::endl;
         std::cout << "Nodes per second:  " << nps << std::endl;
+    }
+    
+
+    int fen_tests()
+    {
+        auto tests = test_suite();
+
+        int n_failed = 0;
+
+        // Run each position
+        for (auto& test : tests)
+        {
+            Position pos(test.fen());
+            auto output_fen = pos.board().to_fen();
+            if (output_fen != test.fen())
+            {
+                std::cout << "[FAIL] " << test.fen() << " (returned FEN:  " << output_fen << ")" << std::endl;
+                n_failed++;
+            }
+            else
+            {
+                std::cout << "[ OK ] " << test.fen() << std::endl;
+            }
+
+        }
+
+        return n_failed;
     }
 }
