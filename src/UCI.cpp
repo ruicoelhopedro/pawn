@@ -176,8 +176,7 @@ namespace UCI
             else if (token == "ponder")
                 limits.ponder = true;
 
-        Search::Time time = Search::update_time(pool->position(), limits);
-        pool->search(limits, time);
+        pool->search(limits);
     }
 
 

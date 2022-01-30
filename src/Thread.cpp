@@ -108,12 +108,12 @@ void ThreadPool::update_position_threads()
 }
 
 
-void ThreadPool::search(Search::Limits limits, Search::Time time, bool wait)
+void ThreadPool::search(const Search::Limits& limits, bool wait)
 {
     std::unique_lock<std::mutex> lock(m_mutex);
     m_status = ThreadStatus::SEARCHING;
     m_limits = limits;
-    m_time = time;
+    m_time = Search::update_time(m_position, limits);
     m_cvar.notify_all();
     lock.unlock();
 

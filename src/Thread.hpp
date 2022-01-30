@@ -84,7 +84,7 @@ public:
 
     void update_position_threads();
 
-    void search(Search::Limits limits, Search::Time time, bool wait = false);
+    void search(const Search::Limits& limits, bool wait = false);
 
     void stop();
 
