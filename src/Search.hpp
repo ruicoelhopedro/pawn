@@ -17,7 +17,7 @@ namespace Search
 {
     struct Limits
     {
-        std::vector<Move> searchmoves;
+        MoveList searchmoves;
         bool ponder;
         int time[NUM_COLORS];
         int incr[NUM_COLORS];
@@ -29,7 +29,6 @@ namespace Search
         bool infinite;
 
         Limits()
-            : searchmoves(0)
         {
             ponder = infinite = false;
             time[WHITE] = time[BLACK] = -1;
@@ -67,8 +66,6 @@ namespace Search
 
     class MultiPVData
     {
-        Move moves[NUM_MAX_MOVES];
-
     public:
         Move bestmove;
         Score score;
@@ -118,7 +115,7 @@ namespace Search
         Score m_static_eval;
         Move m_move;
         Move* m_pv;
-        Move* m_prev_pv;
+        MoveList& m_prev_pv;
         bool m_isPv;
 
     public:

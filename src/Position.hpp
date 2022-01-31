@@ -627,7 +627,6 @@ public:
 class Position
 {
     std::vector<Board> m_boards;
-    MoveStack m_stack;
 
 public:
     Position();
@@ -676,12 +675,6 @@ public:
 
 
     Hash hash() const;
-
-
-    MoveList move_list() const;
-
-
-    void set_init_ply();
 
 
     void prepare();

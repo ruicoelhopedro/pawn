@@ -149,7 +149,7 @@ namespace UCI
         while (stream >> token)
             if (token == "searchmoves")
                 while (stream >> token)
-                    limits.searchmoves.push_back(move_from_uci(pool->position(), token));
+                    limits.searchmoves.push(move_from_uci(pool->position(), token));
             else if (token == "wtime")
                 stream >> limits.time[WHITE];
             else if (token == "btime")
@@ -221,10 +221,7 @@ namespace UCI
         // Push moves to the position
         Move move;
         while (stream >> token && (move = move_from_uci(pos, token)) != MOVE_NULL)
-        {
             pos.make_move(move);
-            pos.set_init_ply();
-        }
 
         // After all moves are pushed, prepare the position for search
         pos.prepare();

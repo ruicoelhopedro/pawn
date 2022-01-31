@@ -57,23 +57,31 @@ constexpr Move MOVE_NULL = Move();
 
 class MoveList
 {
-    Move* m_moves;
+    Move m_moves[NUM_MAX_MOVES];
+    Move* m_start;
     Move* m_end;
 
 public:
     MoveList()
-        : m_moves(nullptr), m_end(nullptr)
+        : m_start(m_moves), m_end(m_moves)
     {
     }
 
-    MoveList(Move* start)
-        : m_moves(start), m_end(start)
+    MoveList(const MoveList& list)
     {
+        m_start = m_moves + (list.m_start - list.m_moves);
+        m_end = m_start;
+        for (Move* m = list.m_start; m != list.m_end; m++)
+            *(m_end++) = *m;
     }
 
-    MoveList(Move* start, Move* end)
-        : m_moves(start), m_end(end)
+    MoveList& operator=(const MoveList& list)
     {
+        m_start = m_moves + (list.m_start - list.m_moves);
+        m_end = m_start;
+        for (Move* m = list.m_start; m != list.m_end; m++)
+            *(m_end++) = *m;
+        return *this;
     }
 
     void push(Move move)
@@ -122,17 +130,18 @@ public:
 
     int length() const
     {
-        return m_end - m_moves;
+        return m_end - m_start;
     }
 
     void clear()
     {
-        m_end = m_moves;
+        m_start = m_moves;
+        m_end = m_start;
     }
 
     bool contains(Move move) const
     {
-        for (Move* i = m_moves; i < m_end; i++)
+        for (Move* i = m_start; i < m_end; i++)
             if (*i == move)
                 return true;
 
@@ -141,103 +150,20 @@ public:
 
     void pop_first()
     {
-        m_moves++;
+        m_start++;
     }
 
     // Iterators
-    Move* begin() { return m_moves; }
-    Move* end()   { return m_end; }
-    const Move* cbegin() const { return m_moves; }
+    Move* begin() const { return m_start; }
+    Move* end()   const { return m_end; }
+    const Move* cbegin() const { return m_start; }
     const Move* cend()   const { return m_end; }
+
+    Move& operator[](int i) { return *(m_start + i); }
+    const Move& operator[](int i) const { return *(m_start + i); }
 
     // IO operators
     friend std::ostream& operator<<(std::ostream& out, const MoveList& list);
-};
-
-
-class MoveStack
-{
-    Move* m_moves;
-    int m_depth;
-    int m_current;
-
-public:
-    MoveStack(int depth = 1)
-        : m_moves(new Move[NUM_MAX_MOVES * depth]), m_depth(depth), m_current(0)
-    {
-    }
-
-    virtual ~MoveStack()
-    {
-        delete[] m_moves;
-    }
-
-    MoveStack(const MoveStack& other)
-        : m_moves(new Move[NUM_MAX_MOVES * other.m_depth]), m_depth(other.m_depth), m_current(other.m_current)
-    {
-        for (int i = 0; i < NUM_MAX_MOVES * other.m_depth; i++)
-            m_moves[i] = other.m_moves[i];
-    }
-
-    MoveStack(MoveStack&& other) noexcept
-        : m_moves(other.m_moves), m_depth(other.m_depth), m_current(other.m_current)
-    {
-        other.m_moves = nullptr;
-    }
-
-    MoveStack& operator=(const MoveStack& other)
-    {
-        if (&other != this)
-        {
-            if (m_depth != other.m_depth)
-            {
-                m_depth = other.m_depth;
-                Move* tmp = new Move[NUM_MAX_MOVES * m_depth];
-                delete[] m_moves;
-                m_moves = tmp;
-            }
-
-            m_current = other.m_current;
-            for (int i = 0; i < NUM_MAX_MOVES * m_depth; i++)
-                m_moves[i] = other.m_moves[i];
-        }
-        return *this;
-    }
-
-    MoveStack& operator=(MoveStack&& other) noexcept
-    {
-        std::swap(m_moves, other.m_moves);
-        std::swap(m_depth, other.m_depth);
-        std::swap(m_current, other.m_current);
-        return *this;
-    }
-
-    void reset_pos()
-    {
-        m_current = 0;
-    }
-
-    MoveList list() const
-    {
-        return MoveList(m_moves + m_current * NUM_MAX_MOVES);
-    }
-
-    MoveList list(int pos) const
-    {
-        return MoveList(m_moves + pos * NUM_MAX_MOVES);
-    }
-
-    MoveStack& operator++()
-    {
-        m_current++;
-        return *this;
-    }
-
-    MoveStack& operator--()
-    {
-        m_current--;
-        return *this;
-    }
 };
 
 
@@ -247,6 +173,6 @@ constexpr int TOTAL_PV_LENGTH = (PV_LENGTH * PV_LENGTH + PV_LENGTH) / 2;
 struct PvContainer
 {
     Move pv[TOTAL_PV_LENGTH];
-    Move prev_pv[PV_LENGTH];
+    MoveList prev_pv;
 };
 

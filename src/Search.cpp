@@ -66,8 +66,7 @@ namespace Search
 
     MultiPVData::MultiPVData()
         : bestmove(MOVE_NULL),
-          score(-SCORE_NONE),
-          pv(moves)
+          score(-SCORE_NONE)
     {
     }
 
@@ -89,7 +88,7 @@ namespace Search
     Move SearchData::excluded_move() const { return m_excluded_move; }
     Move SearchData::last_move() const { return m_move; }
     Move* SearchData::pv() { return m_pv; }
-    Move SearchData::pv_move() { return m_isPv ? *m_prev_pv : MOVE_NULL; }
+    Move SearchData::pv_move() { return m_isPv ? m_prev_pv[m_ply] : MOVE_NULL; }
     Score SearchData::static_eval() const { return m_static_eval; }
     Score& SearchData::static_eval() { return m_static_eval; }
     Depth& SearchData::seldepth() { return m_seldepth; }
@@ -116,10 +115,9 @@ namespace Search
         result.m_static_eval = SCORE_NONE;
         result.m_excluded_move = MOVE_NULL;
         // New pv location
-        result.m_prev_pv++;
         result.m_pv += PV_LENGTH - m_ply;
         // Are we still in a PV line?
-        result.m_isPv = m_isPv && move == *m_prev_pv;
+        result.m_isPv = m_isPv && move == m_prev_pv[m_ply];
         return result;
     }
 
@@ -155,12 +153,9 @@ namespace Search
     {
         // Copy last PV from the table to the prev PV
         Move* src = m_pv;
-        Move* dst = m_prev_pv;
+        m_prev_pv.clear();
         while (*src != MOVE_NULL)
-            *(dst++) = *(src++);
-
-        // Set last entry as null move as a stop condition
-        *dst = MOVE_NULL;
+            m_prev_pv.push(*(src++));
     }
 
 
@@ -329,10 +324,6 @@ namespace Search
 
     Score iter_deepening(Position& position, SearchData& data)
     {
-        // Maximum PV lines
-        int maxPV = std::min(position.generate_moves(MoveGenType::LEGAL).length(), Parameters::multiPV);
-
-        MoveStack pv_stack(maxPV);
         Score score = -SCORE_INFINITE;
         Turn turn = position.get_turn();
         std::chrono::steady_clock::time_point begin_time = std::chrono::steady_clock::now();
@@ -343,7 +334,7 @@ namespace Search
 
         // Check aborted search
         auto moves = position.generate_moves(MoveGenType::LEGAL);
-        if (moves.length() == 0)
+        if (moves.length() == 0 || position.is_draw(false))
         {
             if (main_thread)
             {
@@ -358,10 +349,14 @@ namespace Search
             return SCORE_NONE;
         }
 
+        // Maximum PV lines
+        int maxPV = std::min(moves.length(), Parameters::multiPV);
+
         Move bestmove = MOVE_NULL;
         Move pondermove = MOVE_NULL;
 
         // Clear data
+        data.clear_pv();
         data.histories().clear();
         data.nodes_searched() = 0;
 
@@ -377,8 +372,10 @@ namespace Search
             data.seldepth() = 0;
 
             // MultiPV loop
-            for (auto& multiPV : thread.multiPVs())
+            for (int iPV = 0; iPV < maxPV; iPV++)
             {
+                auto& multiPV = thread.multiPVs()[iPV];
+
                 // Carry the aspirated search
                 Score prev_score = multiPV.score;
                 Depth depth = iDepth + thread.id() / 2;
@@ -409,14 +406,13 @@ namespace Search
 
                 // Output information
                 int64_t nodes = thread.pool().nodes_searched();
-                int iPv = 0;
-                for (auto& multiPV : thread.multiPVs())
+                for (int iPV = 0; iPV < maxPV; iPV++)
                 {
-                    iPv++;
+                    auto& multiPV = thread.multiPVs()[iPV];
                     std::cout << "info";
                     std::cout << " depth " << iDepth;
                     std::cout << " seldepth " << static_cast<int>(data.seldepth());
-                    std::cout << " multipv " << iPv;
+                    std::cout << " multipv " << iPV + 1;
                     if (is_mate(multiPV.score))
                         std::cout << " score mate " << mate_in(multiPV.score);
                     else
@@ -613,8 +609,7 @@ namespace Search
         int move_number = 0;
         Move best_move = MOVE_NULL;
         Score best_score = -SCORE_INFINITE;
-        Move quiet_list[NUM_MAX_MOVES];
-        MoveList quiets_searched(quiet_list);
+        MoveList quiets_searched;
         Move hash_move = (data.in_pv() && data.pv_move() != MOVE_NULL) ? data.pv_move() : tt_move;
         MoveOrder orderer = MoveOrder(position, hash_move, hist);
         while ((move = orderer.next_move()) != MOVE_NULL)
@@ -646,7 +641,7 @@ namespace Search
             }
 
             // Only search for selected root moves if specified
-            if (RootSearch && data.thread().limits().searchmoves.size() != 0)
+            if (RootSearch && data.thread().limits().searchmoves.length() != 0)
             {
                 bool found = false;
                 for (auto root_moves : data.thread().limits().searchmoves)

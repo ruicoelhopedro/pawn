@@ -605,7 +605,7 @@ Bitboard Board::sliders() const
 
 
 Position::Position()
-    : m_boards(1), m_stack(NUM_MAX_DEPTH)
+    : m_boards(1)
 {
     m_boards.reserve(NUM_BOARDS);
 }
@@ -641,7 +641,6 @@ void Position::update_from(const Position& pos)
     // Push moves
     for (const auto& board : pos.m_boards)
         m_boards.push_back(board);
-    m_stack.reset_pos();
 }
 
 
@@ -695,7 +694,7 @@ Turn Position::get_turn() const
 
 MoveList Position::generate_moves(MoveGenType type)
 {
-    auto list = m_stack.list();
+    MoveList list;
     board().generate_moves(list, type);
     return list;
 }
@@ -703,7 +702,6 @@ MoveList Position::generate_moves(MoveGenType type)
 
 void Position::make_move(Move move)
 {
-    ++m_stack;
     m_boards.push_back(board().make_move(move));
 }
 
@@ -711,13 +709,11 @@ void Position::make_move(Move move)
 void Position::unmake_move()
 {
     m_boards.pop_back();
-    --m_stack;
 }
 
 
 void Position::make_null_move()
 {
-    ++m_stack;
     m_boards.push_back(board().make_null_move());
 }
 
@@ -725,7 +721,6 @@ void Position::make_null_move()
 void Position::unmake_null_move()
 {
     m_boards.pop_back();
-    --m_stack;
 }
 
 
@@ -747,22 +742,8 @@ Hash Position::hash() const
 }
 
 
-MoveList Position::move_list() const
-{
-    return m_stack.list();
-}
-
-
-void Position::set_init_ply()
-{
-    m_stack.reset_pos();
-}
-
-
 void Position::prepare()
 {
-    m_stack.reset_pos();
-
     if (m_boards.capacity() < m_boards.size() + NUM_MAX_PLY)
         m_boards.reserve(m_boards.size() + 2 * NUM_MAX_PLY);
 }

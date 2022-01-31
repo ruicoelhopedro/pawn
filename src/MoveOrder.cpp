@@ -237,7 +237,7 @@ Move MoveOrder::next_move()
         else if (m_stage == MoveStage::CAPTURES_INIT)
         {
             ++m_stage;
-            m_moves = m_position.move_list();
+            m_moves.clear();
             m_position.board().generate_moves(m_moves, MoveGenType::CAPTURES);
         }
         else if (m_stage == MoveStage::CAPTURES)
@@ -284,7 +284,7 @@ Move MoveOrder::next_move()
         else if (m_stage == MoveStage::QUIET_INIT)
         {
             ++m_stage;
-            m_moves = m_position.move_list();
+            m_moves.clear();
             m_position.board().generate_moves(m_moves, MoveGenType::QUIETS);
         }
         else if (m_stage == MoveStage::QUIET)
