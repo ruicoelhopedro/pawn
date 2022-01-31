@@ -260,7 +260,7 @@ namespace Tests
         }
 
         // Node counts and nps
-        double elapsed = total_time.elapsed() / 1e3;
+        double elapsed = total_time.elapsed();
         int64_t nps = n_nodes / elapsed;
 
         // Final output

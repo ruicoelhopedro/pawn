@@ -49,7 +49,7 @@ namespace Search
         std::chrono::steady_clock::time_point m_start;
         std::chrono::steady_clock::time_point m_end;
 
-        int diff(std::chrono::steady_clock::time_point a, std::chrono::steady_clock::time_point b) const;
+        double diff(std::chrono::steady_clock::time_point a, std::chrono::steady_clock::time_point b) const;
 
     public:
         Time(bool ponder = false);
@@ -57,8 +57,8 @@ namespace Search
 
         void ponderhit();
 
-        int elapsed() const;
-        int remaining() const;
+        double elapsed() const;
+        double remaining() const;
         bool time_management() const;
         bool pondering() const;
     };

@@ -46,19 +46,20 @@ namespace Search
             m_end = std::chrono::steady_clock::now() + std::chrono::milliseconds(m_movetime);
     }
 
-    int Time::diff(std::chrono::steady_clock::time_point a, std::chrono::steady_clock::time_point b) const
+    double Time::diff(std::chrono::steady_clock::time_point a, std::chrono::steady_clock::time_point b) const
     {
-        return std::chrono::duration_cast<std::chrono::nanoseconds>(a - b).count() / 1000000;
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(a - b).count() / 1e9;
     }
 
-    int Time::elapsed() const
+    double Time::elapsed() const
     {
         return diff(std::chrono::steady_clock::now(), m_start);
     }
 
-    int Time::remaining() const
+    double Time::remaining() const
     {
-        return (m_managed && !m_ponder) ? diff(m_end, std::chrono::steady_clock::now()) : INT32_MAX;
+        return (m_managed && !m_ponder) ? diff(m_end, std::chrono::steady_clock::now())
+                                        : std::numeric_limits<double>::infinity();
     }
 
     bool Time::pondering() const { return m_ponder; }
@@ -326,7 +327,6 @@ namespace Search
     {
         Score score = -SCORE_INFINITE;
         Turn turn = position.get_turn();
-        std::chrono::steady_clock::time_point begin_time = std::chrono::steady_clock::now();
         Thread& thread = data.thread();
         bool main_thread = thread.is_main();
         auto& time = thread.time();
@@ -356,7 +356,6 @@ namespace Search
         Move pondermove = MOVE_NULL;
 
         // Clear data
-        data.clear_pv();
         data.histories().clear();
         data.nodes_searched() = 0;
 
@@ -366,7 +365,7 @@ namespace Search
              iDepth++)
         {
             // Set depth timer
-            std::chrono::steady_clock::time_point depth_begin = std::chrono::steady_clock::now();
+            Time time_depth;
 
             // Reset counters and multiPV data
             data.seldepth() = 0;
@@ -399,11 +398,6 @@ namespace Search
             // Additional tasks for main thread: output information, bestmove and check if we need to stop
             if (main_thread)
             {
-                // Depth timer
-                std::chrono::steady_clock::time_point depth_end = std::chrono::steady_clock::now();
-                double time_depth = std::chrono::duration_cast<std::chrono::nanoseconds>(depth_end - depth_begin).count() / 1e9;
-                double elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(depth_end - begin_time).count() / 1e9;
-
                 // Output information
                 int64_t nodes = thread.pool().nodes_searched();
                 for (int iPV = 0; iPV < maxPV; iPV++)
@@ -418,9 +412,9 @@ namespace Search
                     else
                         std::cout << " score cp " << multiPV.score;
                     std::cout << " nodes " << nodes;
-                    std::cout << " nps " << static_cast<int>(nodes / elapsed);
+                    std::cout << " nps " << static_cast<int>(nodes / time.elapsed());
                     std::cout << " hashfull " << ttable.hashfull();
-                    std::cout << " time " << std::max(1, static_cast<int>(elapsed * 1000));
+                    std::cout << " time " << std::max(1, static_cast<int>(time.elapsed() * 1000));
                     std::cout << " pv " << multiPV.pv;
                     std::cout << std::endl;
                 }
@@ -438,10 +432,10 @@ namespace Search
                     !thread.limits().ponder &&
                     !thread.limits().infinite)
                 {
-                    double remaining = data.time().remaining() / 1e3;
+                    double remaining = time.remaining();
                     // Best move mate or do we expect not to have time for one more iteration?
                     if (is_mate(score) ||
-                        (remaining > 0 && remaining < time_depth * 1.5))
+                        (remaining > 0 && remaining < time_depth.elapsed() * 1.5))
                         break;
                 }
 
@@ -652,7 +646,7 @@ namespace Search
 
             // Output some information during search
             if (RootSearch && data.thread().is_main() &&
-                data.time().elapsed() > 3000)
+                data.time().elapsed() > 3)
                 std::cout << "info depth " << static_cast<int>(depth)
                           << " currmove " << move.to_uci()
                           << " currmovenumber " << n_moves << std::endl;
