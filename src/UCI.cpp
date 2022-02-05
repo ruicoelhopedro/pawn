@@ -143,6 +143,7 @@ namespace UCI
     void go(Stream& stream)
     {
         std::string token;
+        Search::Time time;
         Search::Limits limits;
 
         limits = Search::Limits();
@@ -173,7 +174,8 @@ namespace UCI
             else if (token == "ponder")
                 limits.ponder = true;
 
-        pool->search(limits);
+        Search::update_time(pool->position(), limits, time);
+        pool->search(time, limits);
     }
 
 

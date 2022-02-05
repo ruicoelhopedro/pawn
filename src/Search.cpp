@@ -39,6 +39,17 @@ namespace Search
         m_end = m_start + std::chrono::milliseconds(movetime_ms);
     }
 
+    void Time::set_movetime(int movetime_ms)
+    {
+        m_managed = true;
+        m_end = m_start + std::chrono::milliseconds(movetime_ms);
+    }
+
+    void Time::set_ponder(bool ponder)
+    {
+        m_ponder = ponder;
+    }
+
     void Time::ponderhit()
     {
         m_ponder = false;
@@ -222,16 +233,16 @@ namespace Search
 
 
 
-    Time update_time(const Position& position, Limits limits)
+    void update_time(const Position& position, Limits limits, Time& time)
     {
         Turn turn = position.get_turn();
 
         // Fixed movetime
         if (limits.movetime >= 0)
-            return Time(limits.movetime, limits.ponder);
+            time.set_movetime(limits.movetime);
 
         // With clock time
-        if (limits.time[turn] >= 0)
+        else if (limits.time[turn] >= 0)
         {
             // Number of expected remaining moves
             int n_expected_moves = limits.movestogo >= 0 ? std::min(50, limits.movestogo) : 50;
@@ -239,11 +250,10 @@ namespace Search
 
             // This move will use 1/n_expected_moves of the remaining time
             int movetime = time_remaining / n_expected_moves;
-            return Time(movetime, limits.ponder);
+            time.set_movetime(movetime);
         }
 
-        // No time management
-        return Time(limits.ponder);
+        time.set_ponder(limits.ponder);
     }
 
 

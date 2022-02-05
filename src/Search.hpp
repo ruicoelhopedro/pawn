@@ -55,6 +55,9 @@ namespace Search
         Time(bool ponder = false);
         Time(int movetime_ms, bool ponder = false);
 
+        void set_movetime(int movetime_ms);
+        void set_ponder(bool ponder);
+
         void ponderhit();
 
         double elapsed() const;
@@ -167,7 +170,7 @@ namespace Search
     void go_perft(Depth depth);
 
 
-    Time update_time(const Position& position, Limits limits);
+    void update_time(const Position& position, Limits limits, Time& time);
 
 
     void get_pv(SearchData& data, MoveList& pv);

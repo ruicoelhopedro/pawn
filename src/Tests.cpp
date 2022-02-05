@@ -252,7 +252,8 @@ namespace Tests
             std::cout << "\nPosition " << index << "/" << n_tests << ": " << test << std::endl;
 
             // Run the search
-            pool->search(limits, true);
+            Search::Time time;
+            pool->search(time, limits, true);
 
             // Update node counts
             n_nodes += pool->nodes_searched();
