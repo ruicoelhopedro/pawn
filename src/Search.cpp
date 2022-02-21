@@ -564,7 +564,7 @@ namespace Search
         const bool HasExcludedMove = data.excluded_move() != MOVE_NULL;
         const bool IsCheck = position.is_check();
         const Turn Turn = position.get_turn();
-        const Depth Ply = position.ply();
+        const Depth Ply = data.ply();
 
         if (PvNode)
         {
@@ -694,7 +694,7 @@ namespace Search
         Move quiet_list[NUM_MAX_MOVES];
         MoveList quiets_searched(quiet_list);
         Move hash_move = (data.in_pv() && data.pv_move() != MOVE_NULL) ? data.pv_move() : tt_move;
-        MoveOrder orderer = MoveOrder(position, depth, hash_move, data.histories(), data.last_move());
+        MoveOrder orderer = MoveOrder(position, Ply, depth, hash_move, data.histories(), data.last_move());
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;
@@ -938,7 +938,7 @@ namespace Search
         constexpr bool PvNode = ST == PV;
         const bool IsCheck = position.is_check();
         const Turn Turn = position.get_turn();
-        const Depth Ply = position.ply();
+        const Depth Ply = data.ply();
 
         if (PvNode)
         {
@@ -1015,7 +1015,7 @@ namespace Search
         Move move;
         int n_moves = 0;
         Move best_move = MOVE_NULL;
-        MoveOrder orderer = MoveOrder(position, 0, tt_move, data.histories(), MOVE_NULL, true);
+        MoveOrder orderer = MoveOrder(position, Ply, 0, tt_move, data.histories(), MOVE_NULL, true);
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;

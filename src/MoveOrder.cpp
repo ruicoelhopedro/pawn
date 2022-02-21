@@ -102,8 +102,8 @@ int Histories::low_ply_score(Move move, PieceType piece, Depth ply) const
 }
 
 
-MoveOrder::MoveOrder(Position& pos, Depth depth, Move hash_move, const Histories& histories, Move prev_move, bool quiescence)
-    : m_position(pos), m_depth(depth), m_hash_move(hash_move), m_histories(histories),
+MoveOrder::MoveOrder(Position& pos, Depth ply, Depth depth, Move hash_move, const Histories& histories, Move prev_move, bool quiescence)
+    : m_position(pos), m_ply(ply), m_depth(depth), m_hash_move(hash_move), m_histories(histories),
       m_prev_move(prev_move), m_quiescence(quiescence), m_stage(MoveStage::HASH),
       m_countermove(MOVE_NULL), m_killer(MOVE_NULL)
 {
@@ -145,7 +145,7 @@ int MoveOrder::quiet_score(Move move) const
     auto piece = static_cast<PieceType>(m_position.board().get_piece_at(move.from()));
     return m_histories.butterfly_score(move, m_position.get_turn())
          + m_histories.piece_type_score(move, piece)
-         + m_histories.low_ply_score(move, piece, m_position.ply());
+         + m_histories.low_ply_score(move, piece, m_ply);
 }
 
 
@@ -197,7 +197,7 @@ Move MoveOrder::next_move()
             m_killer = MOVE_NULL;
             for (int i = 0; i < NUM_KILLERS; i++)
             {
-                Move candidate = m_histories.get_killer(i, m_position.ply());
+                Move candidate = m_histories.get_killer(i, m_ply);
                 if (candidate != m_hash_move &&
                     candidate != m_countermove &&
                     m_position.board().legal(candidate))
