@@ -129,8 +129,8 @@ int MoveOrder::capture_score(Move move) const
 {
     // MVV-LVA
     constexpr int piece_score[] = { 10, 30, 31, 50, 90, 1000 };
-    Piece from = m_position.board().get_piece_at(move.from());
-    Piece to = (move.is_ep_capture()) ? PAWN : m_position.board().get_piece_at(move.to());
+    PieceType from = m_position.board().get_piece_at(move.from());
+    PieceType to = move.is_ep_capture() ? PAWN : m_position.board().get_piece_at(move.to());
     return piece_score[to] - piece_score[from];
 }
 
@@ -142,7 +142,7 @@ int MoveOrder::quiet_score(Move move) const
     // 1. Butterfly histories
     // 2. Piece type-destination histories
     // 3. Low ply histories (based on node counts)
-    auto piece = static_cast<PieceType>(m_position.board().get_piece_at(move.from()));
+    PieceType piece = m_position.board().get_piece_at(move.from());
     return m_histories.butterfly_score(move, m_position.get_turn())
          + m_histories.piece_type_score(move, piece)
          + m_histories.low_ply_score(move, piece, m_ply);

@@ -28,11 +28,11 @@ class Board
     Bitboard m_checkers;
     MixedScore m_eval1;
     uint8_t m_phase;
-    BoardPieces m_board_pieces[NUM_SQUARES];
+    Piece m_board_pieces[NUM_SQUARES];
 
 protected:
 
-    template<Turn TURN, Piece PIECE_TYPE>
+    template<Turn TURN, PieceType PIECE_TYPE>
     void generate_moves(MoveList& list, Bitboard filter, Bitboard occupancy) const
     {
         static_assert(PIECE_TYPE != PAWN && PIECE_TYPE != KING, "Pawn and king not supported!");
@@ -264,7 +264,7 @@ protected:
     }
 
 
-    template<Turn TURN, Piece PIECE_TYPE>
+    template<Turn TURN, PieceType PIECE_TYPE>
     bool legal(Move move, Bitboard occupancy) const
     {
         Bitboard filter = ~get_pieces<TURN>();
@@ -400,7 +400,7 @@ protected:
     }
 
 
-    template<Piece PIECE_TYPE>
+    template<PieceType PIECE_TYPE>
     bool legal(Move move, Bitboard occupancy) const
     {
         if (m_turn == WHITE)
@@ -434,16 +434,16 @@ public:
     void generate_moves(MoveList& list, MoveGenType type) const;
 
 
-    inline Piece get_piece_at(Square square) const
+    inline PieceType get_piece_at(Square square) const
     {
-        return static_cast<Piece>(m_board_pieces[square] / 2);
+        return get_piece_type(m_board_pieces[square]);
     }
 
 
     bool is_valid() const;
 
 
-    template<Turn TURN, Piece PIECE_TYPE>
+    template<Turn TURN, PieceType PIECE_TYPE>
     Bitboard get_pieces() const { return m_pieces[PIECE_TYPE][TURN]; }
 
 
@@ -462,7 +462,7 @@ public:
     Bitboard get_pieces() const;
 
 
-    Bitboard get_pieces(Turn turn, Piece piece) const;
+    Bitboard get_pieces(Turn turn, PieceType piece) const;
 
 
     Bitboard checkers() const;
@@ -486,12 +486,12 @@ public:
     Bitboard attackers_battery(Square square, Bitboard occupancy) const
     {
         Bitboard bishops = get_pieces<TURN, BISHOP>() | get_pieces<TURN, QUEEN>();
-        Bitboard rooks   = get_pieces<TURN,   ROOK>() | get_pieces<TURN, QUEEN>();
+        Bitboard rooks = get_pieces<TURN, ROOK>() | get_pieces<TURN, QUEEN>();
         return (Bitboards::get_attacks_pawns<~TURN>(square)                 & get_pieces<TURN, PAWN  >()) |
                (Bitboards::get_attacks<KNIGHT>(square, occupancy)           & get_pieces<TURN, KNIGHT>()) |
                (Bitboards::get_attacks<BISHOP>(square, occupancy ^ bishops) & bishops)                    |
                (Bitboards::get_attacks<ROOK  >(square, occupancy ^ rooks)   & rooks)                      |
-               (Bitboards::get_attacks<KING  >(square, occupancy)           & get_pieces<TURN,   KING>());
+               (Bitboards::get_attacks<KING  >(square, occupancy)           & get_pieces<TURN, KING>());
     }
 
 

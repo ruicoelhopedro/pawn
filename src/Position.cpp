@@ -293,18 +293,16 @@ Hash Board::generate_hash() const
     Hash hash = 0;
 
     // Position hash
-    for (int turn = 0; turn < 2; turn++)
-        for (int piece = 0; piece < 6; piece++)
+    for (Turn turn : { WHITE, BLACK })
+        for (PieceType piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
         {
             Bitboard piece_bb = m_pieces[piece][turn];
             while (piece_bb)
-                hash ^= Zobrist::get_piece_turn_square(static_cast<PieceType>(piece),
-                    static_cast<Turn>(turn),
-                    piece_bb.bitscan_forward_reset());
+                hash ^= Zobrist::get_piece_turn_square(piece, turn, piece_bb.bitscan_forward_reset());
         }
 
     // Turn to move
-    if (m_turn == Turn::BLACK)
+    if (m_turn == BLACK)
         hash ^= Zobrist::get_black_move();
 
     // En-passsant square
@@ -312,10 +310,10 @@ Hash Board::generate_hash() const
         hash ^= Zobrist::get_ep_file(file(m_enpassant_square));
 
     // Castling rights
-    for (int side = 0; side < 2; side++)
-        for (int turn = 0; turn < 2; turn++)
+    for (CastleSide side : { KINGSIDE, QUEENSIDE })
+        for (Turn turn : { WHITE, BLACK })
             if (m_castling_rights[side][turn])
-                hash ^= Zobrist::get_castle_side_turn(static_cast<CastleSide>(side), static_cast<Turn>(turn));
+                hash ^= Zobrist::get_castle_side_turn(side, turn);
 
     return hash;
 }
@@ -326,12 +324,12 @@ void Board::init()
     // Pieces
     for (Square square = 0; square < NUM_SQUARES; square++)
         m_board_pieces[square] = NO_PIECE;
-    for (Piece piece = PAWN; piece < NUM_PIECE_TYPES; piece++)
+    for (PieceType piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
         for (Turn turn : { WHITE, BLACK })
         {
             Bitboard bb = get_pieces(turn, piece);
             while (bb)
-                m_board_pieces[bb.bitscan_forward_reset()] = get_board_piece(piece, turn);
+                m_board_pieces[bb.bitscan_forward_reset()] = get_piece(piece, turn);
         }
 
     // Generate hash
@@ -342,7 +340,7 @@ void Board::init()
 
     // Material and phase evaluation
     m_phase = Phases::Total;
-    for (Piece piece = PAWN; piece < NUM_PIECE_TYPES; piece++)
+    for (PieceType piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
         for (Turn turn : { WHITE, BLACK })
         {
             Bitboard bb = get_pieces(turn, piece);
@@ -375,12 +373,12 @@ void Board::generate_moves(MoveList& list, MoveGenType type) const
 Board Board::make_move(Move move) const
 {
     Board result = *this;
-    PieceType piece = static_cast<PieceType>(get_piece_at(move.from()));
     Color color = turn_to_color(m_turn);
+    PieceType piece = get_piece_at(move.from());
 
     // Increment clocks
     result.m_full_move_clock += m_turn;
-    if (piece == 0 || move.is_capture())
+    if (piece == PAWN || move.is_capture())
         result.m_half_move_clock = 0;
     else
         result.m_half_move_clock++;
@@ -428,13 +426,13 @@ Board Board::make_move(Move move) const
     // Set moving piece
     result.m_pieces[piece][m_turn].set(move.to());
     result.m_hash ^= Zobrist::get_piece_turn_square(piece, m_turn, move.to());
-    result.m_board_pieces[move.to()] = get_board_piece(piece, m_turn);
+    result.m_board_pieces[move.to()] = get_piece(piece, m_turn);
     result.m_eval1 += piece_square(piece, move.to(), m_turn) * color;
 
     // Per move type action
     if (move.is_capture())
     {
-        PieceType target_piece = static_cast<PieceType>(get_piece_at(move.to()));
+        PieceType target_piece = get_piece_at(move.to());
 
         // En passant capture
         int target = move.to();
@@ -493,19 +491,19 @@ Board Board::make_move(Move move) const
         result.m_hash ^= Zobrist::get_piece_turn_square(ROOK, m_turn, iS);
         result.m_hash ^= Zobrist::get_piece_turn_square(ROOK, m_turn, iE);
         result.m_board_pieces[iS] = NO_PIECE;
-        result.m_board_pieces[iE] = get_board_piece(ROOK, m_turn);
+        result.m_board_pieces[iE] = get_piece(ROOK, m_turn);
         result.m_eval1 -= piece_square(ROOK, iS, m_turn) * color;
         result.m_eval1 += piece_square(ROOK, iE, m_turn) * color;
     }
 
     if (move.is_promotion())
     {
-        PieceType promo_piece = static_cast<PieceType>(move.promo_piece());
+        PieceType promo_piece = move.promo_piece();
         result.m_pieces[piece][m_turn].reset(move.to());
         result.m_pieces[promo_piece][m_turn].set(move.to());
         result.m_hash ^= Zobrist::get_piece_turn_square(piece, m_turn, move.to());
         result.m_hash ^= Zobrist::get_piece_turn_square(promo_piece, m_turn, move.to());
-        result.m_board_pieces[move.to()] = get_board_piece(promo_piece, m_turn);
+        result.m_board_pieces[move.to()] = get_piece(promo_piece, m_turn);
         result.m_eval1 -= piece_square(piece, move.to(), m_turn) * color;
         result.m_eval1 += piece_square(promo_piece, move.to(), m_turn) * color;
         result.m_eval1 -= piece_value[piece] * color;
@@ -616,7 +614,7 @@ Bitboard Board::get_pieces() const
 }
 
 
-Bitboard Board::get_pieces(Turn turn, Piece piece) const
+Bitboard Board::get_pieces(Turn turn, PieceType piece) const
 {
     return m_pieces[piece][turn];
 }
@@ -688,13 +686,13 @@ Square Board::least_valuable(Bitboard bb) const
 Score Board::see(Move move, int threshold) const
 {
     // Static-Exchange evaluation with prunning
-    constexpr Score piece_score[] = { 0, 10, 30, 30, 50, 90, 1000 };
+    constexpr Score piece_score[] = { 10, 30, 30, 50, 90, 1000, 0, 0 };
 
     Square target = move.to();
 
     // Make the initial capture
-    Piece last_attacker = get_piece_at(move.from());
-    Score gain = piece_score[1 + (move.is_ep_capture() ? PAWN : get_piece_at(target))] - threshold / 10;
+    PieceType last_attacker = get_piece_at(move.from());
+    Score gain = piece_score[move.is_ep_capture() ? PAWN : get_piece_at(target)] - threshold / 10;
     Bitboard from_bb = Bitboard::from_square(move.from());
     Bitboard occupancy = get_pieces() ^ from_bb;
     Turn side_to_move = ~m_turn;
@@ -714,7 +712,7 @@ Score Board::see(Move move, int threshold) const
         Bitboard attacker_bb = Bitboard::from_square(attacker);
 
         // Make the capture
-        gain += color * piece_score[1 + last_attacker];
+        gain += color * piece_score[last_attacker];
         last_attacker = get_piece_at(attacker);
         occupancy ^= attacker_bb;
         side_to_move = ~side_to_move;
@@ -800,7 +798,7 @@ bool Board::legal(Move move) const
         return false;
 
     // Capture and destination square not occupied by the opponent (including ep)?
-    Piece piece = get_piece_at(move.from());
+    PieceType piece = get_piece_at(move.from());
     Bitboard enemy_pieces = get_pieces() & ~our_pieces;
     if (move.is_ep_capture() && piece == PAWN && m_enpassant_square != SQUARE_NULL)
         enemy_pieces.set(m_enpassant_square);

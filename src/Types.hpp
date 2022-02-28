@@ -8,7 +8,6 @@
 using Square = int8_t;
 using Value = int8_t;
 using Hash = uint64_t;
-using Piece = int8_t;
 using Direction = int8_t;
 using Score = int16_t;
 using Depth = uint8_t;
@@ -40,31 +39,31 @@ enum Color : int8_t
 
 enum PieceType : int8_t
 {
-    PIECE_NONE = -1,
     PAWN = 0,
     KNIGHT = 1,
     BISHOP = 2,
     ROOK = 3,
     QUEEN = 4,
-    KING = 5
+    KING = 5,
+    PIECE_NONE = 7
 };
 
 
-enum BoardPieces : int8_t
+enum Piece : int8_t
 {
-    NO_PIECE = 2 * PIECE_NONE,
-    W_PAWN = 2 * PAWN,
-    W_KNIGHT = 2 * KNIGHT,
-    W_BISHOP = 2 * BISHOP,
-    W_ROOK = 2 * ROOK,
-    W_QUEEN = 2 * QUEEN,
-    W_KING = 2 * KING,
-    B_PAWN = W_PAWN + 1,
-    B_KNIGHT = W_KNIGHT + 1,
-    B_BISHOP = W_BISHOP + 1,
-    B_ROOK = W_ROOK + 1,
-    B_QUEEN = W_QUEEN + 1,
-    B_KING = W_KING + 1
+    W_PAWN   = PAWN,
+    W_KNIGHT = KNIGHT,
+    W_BISHOP = BISHOP,
+    W_ROOK   = ROOK,
+    W_QUEEN  = QUEEN,
+    W_KING   = KING,
+    B_PAWN   = W_PAWN   | 0x8,
+    B_KNIGHT = W_KNIGHT | 0x8,
+    B_BISHOP = W_BISHOP | 0x8,
+    B_ROOK   = W_ROOK   | 0x8,
+    B_QUEEN  = W_QUEEN  | 0x8,
+    B_KING   = W_KING   | 0x8,
+    NO_PIECE = PIECE_NONE
 };
 
 
@@ -206,7 +205,9 @@ constexpr Turn operator~(const Turn& other) { return (other == WHITE) ? BLACK : 
 constexpr Color operator-(const Color& other) { return static_cast<Color>(-static_cast<int>(other)); }
 
 
-constexpr BoardPieces get_board_piece(Piece piece, Turn turn) { return static_cast<BoardPieces>(2 * piece + turn); }
+constexpr Piece get_piece(PieceType pt, Turn turn) { return static_cast<Piece>(pt + (turn << 3)); }
+constexpr PieceType get_piece_type(Piece pc) { return static_cast<PieceType>(pc & 0b111); }
+constexpr Turn get_turn(Piece pc) { return static_cast<Turn>((pc & 0b1000) >> 3); }
 
 
 constexpr bool is_mate(const Score& score)

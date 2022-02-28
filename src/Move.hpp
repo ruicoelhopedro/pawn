@@ -37,7 +37,7 @@ public:
     constexpr bool is_double_pawn_push() const { return move_type() == DOUBLE_PAWN_PUSH; }
     constexpr bool is_promotion() const { return move_type() & KNIGHT_PROMO; }
     constexpr bool is_castle() const { return (move_type() == KING_CASTLE) || (move_type() == QUEEN_CASTLE); }
-    constexpr Piece promo_piece() const { return (move_type() & 0b0011) + 1; }
+    constexpr PieceType promo_piece() const { return static_cast<PieceType>((move_type() & 0b0011) + 1); }
     constexpr MoveType move_type() const { return static_cast<MoveType>(m_move >> 12); }
     constexpr Hash hash() const { return (m_move & 0b111111111111) | ((m_move & 0b11000000000000000) >> 3); }
     constexpr Hash to_int() const { return m_move; }
@@ -51,14 +51,14 @@ public:
         {
             // Promotion
             std::string promo_code;
-            Piece piece = promo_piece();
-            if (piece == 1)
+            PieceType piece = promo_piece();
+            if (piece == KNIGHT)
                 promo_code = "n";
-            else if (piece == 2)
+            else if (piece == BISHOP)
                 promo_code = "b";
-            else if (piece == 3)
+            else if (piece == ROOK)
                 promo_code = "r";
-            else if (piece == 4)
+            else if (piece == QUEEN)
                 promo_code = "q";
             return get_square(from()) + get_square(to()) + promo_code;
         }

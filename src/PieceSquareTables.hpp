@@ -77,7 +77,7 @@ constexpr S psq_table_pawns[6][8] =
 };
 
 
-constexpr MixedScore piece_square(Piece piece, Square square, Turn turn)
+constexpr MixedScore piece_square(PieceType piece, Square square, Turn turn)
 {
     // Correct piece position for table lookup
     int sq_rank = (turn == WHITE) ? rank(square) : (7 - rank(square));

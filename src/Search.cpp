@@ -619,7 +619,7 @@ namespace Search
                 // Update histories for quiet TT moves
                 if (tt_move != MOVE_NULL && !tt_move.is_capture() && !tt_move.is_promotion())
                 {
-                    PieceType piece = static_cast<PieceType>(position.board().get_piece_at(tt_move.from()));
+                    PieceType piece = position.board().get_piece_at(tt_move.from());
                     if (tt_score >= beta)
                         data.histories().fail_high(tt_move, data.last_move(), Turn, depth, Ply, piece);
                     else
@@ -800,7 +800,7 @@ namespace Search
             // Make the move
             Score score;
             bool captureOrPromotion = move.is_capture() || move.is_promotion();
-            PieceType piece = static_cast<PieceType>(position.board().get_piece_at(move.from()));
+            PieceType piece = position.board().get_piece_at(move.from());
             position.make_move(move);
             nodes_searched++;
             data.nodes_searched()++;
@@ -905,7 +905,7 @@ namespace Search
         if (best_score >= alpha)
             for (auto move : quiets_searched)
                 if (move != best_move)
-                    data.histories().add_bonus(move, Turn, static_cast<PieceType>(position.board().get_piece_at(move.from())), -depth * depth / 4);
+                    data.histories().add_bonus(move, Turn, position.board().get_piece_at(move.from()), -depth * depth / 4);
 
         // Check for game end
         if (n_moves == 0)
