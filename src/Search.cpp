@@ -21,6 +21,7 @@ namespace Search
     std::vector<Move> multiPV_roots;
     std::vector<Score> multiPV_scores;
     std::vector<MoveList> multiPV_lists;
+    std::vector<int> multiPV_order;
 
 
     namespace Parameters
@@ -441,6 +442,9 @@ namespace Search
             multiPV_roots.resize(maxPV);
             multiPV_scores.resize(maxPV);
             multiPV_lists.resize(maxPV);
+            multiPV_order.resize(maxPV);
+            for (int iPv = 0; iPv < maxPV; iPv++)
+                multiPV_order[iPv] = iPv;
         }
 
         Move bestmove = MOVE_NULL;
@@ -499,12 +503,19 @@ namespace Search
             // Output information
             if (main_thread)
             {
-                for (int iPv = 0; iPv < maxPV; iPv++)
+                // Sort PVs in MultiPV mode
+                std::sort(multiPV_order.begin(), multiPV_order.end(), [] (int a, int b) 
                 {
+                    return multiPV_scores[a] > multiPV_scores[b];
+                });
+
+                for (int i = 0; i < maxPV; i++)
+                {
+                    int iPv = multiPV_order[i];
                     std::cout << "info";
                     std::cout << " depth " << iDepth;
                     std::cout << " seldepth " << static_cast<int>(data.seldepth());
-                    std::cout << " multipv " << iPv + 1;
+                    std::cout << " multipv " << i + 1;
                     if (is_mate(multiPV_scores[iPv]))
                         std::cout << " score mate " << mate_in(multiPV_scores[iPv]);
                     else
