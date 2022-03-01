@@ -296,7 +296,7 @@ namespace Search
         {
             // Number of expected remaining moves
             int n_expected_moves = std::max(1, std::min(50, limits.movestogo));
-            int time_remaining = limits.time[turn] + limits.incr[turn] * n_expected_moves;
+            int time_remaining = limits.time[turn] + limits.incr[turn] * (n_expected_moves - 1);
 
             // This move will use 1/n_expected_moves of the remaining time
             movetime = std::min(movetime, time_remaining / n_expected_moves);
