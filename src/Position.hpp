@@ -3,6 +3,8 @@
 #include "Types.hpp"
 #include "Bitboard.hpp"
 #include "Move.hpp"
+#include "Zobrist.hpp"
+#include "PieceSquareTables.hpp"
 #include <algorithm>
 #include <string>
 
@@ -253,6 +255,51 @@ protected:
 
 
     void update_checkers();
+
+
+    inline void set_piece(PieceType piece, Turn turn, Square square)
+    {
+        m_pieces[piece][turn].set(square);
+        m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
+        m_board_pieces[square] = get_piece(piece, turn);
+        m_eval1 += piece_square(piece, square, turn) * turn_to_color(turn);
+        m_eval1 += piece_value[piece] * turn_to_color(turn);
+        m_phase -= Phases::Pieces[piece];
+    }
+
+
+    inline void pop_piece(PieceType piece, Turn turn, Square square)
+    {
+        m_pieces[piece][turn].reset(square);
+        m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
+        m_board_pieces[square] = NO_PIECE;
+        m_eval1 -= piece_square(piece, square, turn) * turn_to_color(turn);
+        m_eval1 -= piece_value[piece] * turn_to_color(turn);
+        m_phase += Phases::Pieces[piece];
+    }
+
+
+    inline void move_piece(PieceType piece, Turn turn, Square from, Square to)
+    {
+        m_pieces[piece][turn].reset(from);
+        m_pieces[piece][turn].set(to);
+        m_hash ^= Zobrist::get_piece_turn_square(piece, turn, from);
+        m_hash ^= Zobrist::get_piece_turn_square(piece, turn, to);
+        m_board_pieces[from] = NO_PIECE;
+        m_board_pieces[to] = get_piece(piece, turn);
+        m_eval1 += (piece_square(piece, to, turn) - piece_square(piece, from, turn)) * turn_to_color(turn);
+    }
+
+
+    template<bool CAN_CASTLE>
+    inline void set_castling(CastleSide side, Turn turn)
+    {
+        if (m_castling_rights[side][turn] != CAN_CASTLE)
+        {
+            m_hash ^= Zobrist::get_castle_side_turn(side, turn);
+            m_castling_rights[side][turn] = CAN_CASTLE;
+        }
+    }
 
 
     template<Turn TURN>
@@ -568,9 +615,6 @@ public:
 
 
     uint8_t phase() const;
-
-
-    bool insufficient_material() const;
 
 
     bool legal(Move move) const;

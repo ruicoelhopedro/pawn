@@ -50,16 +50,11 @@ public:
         if (is_promotion())
         {
             // Promotion
-            std::string promo_code;
             PieceType piece = promo_piece();
-            if (piece == KNIGHT)
-                promo_code = "n";
-            else if (piece == BISHOP)
-                promo_code = "b";
-            else if (piece == ROOK)
-                promo_code = "r";
-            else if (piece == QUEEN)
-                promo_code = "q";
+            char promo_code = piece == KNIGHT ? 'n'
+                            : piece == BISHOP ? 'b'
+                            : piece == ROOK   ? 'r'
+                            :                   'q';
             return get_square(from()) + get_square(to()) + promo_code;
         }
         else

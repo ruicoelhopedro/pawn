@@ -373,8 +373,8 @@ void Board::generate_moves(MoveList& list, MoveGenType type) const
 Board Board::make_move(Move move) const
 {
     Board result = *this;
-    Color color = turn_to_color(m_turn);
-    PieceType piece = get_piece_at(move.from());
+    const Direction up = (m_turn == WHITE) ? 8 : -8;
+    const PieceType piece = get_piece_at(move.from());
 
     // Increment clocks
     result.m_full_move_clock += m_turn;
@@ -383,140 +383,70 @@ Board Board::make_move(Move move) const
     else
         result.m_half_move_clock++;
 
-    // Initial empty en passant square
+    // Initial empty ep square
     result.m_enpassant_square = SQUARE_NULL;
 
-    // Castling rights
+    // Update castling rights after this move
     if (piece == KING)
     {
-        if (m_castling_rights[KINGSIDE][m_turn])
-        {
-            result.m_castling_rights[KINGSIDE][m_turn] = false;
-            result.m_hash ^= Zobrist::get_castle_side_turn(KINGSIDE, m_turn);
-        }
-        if (m_castling_rights[QUEENSIDE][m_turn])
-        {
-            result.m_castling_rights[QUEENSIDE][m_turn] = false;
-            result.m_hash ^= Zobrist::get_castle_side_turn(QUEENSIDE, m_turn);
-        }
+        // Unset all castling rights after a king move
+        for (auto side : { KINGSIDE, QUEENSIDE })
+            result.set_castling<false>(side, m_turn);
     }
     else if (piece == ROOK)
     {
-        // Initial rook positions
-        int iKing = (m_turn == WHITE) ? SQUARE_H1 : SQUARE_H8;
-        int iQueen = (m_turn == WHITE) ? SQUARE_A1 : SQUARE_A8;
-        if (move.from() == iKing && m_castling_rights[KINGSIDE][m_turn])
-        {
-            result.m_castling_rights[KINGSIDE][m_turn] = false;
-            result.m_hash ^= Zobrist::get_castle_side_turn(KINGSIDE, m_turn);
-        }
-        if (move.from() == iQueen && m_castling_rights[QUEENSIDE][m_turn])
-        {
-            result.m_castling_rights[QUEENSIDE][m_turn] = false;
-            result.m_hash ^= Zobrist::get_castle_side_turn(QUEENSIDE, m_turn);
-        }
+        // Unset castling rights for a certain side if a rook moves
+        if (move.from() == (m_turn == WHITE ? SQUARE_H1 : SQUARE_H8))
+            result.set_castling<false>(KINGSIDE, m_turn);
+        if (move.from() == (m_turn == WHITE ? SQUARE_A1 : SQUARE_A8))
+            result.set_castling<false>(QUEENSIDE, m_turn);
     }
-
-    // Remove moving piece
-    result.m_pieces[piece][m_turn].reset(move.from());
-    result.m_hash ^= Zobrist::get_piece_turn_square(piece, m_turn, move.from());
-    result.m_board_pieces[move.from()] = NO_PIECE;
-    result.m_eval1 -= piece_square(piece, move.from(), m_turn) * color;
-
-    // Set moving piece
-    result.m_pieces[piece][m_turn].set(move.to());
-    result.m_hash ^= Zobrist::get_piece_turn_square(piece, m_turn, move.to());
-    result.m_board_pieces[move.to()] = get_piece(piece, m_turn);
-    result.m_eval1 += piece_square(piece, move.to(), m_turn) * color;
 
     // Per move type action
     if (move.is_capture())
     {
-        PieceType target_piece = get_piece_at(move.to());
-
-        // En passant capture
-        int target = move.to();
-        if (move.is_ep_capture())
-        {
-            Direction dir = (m_turn == WHITE) ? 8 : -8;
-            target = move.to() - dir;
-            target_piece = PAWN;
-            result.m_board_pieces[target] = NO_PIECE;
-        }
+        // Captured square is different for ep captures
+        Square target = move.is_ep_capture() ? move.to() - up : move.to();
 
         // Remove captured piece
-        result.m_pieces[target_piece][~m_turn].reset(target);
-        result.m_hash ^= Zobrist::get_piece_turn_square(target_piece, ~m_turn, target);
-        result.m_eval1 -= piece_square(target_piece, target, ~m_turn) * (~color);
-        result.m_eval1 -= piece_value[target_piece] * (~color);
-        result.m_phase += Phases::Pieces[target_piece];
+        result.pop_piece(get_piece_at(target), ~m_turn, target);
 
         // Castling: check if any rook has been captured
-        int iKing = (m_turn == WHITE) ? SQUARE_H8 : SQUARE_H1;
-        int iQueen = (m_turn == WHITE) ? SQUARE_A8 : SQUARE_A1;
-        if (move.to() == iKing && m_castling_rights[KINGSIDE][~m_turn])
-        {
-            result.m_castling_rights[KINGSIDE][~m_turn] = false;
-            result.m_hash ^= Zobrist::get_castle_side_turn(KINGSIDE, ~m_turn);
-        }
-        if (move.to() == iQueen && m_castling_rights[QUEENSIDE][~m_turn])
-        {
-            result.m_castling_rights[QUEENSIDE][~m_turn] = false;
-            result.m_hash ^= Zobrist::get_castle_side_turn(QUEENSIDE, ~m_turn);
-        }
+        if (move.to() == (m_turn == WHITE ? SQUARE_H8 : SQUARE_H1))
+            result.set_castling<false>(KINGSIDE, ~m_turn);
+        if (move.to() == (m_turn == WHITE ? SQUARE_A8 : SQUARE_A1))
+            result.set_castling<false>(QUEENSIDE, ~m_turn);
     }
     else if (move.is_double_pawn_push())
     {
-        Direction dir = (m_turn == WHITE) ? 8 : -8;
+        // Update ep square
+        result.m_enpassant_square = move.to() - up;
         result.m_hash ^= Zobrist::get_ep_file(file(move.to()));
-        result.m_enpassant_square = move.to() - dir;
     }
     else if (move.is_castle())
     {
-        Square iS, iE;
-        if (move.to() > move.from())
-        {
-            // King side
-            iS = move.to() + 1;
-            iE = move.to() - 1;
-        }
-        else
-        {
-            // Queen side
-            iS = move.to() - 2;
-            iE = move.to() + 1;
-        }
-        result.m_pieces[ROOK][m_turn].reset(iS);
-        result.m_pieces[ROOK][m_turn].set(iE);
-        result.m_hash ^= Zobrist::get_piece_turn_square(ROOK, m_turn, iS);
-        result.m_hash ^= Zobrist::get_piece_turn_square(ROOK, m_turn, iE);
-        result.m_board_pieces[iS] = NO_PIECE;
-        result.m_board_pieces[iE] = get_piece(ROOK, m_turn);
-        result.m_eval1 -= piece_square(ROOK, iS, m_turn) * color;
-        result.m_eval1 += piece_square(ROOK, iE, m_turn) * color;
+        // Move the rook to the new square
+        Square iS = move.to() + (move.to() > move.from() ? +1 : -2);
+        Square iE = move.to() + (move.to() > move.from() ? -1 : +1);
+        result.move_piece(ROOK, m_turn, iS, iE);
     }
 
+    // Set piece on target square
     if (move.is_promotion())
     {
-        PieceType promo_piece = move.promo_piece();
-        result.m_pieces[piece][m_turn].reset(move.to());
-        result.m_pieces[promo_piece][m_turn].set(move.to());
-        result.m_hash ^= Zobrist::get_piece_turn_square(piece, m_turn, move.to());
-        result.m_hash ^= Zobrist::get_piece_turn_square(promo_piece, m_turn, move.to());
-        result.m_board_pieces[move.to()] = get_piece(promo_piece, m_turn);
-        result.m_eval1 -= piece_square(piece, move.to(), m_turn) * color;
-        result.m_eval1 += piece_square(promo_piece, move.to(), m_turn) * color;
-        result.m_eval1 -= piece_value[piece] * color;
-        result.m_eval1 += piece_value[promo_piece] * color;
-        result.m_phase += Phases::Pieces[piece];
-        result.m_phase -= Phases::Pieces[promo_piece];
+        result.pop_piece(piece, m_turn, move.from());
+        result.set_piece(move.promo_piece(), m_turn, move.to());
+    }
+    else
+    {
+        result.move_piece(piece, m_turn, move.from(), move.to());
     }
 
     // Swap turns
     result.m_turn = ~m_turn;
     result.m_hash ^= Zobrist::get_black_move();
 
-    // If en-passant was played reset the bit
+    // Reset previous en-passant hash
     if (m_enpassant_square != SQUARE_NULL)
         result.m_hash ^= Zobrist::get_ep_file(file(m_enpassant_square));
 
@@ -738,46 +668,6 @@ uint8_t Board::phase() const
 }
 
 
-bool Board::insufficient_material() const
-{
-    // Any pawn, rook or queen in the board?
-    Bitboard pieces = get_pieces<WHITE, PAWN>()  | get_pieces<BLACK, PAWN>()
-                    | get_pieces<WHITE, ROOK>()  | get_pieces<BLACK, ROOK>()
-                    | get_pieces<WHITE, QUEEN>() | get_pieces<BLACK, QUEEN>();
-    if (pieces)
-        return false;
-
-    // Number of knights, bishops and minor pieces for each side
-    int white_knights = get_pieces<WHITE, KNIGHT>().count();
-    int black_knights = get_pieces<BLACK, KNIGHT>().count();
-    int white_bishops = get_pieces<WHITE, BISHOP>().count();
-    int black_bishops = get_pieces<BLACK, BISHOP>().count();
-    int n_white_minor = white_knights + white_bishops;
-    int n_black_minor = black_knights + black_bishops;
-
-    // One side has at least 3 more pieces than the other
-    if (abs(n_white_minor - n_black_minor) >= 3)
-        return false;
-
-    //// King vs king or King + Minor vs King (+ Minor)
-    //if (n_white_minor <= 1 && n_black_minor <= 1)
-    //  return true;
-
-    //// 2 Knights + King vs King (+ Minor)
-    //if (white_knights == 2 && white_bishops == 0 && n_black_minor <= 1 ||
-    //  black_knights == 2 && black_bishops == 0 && n_white_minor <= 1)
-    //  return true;
-
-    //// 2 Bishops + King vs Bishop + King
-    //if (white_knights == 0 && black_knights == 0 && 
-    //  ((white_bishops == 2 && black_bishops == 1) || (white_bishops == 1 && black_bishops == 2)))
-    //  return true;
-
-    // There are some corner cases with the bishop pair, but let's ignore them for now
-    return false;
-}
-
-
 bool Board::legal(Move move) const
 {
     // Same source and destination squares?
@@ -877,12 +767,8 @@ Position::Position(std::string fen)
 
 bool Position::is_draw(bool unique) const
 {
-    // Insufficient material check
-    if (board().insufficient_material())
-        return true;
-
     // Fifty move rule
-    if (board().half_move_clock() > 100)
+    if (board().half_move_clock() >= 100)
         return true;
 
     // Repetitions

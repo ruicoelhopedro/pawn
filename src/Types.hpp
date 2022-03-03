@@ -217,17 +217,6 @@ constexpr bool is_mate(const Score& score)
 }
 
 
-constexpr Score update_score(const Score& score, int depth = 1)
-{
-    // Non-mate score
-    if (!is_mate(score))
-        return score;
-
-    // Mate score -> subtract one depth in the correct side
-    return (score > 0) ? score - depth : score + depth;
-}
-
-
 constexpr Score score_to_tt(const Score& score, int ply)
 {
     if (!is_mate(score))
