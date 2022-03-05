@@ -5,6 +5,54 @@
 #include <cassert>
 #include <sstream>
 #include <string>
+#include <cctype>
+#include <cstring>
+
+
+PieceType fen_piece(char c)
+{
+    char lower = tolower(c);
+    return lower == 'p' ? PAWN
+         : lower == 'n' ? KNIGHT
+         : lower == 'b' ? BISHOP
+         : lower == 'r' ? ROOK
+         : lower == 'q' ? QUEEN
+         : lower == 'k' ? KING
+         : PIECE_NONE;
+}
+
+
+char fen_piece(Piece pc)
+{
+    PieceType piece = get_piece_type(pc);
+    char p = piece == PAWN   ? 'p'
+           : piece == KNIGHT ? 'n'
+           : piece == BISHOP ? 'b'
+           : piece == ROOK   ? 'r'
+           : piece == QUEEN  ? 'q'
+           : piece == KING   ? 'k'
+           : 'x';
+    return get_turn(pc) == WHITE ? toupper(p) : p;
+}
+
+
+CastleSide fen_castle_side(char c)
+{
+    char lower = tolower(c);
+    return lower == 'k' ? KINGSIDE
+         : lower == 'q' ? QUEENSIDE
+         : NO_SIDE;
+}
+
+
+char fen_castle_side(CastleSide side, Turn turn)
+{
+    char c = side == KINGSIDE  ? 'k'
+           : side == QUEENSIDE ? 'q'
+           : 'x';
+    return turn == WHITE ? toupper(c) : c;
+}
+
 
 Board::Board()
     : Board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
@@ -12,279 +60,114 @@ Board::Board()
 
 
 Board::Board(std::string fen)
-    : m_eval1(0, 0)
+    : m_hash(0),
+      m_psq(0, 0),
+      m_phase(Phases::Total)
 {
-    auto parts = split(fen, ' ');
-    assert(parts.size() == 6 && "Invalid FEN, wrong number of fields");
+    auto c = fen.cbegin();
 
-    unsigned int pos = 0;
-    for (int i = 7; i >= 0; i--)
+    // Default initialisation for board pieces
+    std::memset(m_board_pieces, PIECE_NONE, sizeof(m_board_pieces));
+
+    // Read position
+    Square square = SQUARE_A8;
+    while (c < fen.cend() && !isspace(*c))
     {
-        int n_empty = 0;
-        for (int j = 0; j < 8; j++)
-        {
-            if (n_empty > 1)
-            {
-                n_empty--;
-                continue;
-            }
-            int index = i * 8 + j;
-            assert(pos < parts[0].size() && "Invalid FEN, too short");
-            char current = parts[0][pos];
-            if (current == 'P')
-                m_pieces[PAWN][WHITE].set(index);
-            else if (current == 'p')
-                m_pieces[PAWN][BLACK].set(index);
-            else if (current == 'N')
-                m_pieces[KNIGHT][WHITE].set(index);
-            else if (current == 'n')
-                m_pieces[KNIGHT][BLACK].set(index);
-            else if (current == 'B')
-                m_pieces[BISHOP][WHITE].set(index);
-            else if (current == 'b')
-                m_pieces[BISHOP][BLACK].set(index);
-            else if (current == 'R')
-                m_pieces[ROOK][WHITE].set(index);
-            else if (current == 'r')
-                m_pieces[ROOK][BLACK].set(index);
-            else if (current == 'Q')
-                m_pieces[QUEEN][WHITE].set(index);
-            else if (current == 'q')
-                m_pieces[QUEEN][BLACK].set(index);
-            else if (current == 'K')
-                m_pieces[KING][WHITE].set(index);
-            else if (current == 'k')
-                m_pieces[KING][BLACK].set(index);
-            else if (current == '1')
-                n_empty = 1;
-            else if (current == '2')
-                n_empty = 2;
-            else if (current == '3')
-                n_empty = 3;
-            else if (current == '4')
-                n_empty = 4;
-            else if (current == '5')
-                n_empty = 5;
-            else if (current == '6')
-                n_empty = 6;
-            else if (current == '7')
-                n_empty = 7;
-            else if (current == '8')
-                n_empty = 8;
-            else
-                assert(false && "Invalid FEN, unknown character");
+        if (isdigit(*c))
+            square += *c - '0';
+        else if (*c == '/')
+            square -= 16;
+        else
+            set_piece(fen_piece(*c), isupper(*c) ? WHITE : BLACK, square++);
 
-            pos++;
-        }
-        if (i > 0)
-        {
-            assert(pos < parts[0].size() && "Invalid FEN, too short");
-            assert(parts[0][pos] == '/' && "Invalid FEN, missing /");
-            pos++;
-        }
+        c++;
     }
 
-    // Turn
-    assert(parts[1].size() == 1 && "Invalid FEN, bad active color");
-    if (parts[1][0] == 'w')
-        m_turn = Turn::WHITE;
-    else if (parts[1][0] == 'b')
-        m_turn = Turn::BLACK;
-    else
-        assert(false && "Invalid FEN, unknown turn specifier");
+    // Side to move
+    m_turn = WHITE;
+    while ((++c) < fen.cend() && !isspace(*c))
+        m_turn = (*c == 'w') ? WHITE : BLACK;
 
     // Castling rights
-    m_castling_rights[KINGSIDE][WHITE] = false;
-    m_castling_rights[QUEENSIDE][WHITE] = false;
-    m_castling_rights[KINGSIDE][BLACK] = false;
-    m_castling_rights[QUEENSIDE][BLACK] = false;
-    assert(parts[2].size() > 0 && parts[2].size() < 5 && "Invalid FEN, bad castling rights");
-    if (parts[2][0] == '-')
-    {
-        assert(parts[2].size() == 1 && "Invalid FEN, bad castling rights");
-    }
-    else
-    {
-        for (unsigned int i = 0; i < parts[2].size(); i++)
-        {
-            if (parts[2][i] == 'K' && !m_castling_rights[KINGSIDE][WHITE])
-                m_castling_rights[KINGSIDE][WHITE] = true;
-            else if (parts[2][i] == 'Q' && !m_castling_rights[QUEENSIDE][WHITE])
-                m_castling_rights[QUEENSIDE][WHITE] = true;
-            else if (parts[2][i] == 'k' && !m_castling_rights[KINGSIDE][BLACK])
-                m_castling_rights[KINGSIDE][BLACK] = true;
-            else if (parts[2][i] == 'q' && !m_castling_rights[QUEENSIDE][BLACK])
-                m_castling_rights[QUEENSIDE][BLACK] = true;
-            else
-                assert(false && "Invalid FEN, unknown castling right");
-        }
-    }
+    std::memset(m_castling_rights, 0, sizeof(m_castling_rights));
+    while ((++c) < fen.cend() && !isspace(*c))
+        if (fen_castle_side(*c) != NO_SIDE)
+            set_castling<true>(fen_castle_side(*c), isupper(*c) ? WHITE : BLACK);
 
-    // En passant
-    assert(parts[3].size() > 0 && parts[3].size() < 3 && "Invalid FEN, bad castling rights");
-    if (parts[3] == "-")
-    {
-        m_enpassant_square = -1;
-    }
-    else
-    {
-        int i;
-        int j;
-        if (parts[3][0] == 'a')
-            j = 0;
-        else if (parts[3][0] == 'b')
-            j = 1;
-        else if (parts[3][0] == 'c')
-            j = 2;
-        else if (parts[3][0] == 'd')
-            j = 3;
-        else if (parts[3][0] == 'e')
-            j = 4;
-        else if (parts[3][0] == 'f')
-            j = 5;
-        else if (parts[3][0] == 'g')
-            j = 6;
-        else if (parts[3][0] == 'h')
-            j = 7;
-        else
-            assert(false && "Invalid FEN, unknown en passant square");
-
-        if (parts[3][1] == '1')
-            i = 0;
-        else if (parts[3][1] == '2')
-            i = 1;
-        else if (parts[3][1] == '3')
-            i = 2;
-        else if (parts[3][1] == '4')
-            i = 3;
-        else if (parts[3][1] == '5')
-            i = 4;
-        else if (parts[3][1] == '6')
-            i = 5;
-        else if (parts[3][1] == '7')
-            i = 6;
-        else if (parts[3][1] == '8')
-            i = 7;
-        else
-            assert(false && "Invalid FEN, unknown en passant square");
-
-        m_enpassant_square = i * 8 + j;
-    }
+    // Ep square
+    m_enpassant_square = SQUARE_NULL;
+    while ((++c) < fen.cend() && !isspace(*c))
+        if (*c != '-' && (++c) != fen.cend() && !isspace(*c))
+            m_enpassant_square = make_square(*c - '1', *(c-1) - 'a');
 
     // Half-move clock
-    assert(parts[4].size() > 0 && "Invalid FEN, bad half-move clock");
-    std::stringstream ss_half(parts[4]);
-    ss_half >> m_half_move_clock;
-    assert(!ss_half.fail() && "Invalid FEN, bad half-move clock");
+    m_half_move_clock = 0;
+    while ((++c) < fen.cend() && !isspace(*c))
+        m_half_move_clock = m_half_move_clock * 10 + (*c - '0');
 
     // Full-move clock
-    assert(parts[5].size() > 0 && "Invalid FEN, bad full-move clock");
-    std::stringstream ss_full(parts[5]);
-    ss_full >> m_full_move_clock;
-    assert(!ss_full.fail() && "Invalid FEN, bad full-move clock");
+    m_full_move_clock = 0;
+    while ((++c) < fen.cend() && !isspace(*c))
+        m_full_move_clock = m_full_move_clock * 10 + (*c - '0');
+    m_full_move_clock = std::max(m_full_move_clock, 1);
 
-    init();
+    // Update remaining hash: turn and ep square
+    if (m_turn == Turn::BLACK)
+        m_hash ^= Zobrist::get_black_move();
+    if (m_enpassant_square != SQUARE_NULL)
+        m_hash ^= Zobrist::get_ep_file(file(m_enpassant_square));
+
+    update_checkers();
 }
 
 
 std::string Board::to_fen() const
 {
-    Bitboard white_pieces = m_pieces[0][0] | m_pieces[1][0] | m_pieces[2][0]
-                          | m_pieces[3][0] | m_pieces[4][0] | m_pieces[5][0];
-    Bitboard black_pieces = m_pieces[0][1] | m_pieces[1][1] | m_pieces[2][1]
-                          | m_pieces[3][1] | m_pieces[4][1] | m_pieces[5][1];
-    Bitboard occupied = white_pieces | black_pieces;
+    std::ostringstream ss;
 
-    std::string out;
-
-    for (int i = 7; i >= 0; i--)
+    // Position
+    for (int rank = 7; rank >= 0; rank--)
     {
-        int n_empty = 0;
-        for (int j = 0; j < 8; j++)
+        int space = 0;
+        for (int file = 0; file < 8; file++)
         {
-            int index = i * 8 + j;
-            if (!occupied.test(index))
-            {
-                n_empty++;
-            }
+            Piece pc = m_board_pieces[make_square(rank, file)];
+            if (pc == Piece::NO_PIECE)
+                space++;
             else
             {
-                if (n_empty != 0)
-                {
-                    out += std::to_string(n_empty);
-                    n_empty = 0;
-                }
-                if (white_pieces.test(index))
-                {
-                    if (m_pieces[0][0].test(index))
-                        out += "P";
-                    else if (m_pieces[1][0].test(index))
-                        out += "N";
-                    else if (m_pieces[2][0].test(index))
-                        out += "B";
-                    else if (m_pieces[3][0].test(index))
-                        out += "R";
-                    else if (m_pieces[4][0].test(index))
-                        out += "Q";
-                    else if (m_pieces[5][0].test(index))
-                        out += "K";
-                }
-                else
-                {
-                    if (m_pieces[0][1].test(index))
-                        out += "p";
-                    else if (m_pieces[1][1].test(index))
-                        out += "n";
-                    else if (m_pieces[2][1].test(index))
-                        out += "b";
-                    else if (m_pieces[3][1].test(index))
-                        out += "r";
-                    else if (m_pieces[4][1].test(index))
-                        out += "q";
-                    else if (m_pieces[5][1].test(index))
-                        out += "k";
-                }
+                if (space)
+                    ss << space;
+                ss << fen_piece(pc);
+                space = 0;
             }
         }
-        if (n_empty != 0)
-            out += std::to_string(n_empty);
-        if (i > 0)
-            out += "/";
+        if (space)
+            ss << space;
+        ss << (rank > 0 ? '/' : ' ');
     }
 
-    // Turn
-    if (m_turn == Turn::WHITE)
-        out += " w ";
-    else
-        out += " b ";
+    // Side to move
+    ss << (m_turn == WHITE ? "w " : "b ");
 
     // Castling rights
-    if (m_castling_rights[0][0])
-        out += "K";
-    if (m_castling_rights[1][0])
-        out += "Q";
-    if (m_castling_rights[0][1])
-        out += "k";
-    if (m_castling_rights[1][1])
-        out += "q";
-    if (!(m_castling_rights[0][0] || m_castling_rights[1][0]
-       || m_castling_rights[0][1] || m_castling_rights[1][1]))
-        out += "-";
+    bool found = false;
+    for (auto turn : { WHITE, BLACK })
+        for (auto side : { KINGSIDE, QUEENSIDE })
+            if (m_castling_rights[side][turn])
+            {
+                found = true;
+                ss << fen_castle_side(side, turn);
+            }
+    ss << (found ? " " : "- ");
 
-    // En passant
-    out += " ";
-    if (m_enpassant_square == -1)
-        out += "-";
-    else
-        out += get_square(m_enpassant_square);
+    // Ep square
+    ss << (m_enpassant_square == SQUARE_NULL ? "-" : get_square(m_enpassant_square)) << ' ';
 
-    // Half-move clock
-    out += " " + std::to_string(m_half_move_clock);
+    // Half- and full-move clocks
+    ss << m_half_move_clock << ' ' << m_full_move_clock;
 
-    // Full-move clock
-    out += " " + std::to_string(m_full_move_clock);
-
-    return out;
+    return ss.str();
 }
 
 
@@ -316,39 +199,6 @@ Hash Board::generate_hash() const
                 hash ^= Zobrist::get_castle_side_turn(side, turn);
 
     return hash;
-}
-
-
-void Board::init()
-{
-    // Pieces
-    for (Square square = 0; square < NUM_SQUARES; square++)
-        m_board_pieces[square] = NO_PIECE;
-    for (PieceType piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
-        for (Turn turn : { WHITE, BLACK })
-        {
-            Bitboard bb = get_pieces(turn, piece);
-            while (bb)
-                m_board_pieces[bb.bitscan_forward_reset()] = get_piece(piece, turn);
-        }
-
-    // Generate hash
-    m_hash = generate_hash();
-
-    // Checkers
-    update_checkers();
-
-    // Material and phase evaluation
-    m_phase = Phases::Total;
-    for (PieceType piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
-        for (Turn turn : { WHITE, BLACK })
-        {
-            Bitboard bb = get_pieces(turn, piece);
-            m_eval1 += piece_value[piece] * bb.count() * turn_to_color(turn);
-            m_phase -= bb.count() * Phases::Pieces[piece];
-            while (bb)
-                m_eval1 += piece_square(piece, bb.bitscan_forward_reset(), turn) * turn_to_color(turn);
-        }
 }
 
 
@@ -462,10 +312,7 @@ bool Board::is_valid() const
     // Side not to move in check?
     Square king_square = m_pieces[KING][~m_turn].bitscan_forward();
     if (attackers(king_square, get_pieces(), m_turn))
-    {
-        std::cout << "bad check on moved side" << std::endl;
         return false;
-    }
 
     // Bitboard consistency
     Bitboard occupancy;
@@ -473,13 +320,7 @@ bool Board::is_valid() const
         for (auto turn : { WHITE, BLACK })
         {
             if (m_pieces[piece][turn] & occupancy)
-            {
-                std::cout << "bad occupancy" << std::endl;
-                std::cout << (int)piece << " " << (int)turn << std::endl;
-                std::cout << m_pieces[piece][turn] << std::endl;
-                std::cout << occupancy << std::endl;
                 return false;
-            }
             occupancy |= m_pieces[piece][turn];
         }
 
@@ -488,29 +329,31 @@ bool Board::is_valid() const
         if (m_board_pieces[square] == NO_PIECE)
         {
             if (occupancy.test(square))
-            {
-                std::cout << "bad empty square" << std::endl;
-                std::cout << (int)square << std::endl;
-                std::cout << (int)m_board_pieces[square] << std::endl;
-                std::cout << occupancy << std::endl;
                 return false;
-            }
         }
-        else
+        else if (!m_pieces[get_piece_at(square)][get_turn(m_board_pieces[square])].test(square))
+            return false;
+
+    // Hash consistency
+    if (m_hash != generate_hash())
+        return false;
+
+    // Material and phase evaluation
+    uint8_t phase = Phases::Total;
+    auto eval = MixedScore(0, 0);
+    for (PieceType piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
+        for (Turn turn : { WHITE, BLACK })
         {
-            auto piece = get_piece_at(square);
-            auto turn = (m_board_pieces[square] % 2 == 0) ? WHITE : BLACK;
-            if (!m_pieces[piece][turn].test(square))
-            {
-                std::cout << "bad occupied square" << std::endl;
-                std::cout << (int)square << std::endl;
-                std::cout << (int)piece << std::endl;
-                std::cout << (int)turn << std::endl;
-                std::cout << (int)m_board_pieces[square] << std::endl;
-                std::cout << m_pieces[piece][turn] << std::endl;
-                return false;
-            }
+            Bitboard bb = get_pieces(turn, piece);
+            eval += piece_value[piece] * bb.count() * turn_to_color(turn);
+            phase -= bb.count() * Phases::Pieces[piece];
+            while (bb)
+                eval += piece_square(piece, bb.bitscan_forward_reset(), turn) * turn_to_color(turn);
         }
+    if (phase != m_phase)
+        return false;
+    if (eval.middlegame() != m_psq.middlegame() || eval.endgame() != m_psq.endgame())
+        return false;
 
     return true;
 }
@@ -579,14 +422,14 @@ bool Board::operator==(const Board& other) const
     if (m_turn != other.m_turn || m_enpassant_square != other.m_enpassant_square)
         return false;
 
-    for (int i = 0; i < 2; i++)
-        for (int j = 0; j < 2; j++)
-            if (m_castling_rights[i][j] != other.m_castling_rights[i][j])
+    for (CastleSide side : { KINGSIDE, QUEENSIDE })
+        for (Turn turn : { WHITE, BLACK })
+            if (m_castling_rights[side][turn] != other.m_castling_rights[side][turn])
                 return false;
 
-    for (int i = 0; i < 6; i++)
-        for (int j = 0; j < 2; j++)
-            if (!(m_pieces[i][j] == other.m_pieces[i][j]))
+    for (PieceType piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
+        for (Turn turn : { WHITE, BLACK })
+            if (!(m_pieces[piece][turn] == other.m_pieces[piece][turn]))
                 return false;
 
     return true;
@@ -602,7 +445,7 @@ Hash Board::hash() const
 Square Board::least_valuable(Bitboard bb) const
 {
     // Return the least valuable piece in the bitboard
-    for (auto piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
+    for (PieceType piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
     {
         Bitboard piece_bb = (get_pieces(WHITE, piece) | get_pieces(BLACK, piece)) & bb;
         if (piece_bb)
@@ -615,7 +458,7 @@ Square Board::least_valuable(Bitboard bb) const
 
 Score Board::see(Move move, int threshold) const
 {
-    // Static-Exchange evaluation with prunning
+    // Static-Exchange evaluation with pruning
     constexpr Score piece_score[] = { 10, 30, 30, 50, 90, 1000, 0, 0 };
 
     Square target = move.to();
@@ -658,7 +501,7 @@ Score Board::see(Move move, int threshold) const
 
 MixedScore Board::material_eval() const
 {
-    return m_eval1;
+    return m_psq;
 }
 
 
@@ -916,56 +759,29 @@ bool Position::reduced() const
 
 std::ostream& operator<<(std::ostream& out, const Board& board)
 {
-    Bitboard white_pieces = board.m_pieces[0][0] | board.m_pieces[1][0] | board.m_pieces[2][0]
-                          | board.m_pieces[3][0] | board.m_pieces[4][0] | board.m_pieces[5][0];
-    Bitboard black_pieces = board.m_pieces[0][1] | board.m_pieces[1][1] | board.m_pieces[2][1]
-                          | board.m_pieces[3][1] | board.m_pieces[4][1] | board.m_pieces[5][1];
-    Bitboard occupied = white_pieces | black_pieces;
-
-    for (int i = 7; i >= 0; i--)
+    out << "   +------------------------+\n";
+    for (int rank = 7; rank >= 0; rank--)
     {
-        for (int j = 0; j < 8; j++)
+        out << " " << rank + 1 << " |";
+        for (int file = 0; file < 8; file++)
         {
-            int index = i * 8 + j;
-            if (!occupied.test(index))
-            {
-                out << " .";
-            }
+            out << " ";
+            Piece pc = board.m_board_pieces[make_square(rank, file)];
+            if (pc == Piece::NO_PIECE)
+                out << '.';
             else
-            {
-                if (white_pieces.test(index))
-                {
-                    if (board.m_pieces[0][0].test(index))
-                        out << " P";
-                    else if (board.m_pieces[1][0].test(index))
-                        out << " N";
-                    else if (board.m_pieces[2][0].test(index))
-                        out << " B";
-                    else if (board.m_pieces[3][0].test(index))
-                        out << " R";
-                    else if (board.m_pieces[4][0].test(index))
-                        out << " Q";
-                    else if (board.m_pieces[5][0].test(index))
-                        out << " K";
-                }
-                else
-                {
-                    if (board.m_pieces[0][1].test(index))
-                        out << " p";
-                    else if (board.m_pieces[1][1].test(index))
-                        out << " n";
-                    else if (board.m_pieces[2][1].test(index))
-                        out << " b";
-                    else if (board.m_pieces[3][1].test(index))
-                        out << " r";
-                    else if (board.m_pieces[4][1].test(index))
-                        out << " q";
-                    else if (board.m_pieces[5][1].test(index))
-                        out << " k";
-                }
-            }
+                out << fen_piece(pc);
+            out << " ";
         }
-        out << "\n";
+        out << "|\n";
+        if (rank > 0)
+            out << "   |                        |\n";
     }
+    out << "   +------------------------+\n";
+    out << "     A  B  C  D  E  F  G  H \n";
+
+    out << "\n";
+    out << "FEN: " << board.to_fen() << "\n";
+    out << "Hash: " << std::hex << board.m_hash << std::dec << "\n";
     return out;
 }

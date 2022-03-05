@@ -106,7 +106,8 @@ enum Squares : int8_t
 enum CastleSide
 {
     KINGSIDE = 0,
-    QUEENSIDE = 1
+    QUEENSIDE = 1,
+    NO_SIDE = 2
 };
 
 
@@ -262,6 +263,3 @@ inline constexpr Square vertical_mirror(Square square)
 
 
 std::string get_square(Square square);
-
-
-std::vector<std::string> split(const std::string& s, char delimiter);

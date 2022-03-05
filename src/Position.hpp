@@ -28,7 +28,7 @@ class Board
     // Updated fields
     Hash m_hash;
     Bitboard m_checkers;
-    MixedScore m_eval1;
+    MixedScore m_psq;
     uint8_t m_phase;
     Piece m_board_pieces[NUM_SQUARES];
 
@@ -248,9 +248,6 @@ protected:
     }
 
 
-    void init();
-
-
     Hash generate_hash() const;
 
 
@@ -262,8 +259,8 @@ protected:
         m_pieces[piece][turn].set(square);
         m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
         m_board_pieces[square] = get_piece(piece, turn);
-        m_eval1 += piece_square(piece, square, turn) * turn_to_color(turn);
-        m_eval1 += piece_value[piece] * turn_to_color(turn);
+        m_psq += piece_square(piece, square, turn) * turn_to_color(turn);
+        m_psq += piece_value[piece] * turn_to_color(turn);
         m_phase -= Phases::Pieces[piece];
     }
 
@@ -273,8 +270,8 @@ protected:
         m_pieces[piece][turn].reset(square);
         m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
         m_board_pieces[square] = NO_PIECE;
-        m_eval1 -= piece_square(piece, square, turn) * turn_to_color(turn);
-        m_eval1 -= piece_value[piece] * turn_to_color(turn);
+        m_psq -= piece_square(piece, square, turn) * turn_to_color(turn);
+        m_psq -= piece_value[piece] * turn_to_color(turn);
         m_phase += Phases::Pieces[piece];
     }
 
@@ -287,7 +284,7 @@ protected:
         m_hash ^= Zobrist::get_piece_turn_square(piece, turn, to);
         m_board_pieces[from] = NO_PIECE;
         m_board_pieces[to] = get_piece(piece, turn);
-        m_eval1 += (piece_square(piece, to, turn) - piece_square(piece, from, turn)) * turn_to_color(turn);
+        m_psq += (piece_square(piece, to, turn) - piece_square(piece, from, turn)) * turn_to_color(turn);
     }
 
 
