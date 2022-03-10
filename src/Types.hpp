@@ -263,3 +263,29 @@ inline constexpr Square vertical_mirror(Square square)
 
 
 std::string get_square(Square square);
+
+
+// Pseudo random number generator based on SplitMix64
+class PseudoRandom
+{
+    uint64_t m_state;
+
+public:
+    inline PseudoRandom(uint64_t seed) : m_state(seed) {}
+
+    inline static uint64_t get(uint64_t seed)
+    {
+        uint64_t z = seed + 0x9e3779b97f4a7c15;
+        z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
+        z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
+        return z ^ (z >> 31);
+    }
+
+    inline uint64_t next()
+    {
+        uint64_t z = (m_state += 0x9e3779b97f4a7c15);
+        z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
+        z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
+        return z ^ (z >> 31);
+    }
+};

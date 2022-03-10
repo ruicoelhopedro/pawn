@@ -10,38 +10,26 @@ namespace Zobrist
         Hash rnd_black_move;
         Hash rnd_castle_side_turn[NUM_COLORS][NUM_CASTLE_SIDES];
         Hash rnd_ep_file[8];
-        Hash rnd_move_hash[NUM_SQUARES * NUM_SQUARES];
     }
 
 
     void build_rnd_hashes()
     {
+        PseudoRandom rnd(54651);
+
         for (int i = 0; i < NUM_PIECE_TYPES; i++)
             for (int j = 0; j < NUM_COLORS; j++)
                 for (int k = 0; k < NUM_SQUARES; k++)
-                    randoms::rnd_piece_turn_square[i][j][k] = get_rnd_number();
+                    randoms::rnd_piece_turn_square[i][j][k] = rnd.next();
 
-        randoms::rnd_black_move = get_rnd_number();
+        randoms::rnd_black_move = rnd.next();
 
         for (int i = 0; i < NUM_CASTLE_SIDES; i++)
             for (int j = 0; j < NUM_COLORS; j++)
-                randoms::rnd_castle_side_turn[i][j] = get_rnd_number();
+                randoms::rnd_castle_side_turn[i][j] = rnd.next();
 
         for (int i = 0; i < 8; i++)
-            randoms::rnd_ep_file[i] = get_rnd_number();
-
-        for (int i = 0; i < NUM_SQUARES*NUM_SQUARES; i++)
-            randoms::rnd_move_hash[i] = get_rnd_number();
-    }
-
-
-    Hash get_rnd_number()
-    {
-        Hash u1 = rand() & 0xFFFF;
-        Hash u2 = rand() & 0xFFFF;
-        Hash u3 = rand() & 0xFFFF;
-        Hash u4 = rand() & 0xFFFF;
-        return u1 | (u2 << 16) | (u3 << 32) | (u4 << 48);
+            randoms::rnd_ep_file[i] = rnd.next();
     }
 
 
@@ -71,6 +59,8 @@ namespace Zobrist
 
     Hash get_move_hash(Move move)
     {
-        return randoms::rnd_move_hash[move.from() | move.to() << 6];
+        // Based on a simple linear congruential generator
+        // These values have been tested for collisions for all possible Move values
+        return 0x89b4fa525 * move.to_int() + 0xe3b2eb29df24cba7;
     }
 }

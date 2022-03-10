@@ -10,11 +10,9 @@ namespace Zobrist
         extern Hash rnd_black_move;
         extern Hash rnd_castle_side_turn[NUM_COLORS][NUM_CASTLE_SIDES];
         extern Hash rnd_ep_file[8];
-        extern Hash rnd_move_hash[NUM_SQUARES * NUM_SQUARES];
     }
 
     void build_rnd_hashes();
-    Hash get_rnd_number();
 
     Hash get_piece_turn_square(PieceType piece, Turn turn, Square square);
     Hash get_black_move();
