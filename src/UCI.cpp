@@ -1,7 +1,7 @@
 #include "Evaluation.hpp"
 #include "Search.hpp"
 #include "Tests.hpp"
-#include "Transpositions.hpp"
+#include "Hash.hpp"
 #include "Types.hpp"
 #include "UCI.hpp"
 #include <iostream>

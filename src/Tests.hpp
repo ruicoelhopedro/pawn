@@ -1,5 +1,5 @@
 #pragma once
-#include "Transpositions.hpp"
+#include "Hash.hpp"
 #include "Search.hpp"
 #include "Types.hpp"
 #include "Position.hpp"

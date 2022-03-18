@@ -1,7 +1,7 @@
 #include "Types.hpp"
 #include "Move.hpp"
 #include "Position.hpp"
-#include "Transpositions.hpp"
+#include "Hash.hpp"
 #include "MoveOrder.hpp"
 #include "Search.hpp"
 #include "Evaluation.hpp"
@@ -682,7 +682,7 @@ namespace Search
         }
 
         // TT-based reduction idea
-        if (PvNode && !IsCheck && depth >= 6 && entry == nullptr)
+        if (PvNode && !IsCheck && depth >= 6 && !tt_hit)
             depth -= 2;
 
         // Regular move search
@@ -924,7 +924,7 @@ namespace Search
             EntryType type = best_score >= beta                  ? EntryType::LOWER_BOUND
                            : (PvNode && best_score > alpha_init) ? EntryType::EXACT
                            :                                       EntryType::UPPER_BOUND;
-            ttable.store(TranspositionEntry(hash, depth, score_to_tt(best_score, Ply), best_move, type, data.static_eval()), RootSearch);
+            ttable.store(hash, depth, score_to_tt(best_score, Ply), best_move, type, data.static_eval());
         }
 
         return best_score;
@@ -1069,7 +1069,7 @@ namespace Search
         EntryType type = best_score >= beta                  ? EntryType::LOWER_BOUND
                        : (PvNode && best_score > alpha_init) ? EntryType::EXACT
                        :                                       EntryType::UPPER_BOUND;
-        ttable.store(TranspositionEntry(position.hash(), 0, score_to_tt(best_score, Ply), best_move, type, static_eval));
+        ttable.store(position.hash(), 0, score_to_tt(best_score, Ply), best_move, type, static_eval);
 
         return best_score;
     }

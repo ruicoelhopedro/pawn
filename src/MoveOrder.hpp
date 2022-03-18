@@ -2,7 +2,7 @@
 #include "Types.hpp"
 #include "Position.hpp"
 #include "Move.hpp"
-#include "Transpositions.hpp"
+#include "Hash.hpp"
 
 
 enum class MoveStage

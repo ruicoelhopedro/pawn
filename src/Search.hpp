@@ -2,7 +2,7 @@
 #include "Types.hpp"
 #include "Move.hpp"
 #include "Position.hpp"
-#include "Transpositions.hpp"
+#include "Hash.hpp"
 #include "MoveOrder.hpp"
 #include <atomic>
 #include <memory>
@@ -265,7 +265,7 @@ namespace Search
 
         // TT storing
         if (TT)
-            perft_table.store(PerftEntry(position.hash(), depth, n_nodes));
+            perft_table.store(position.hash(), depth, n_nodes);
 
         return n_nodes;
     }
