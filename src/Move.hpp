@@ -140,7 +140,7 @@ public:
         *move = *(--m_end);
     }
 
-    int lenght() const
+    int length() const
     {
         return m_end - m_moves;
     }
@@ -167,6 +167,8 @@ public:
     // Iterators
     Move* begin() { return m_moves; }
     Move* end()   { return m_end; }
+    const Move* begin() const { return m_moves; }
+    const Move* end()   const { return m_end; }
     const Move* cbegin() const { return m_moves; }
     const Move* cend()   const { return m_end; }
 

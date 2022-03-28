@@ -8,6 +8,10 @@
 #include <memory>
 #include <thread>
 #include <vector>
+#include <mutex>
+#include <condition_variable>
+
+class Thread;
 
 namespace Search
 {
@@ -28,24 +32,87 @@ namespace Search
         int incr[NUM_COLORS];
         int movestogo;
         int depth;
-        int64_t nodes;
+        uint64_t nodes;
         int mate;
         int movetime;
         bool infinite;
-        int64_t end_time;
 
         Limits()
-            : searchmoves(0)
         {
             ponder = infinite = false;
-            time[WHITE] = time[BLACK] = incr[WHITE] = incr[BLACK] = 0;
+            time[WHITE] = time[BLACK] = -1;
+            incr[WHITE] = incr[BLACK] = 0;
             mate = 0;
             depth = NUM_MAX_DEPTH;
-            movestogo = movetime = INT32_MAX;
-            end_time = INT64_MAX;
-            nodes = INT64_MAX;
+            movestogo = movetime = -1;
+            nodes = UINT64_MAX;
         }
     };
+
+
+    class Timer
+    {
+        std::chrono::steady_clock::time_point m_start;
+
+
+    public:
+        Timer();
+
+        double elapsed() const;
+        std::chrono::steady_clock::time_point begin() const;
+
+        static double diff(std::chrono::steady_clock::time_point a, std::chrono::steady_clock::time_point b);
+    };
+
+
+    class SearchTime
+    {
+        Timer m_timer;
+        bool m_managed;
+        uint64_t m_movetime_ms;
+        std::atomic_bool m_pondering;
+        std::atomic<std::chrono::steady_clock::time_point> m_end_time;
+
+    public:
+        SearchTime() noexcept;
+
+        void init(const Timer& timer, bool ponder);
+        void init(const Timer& timer, uint64_t movetime_ms, bool ponder);
+
+        void ponderhit();
+
+        bool pondering() const;
+
+        double elapsed() const;
+
+        double remaining() const;
+
+        bool time_management() const;
+    };
+
+
+    enum class BoundType
+    {
+        LOWER_BOUND,
+        UPPER_BOUND,
+        EXACT,
+        NO_BOUND
+    };
+
+    class MultiPVData
+    {
+    public:
+        Depth depth;
+        Depth seldepth;
+        Score score;
+        Move pv[NUM_MAX_DEPTH];
+        BoundType type;
+    
+        MultiPVData();
+
+        void write_pv(int index, uint64_t nodes, double elapsed) const;
+    };
+
 
     enum SearchType
     {
@@ -75,7 +142,6 @@ namespace Search
     class SearchData
     {
         int m_ply;
-        int64_t& m_nodes_searched;
         Depth& m_seldepth;
         SearchFlags m_flags;
         int m_reductions;
@@ -83,7 +149,7 @@ namespace Search
         Histories& m_histories;
         const SearchData* m_prev;
         Move m_excluded_move;
-        int m_thread_id;
+        Thread& m_thread;
         Score m_static_eval;
         Move m_move;
         Move* m_pv;
@@ -91,26 +157,28 @@ namespace Search
         bool m_isPv;
 
     public:
-        SearchData(Histories& histories, int thread_id, int64_t& nodes_searched, Depth& seldepth, Move* pv, Move* prev_pv);
+        SearchData(Thread& thread);
 
         SearchData next(Move move) const;
 
-        Histories& histories() const;
+        int ply() const;
         int reductions() const;
         int extensions() const;
-        int ply() const;
-        Move excluded_move() const;
-        int thread() const;
-        Score& static_eval();
-        Score static_eval() const;
-        Move last_move() const;
-        SearchFlags flags() const;
-        const SearchData* previous(int distance = 1) const;
-        int64_t& nodes_searched();
-        Depth& seldepth();
         bool in_pv() const;
-        Move* pv();
         Move pv_move();
+        Move last_move() const;
+        Move excluded_move() const;
+        Move* pv();
+        Move* prev_pv();
+        Score static_eval() const;
+        Score& static_eval();
+        Depth& seldepth();
+        Thread& thread() const;
+        SearchFlags flags() const;
+        Histories& histories() const;
+        uint64_t nodes_searched() const;
+
+        const SearchData* previous(int distance = 1) const;
 
         void exclude(Move move);
 
@@ -125,62 +193,10 @@ namespace Search
     };
 
 
-    class SearchThread
-    {
-        std::unique_ptr<Histories> m_histories;
-        std::unique_ptr<PvContainer> m_pv;
-        int64_t m_nodes_searched;
-        Depth m_seldepth;
-        SearchData m_data;
-
-    public:
-        SearchThread(int id);
-
-        Histories& histories();
-        SearchData& data();
-    };
+    void copy_pv(Move* src, Move* dst);
 
 
-    extern bool thinking;
-    extern int64_t nodes_searched;
-    extern Position* base_position;
-    extern std::vector<std::thread> threads;
-    extern std::chrono::steady_clock::time_point start_time;
-    extern std::chrono::steady_clock::time_point end_time;
-
-
-    namespace Parameters
-    {
-        extern Depth depth;
-        extern int multiPV;
-        extern int n_threads;
-        extern Limits limits;
-        extern bool ponder;
-    }
-
-
-    bool timeout();
-
-
-    void start_search_threads();
-
-
-    void stop_search_threads();
-
-
-    void go_perft(Depth depth);
-
-
-    void thread_search(int id);
-
-
-    void update_time();
-
-
-    void get_pv(Position& position, Depth depth, MoveList& pv);
-
-
-    Score aspiration_search(Position& position, Score init_score, Depth depth, Color color, SearchData& data);
+    Score aspiration_search(Position& position, MultiPVData& pv, Depth depth, SearchData& data);
 
 
     Score iter_deepening(Position& position, SearchData& data);
@@ -256,7 +272,7 @@ namespace Search
             }
             else
             {
-                n_nodes = move_list.lenght();
+                n_nodes = move_list.length();
                 if (OUTPUT)
                     for (auto move : move_list)
                         std::cout << move.to_uci() << ": " << 1 << std::endl;
