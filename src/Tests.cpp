@@ -196,7 +196,7 @@ namespace Tests
             Position pos(test.fen());
 
             auto moves = pos.generate_moves(MoveGenType::LEGAL);
-            int reference = moves.lenght();
+            int reference = moves.length();
 
             int result = 0;
             for (uint16_t number = 0; number < UINT16_MAX; number++)

@@ -11,7 +11,7 @@ std::ostream& operator<<(std::ostream& out, const Move& move)
 
 std::ostream& operator<<(std::ostream& out, const MoveList& list)
 {
-    if (list.lenght() > 0)
+    if (list.length() > 0)
     {
         out << list.m_moves[0];
         for (Move* i = (list.m_moves + 1); i < list.m_end; i++)

@@ -6,7 +6,6 @@
 
 
 using Square = int8_t;
-using Value = int8_t;
 using Hash = uint64_t;
 using Direction = int8_t;
 using Score = int16_t;
@@ -20,6 +19,7 @@ constexpr int NUM_CASTLE_SIDES = 2;
 
 
 constexpr int NUM_MAX_MOVES = 256;
+constexpr int NUM_MAX_PLY = 200;
 constexpr Depth NUM_MAX_DEPTH = 200;
 
 

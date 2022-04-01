@@ -36,6 +36,8 @@ class Histories
 public:
     Histories();
 
+    void clear();
+
     void add_bonus(Move move, Turn turn, PieceType piece, int bonus);
     void fail_high(Move move, Move prev_move, Turn turn, Depth depth, Depth ply, PieceType piece);
     void update_low_ply(Move move, Depth ply, PieceType piece, int value);

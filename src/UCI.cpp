@@ -4,6 +4,8 @@
 #include "Hash.hpp"
 #include "Types.hpp"
 #include "UCI.hpp"
+#include "Thread.hpp"
+#include <array>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -11,10 +13,95 @@
 
 namespace UCI
 {
+    std::map<std::string, Option> OptionsMap;
+
+
     namespace Options
     {
-        int hash = 16;
+        int Hash;
+        int MultiPV;
+        bool Ponder;
+        int Threads;
     }
+
+
+    void Option::set(std::string value)
+    {
+        if (m_type == OptionType::CHECK)
+        {
+            *std::get<bool*>(m_data) = (value == "true");
+        }
+        else if (m_type == OptionType::SPIN)
+        {
+            *std::get<int*>(m_data) = std::clamp(std::stoi(value), m_min, m_max);
+        }
+        else if (m_type == OptionType::COMBO)
+        {
+            auto val = std::find(m_var.begin(), m_var.end(), value);
+            if (val != m_var.end())
+                *std::get<std::string*>(m_data) = *val;
+        }
+        else if (m_type == OptionType::STRING)
+        {
+            *std::get<std::string*>(m_data) = value;
+        }
+
+        // On-change callback
+        if (std::visit([](auto func){ return func != nullptr; }, m_change))
+        {
+            if (m_type == CHECK)
+                std::get<OnChange<bool>>(m_change)(*std::get<bool*>(m_data));
+            else if (m_type == SPIN)
+                std::get<OnChange<int>>(m_change)(*std::get<int*>(m_data));
+            else if (m_type == BUTTON)
+                std::get<OnChange<>>(m_change)();
+            else
+                std::get<OnChange<std::string>>(m_change)(*std::get<std::string*>(m_data));
+        }
+    }
+
+
+
+    std::ostream& operator<<(std::ostream& out, const Option& option)
+    {
+        std::array<std::string, 5> types{ "check", "spin", "combo", "button", "string" };
+        out << " type " << types[option.m_type];
+        
+        // Button type has no default
+        if (option.m_type != BUTTON)
+        {
+            out << " default ";
+            // Ensure we print true or false for check types
+            if (option.m_type == CHECK)
+                out << (std::get<bool>(option.m_default) ? "true" : "false");
+            else
+                std::visit([&out](auto value){ out << value; }, option.m_default);
+
+            // Spin has min and max
+            if (option.m_type == SPIN)
+                out << " min " << option.m_min << " max " << option.m_max;
+            // Combo has the list of vars
+            else if (option.m_type == COMBO)
+                for (std::string var : option.m_var)
+                    out << " var " << var;
+        }
+
+        return out;
+    }
+
+
+
+    void init_options()
+    {
+        OptionsMap.emplace("Clear Hash", Option(OnChange<>([]() { ttable.clear(); })));
+        OptionsMap.emplace("Hash",       Option(&Options::Hash, 16, 1, ttable.max_size(),
+                                                [](int v) { ttable.resize(v); }));
+        OptionsMap.emplace("MultiPV",    Option(&Options::MultiPV, 1, 1, 255));
+        OptionsMap.emplace("Threads",    Option(&Options::Threads, 1, 1, 512,
+                                                [](int v) { pool->resize(v); }));
+        OptionsMap.emplace("Ponder",     Option(&Options::Ponder, false));
+    }
+
 
 
     void main_loop()
@@ -51,9 +138,9 @@ namespace UCI
 
             // Non-UCI commands
             else if (token == "board")
-                std::cout << Search::base_position->board() << std::endl;
+                std::cout << pool->position().board() << std::endl;
             else if (token == "eval")
-                evaluation(*Search::base_position, true);
+                evaluation(pool->position(), true);
             else if (token == "test")
             {
                 int t1 = Tests::perft_tests();
@@ -81,10 +168,8 @@ namespace UCI
 
         // Send options
         std::cout << std::endl;
-        std::cout << "option name Hash type spin default 16 min 1 max " << ttable.max_size() << std::endl;
-        std::cout << "option name MultiPV type spin default 1 min 1 max 255" << std::endl;
-        std::cout << "option name Ponder type check default false" << std::endl;
-        std::cout << "option name Threads type spin default 1 min 1 max 512" << std::endl;
+        for (const auto &[name, option] : OptionsMap)
+            std::cout << "option name " << name << option << std::endl;
 
         // Mandatory uciok at the end
         std::cout << "uciok" << std::endl;
@@ -108,20 +193,7 @@ namespace UCI
             while (stream >> token)
                 value += value.empty() ? token : (" " + token);
 
-            // Set value
-            if (name == "Hash")
-            {
-                Options::hash = std::min(std::max(std::stoi(value), 1), ttable.max_size());
-                ttable.resize(Options::hash);
-            }
-            else if (name == "MultiPV")
-                Search::Parameters::multiPV = std::min(std::max(std::stoi(value), 1), 255);
-            else if (name == "Threads")
-                Search::Parameters::n_threads = std::min(std::max(std::stoi(value), 1), 512);
-            else if (name == "Ponder")
-                Search::Parameters::ponder = (value == "true");
-            else
-                std::cout << "Unknown option " << name << std::endl;
+            OptionsMap.at(name).set(value);
         }
     }
 
@@ -131,13 +203,13 @@ namespace UCI
     {
         std::string token;
         int perft_depth = 0;
-        auto& limits = Search::Parameters::limits;
+        Search::Timer timer;
+        Search::Limits limits;
 
-        limits = Search::Limits();
         while (stream >> token)
             if (token == "searchmoves")
                 while (stream >> token)
-                    limits.searchmoves.push_back(move_from_uci(*Search::base_position, token));
+                    limits.searchmoves.push_back(move_from_uci(pool->position(), token));
             else if (token == "wtime")
                 stream >> limits.time[WHITE];
             else if (token == "btime")
@@ -166,34 +238,33 @@ namespace UCI
         // Check if perft search
         if (perft_depth > 0)
         {
-            Search::go_perft(perft_depth);
+            int64_t nodes = Search::perft<true>(pool->position(), perft_depth);
+            std::cout << "\nNodes searched: " << nodes << std::endl;
             return;
         }
 
-        Search::end_time = std::chrono::steady_clock::now() + std::chrono::milliseconds(INT32_MAX);
-        Search::update_time();
-        Search::start_search_threads();
+        pool->search(timer, limits);
     }
 
 
 
     void stop(Stream& stream)
     {
-        Search::stop_search_threads();
+        pool->stop();
     }
 
 
 
     void quit(Stream& stream)
     {
-        Search::stop_search_threads();
+        pool->kill_threads();
     }
 
 
 
     void position(Stream& stream)
     {
-        Position& pos = *Search::base_position;
+        Position& pos =  pool->position();
 
         std::string token;
         stream >> token;
@@ -202,9 +273,8 @@ namespace UCI
         {
             pos = Position();
 
-            // Check if moves token has been passed
-            if (stream >> token && token != "moves")
-                return;
+            // Consume moves token, if passed
+            while (stream >> token && token != "moves");
         }
         else if (token == "fen")
         {
@@ -224,14 +294,15 @@ namespace UCI
             pos.make_move(move);
             pos.set_init_ply();
         }
+
+        pool->update_position_threads();
     }
 
 
 
     void ponderhit(Stream& stream)
     {
-        Search::Parameters::limits.ponder = false;
-        Search::update_time();
+        pool->ponderhit();
     }
 
 

@@ -2,7 +2,7 @@ BIN_NAME=pawn
 BUILD_DIR=build
 SRC_DIR=src
 
-CXXFLAGS=-Wall -std=c++14 -O3 -march=native -flto
+CXXFLAGS=-Wall -std=c++17 -O3 -march=native -flto
 LDFLAGS=-pthread -flto
 
 SRC_FILES = $(shell find $(SRC_DIR) -name *.cpp)

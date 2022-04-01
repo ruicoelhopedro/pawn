@@ -9,6 +9,12 @@
 
 Histories::Histories()
 {
+    clear();
+}
+
+
+void Histories::clear()
+{
     for (int i = 0; i < NUM_COLORS; i++)
         for (int j = 0; j < NUM_SQUARES; j++)
             for (int k = 0; k < NUM_SQUARES; k++)
