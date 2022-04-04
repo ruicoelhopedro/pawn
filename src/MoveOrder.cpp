@@ -171,10 +171,12 @@ Move MoveOrder::next_move()
             ++m_stage;
             m_moves = m_position.move_list();
             m_position.board().generate_moves(m_moves, MoveGenType::CAPTURES);
+            sort_moves<true>(m_moves);
+            m_curr = m_moves.begin();
         }
         else if (m_stage == MoveStage::CAPTURES)
         {
-            while (best_move<true>(move))
+            while (next(move))
                 if (move != m_hash_move)
                     return move;
             ++m_stage;
@@ -218,10 +220,12 @@ Move MoveOrder::next_move()
             ++m_stage;
             m_moves = m_position.move_list();
             m_position.board().generate_moves(m_moves, MoveGenType::QUIETS);
+            sort_moves<false>(threshold_moves<false>(m_moves, -3000 * m_depth));
+            m_curr = m_moves.begin();
         }
         else if (m_stage == MoveStage::QUIET)
         {
-            while (best_move<false>(move))
+            while (next(move))
                 if (move != m_hash_move && move != m_killer && move != m_countermove)
                     return move;
             ++m_stage;

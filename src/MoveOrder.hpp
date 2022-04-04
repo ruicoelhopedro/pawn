@@ -64,6 +64,7 @@ class MoveOrder
     MoveStage m_stage;
     Move m_countermove;
     Move m_killer;
+    Move* m_curr;
 
     bool hash_move(Move& move);
 
@@ -76,36 +77,14 @@ class MoveOrder
         else
             return quiet_score(move);
     }
-    
-    
-    template<bool CAPTURES>
-    bool best_move(Move& move)
+
+
+    bool next(Move& move)
     {
-        // Do we have any move?
-        if (m_moves.begin() == m_moves.end())
+        if (m_curr == m_moves.end())
             return false;
 
-        auto list_move = m_moves.begin();
-        int curr_score = move_score<CAPTURES>(*list_move);
-        Move* curr_move = list_move;
-
-        // Find move with greater score
-        list_move++;
-        while (list_move != m_moves.end())
-        {
-            int score = move_score<CAPTURES>(*list_move);
-            if (score > curr_score)
-            {
-                curr_score = score;
-                curr_move = list_move;
-            }
-
-            list_move++;
-        }
-        
-        // Pop the move and return
-        move = *curr_move;
-        m_moves.pop(curr_move);
+        move = *(m_curr++);
         return true;
     }
 
@@ -131,22 +110,10 @@ class MoveOrder
     template<bool CAPTURES>
     void sort_moves(MoveList list) const
     {
-        for (auto move = list.begin(); move != list.end(); move++)
-        {
-            Move* best_move = list.begin();
-            int best_score = move_score<CAPTURES>(*best_move);
-            for (auto other = best_move + 1; other != list.end(); other++)
-            {
-                int score = move_score<CAPTURES>(*other);
-                if (score > best_score)
-                {
-                    best_move = other;
-                    best_score = score;
-                }
-            }
-            if (best_move != move)
-                std::swap(*best_move, *move);
-        }
+        std::sort(list.begin(), list.end(), [this](Move a, Move b)
+                  {
+                      return move_score<CAPTURES>(a) > move_score<CAPTURES>(b);
+                  });
     }
 
 
