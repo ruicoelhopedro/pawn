@@ -362,6 +362,10 @@ void Thread::search()
     // Main thread is responsible for the bestmove output
     if (main_thread)
     {
+        // While pondering or in infinite mode we should not send a premature bestmove, so
+        // we park here until the search gets stopped or we get a ponderhit
+        while (!timeout() && (m_pool.pondering() || limits.infinite)) {}
+
         // Stop the search
         m_pool.stop();
 
