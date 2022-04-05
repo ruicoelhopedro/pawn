@@ -27,10 +27,12 @@ class Thread
 {
     int m_id;
     ThreadPool& m_pool;
+    std::mutex m_mutex;
     Position m_position;
     std::thread m_thread;
     ThreadStatus m_status;
     MoveList m_root_moves;
+    std::condition_variable m_cvar;
 
     void thread_loop();
 
@@ -56,6 +58,10 @@ public:
 
     bool timeout() const;
 
+    void wake(ThreadStatus status);
+
+    void wait();
+
     int id() const;
     bool is_main() const;
     ThreadPool& pool() const;
@@ -73,10 +79,8 @@ class ThreadPool
 
 protected:
     friend class Thread;
-    std::mutex m_mutex;
     Search::Limits m_limits;
     Search::SearchTime m_time;
-    std::condition_variable m_cvar;
     std::atomic<ThreadStatus> m_status;
 
 public:
@@ -106,6 +110,8 @@ public:
     int64_t nodes_searched() const;
 
     int size() const;
+
+    void wait();
 };
 
 

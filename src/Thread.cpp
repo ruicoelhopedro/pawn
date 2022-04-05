@@ -32,14 +32,30 @@ void Thread::thread_loop()
 {
     while (m_status != ThreadStatus::QUITTING)
     {
-        std::unique_lock<std::mutex> lock(m_pool.m_mutex);
-        m_pool.m_cvar.wait(lock, [this]() { return m_pool.status() != m_status; });
-        m_status = m_pool.status();
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_status = ThreadStatus::WAITING;
+        m_cvar.notify_one();
+        m_cvar.wait(lock, [this]() { return m_status != ThreadStatus::WAITING; });
         lock.unlock();
 
         if (m_status == ThreadStatus::SEARCHING)
             search();
     }
+}
+
+
+void Thread::wait()
+{
+    std::unique_lock<std::mutex> lock(m_mutex);
+    m_cvar.wait(lock, [this]{ return m_status != ThreadStatus::SEARCHING; });
+}
+
+
+void Thread::wake(ThreadStatus status)
+{
+    std::unique_lock<std::mutex> lock(m_mutex);
+    m_status = status;
+    m_cvar.notify_one();
 }
 
 
@@ -81,9 +97,8 @@ ThreadPool::ThreadPool()
 
 void ThreadPool::send_signal(ThreadStatus signal)
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_status = signal;
-    m_cvar.notify_all();
+    for (auto& thread : m_threads)
+        thread->wake(signal);
 }
 
 
@@ -117,8 +132,10 @@ void ThreadPool::update_position_threads()
 
 void ThreadPool::search(const Search::Timer& timer, const Search::Limits& limits, bool wait)
 {
-    // Acquire lock and set the search data before waking the threads
-    std::unique_lock<std::mutex> lock(m_mutex);
+    // Ensure all threads are stopped before we start searching
+    this->wait();
+
+    // Set the search data before waking the threads
     m_status = ThreadStatus::SEARCHING;
     m_limits = limits;
 
@@ -126,22 +143,23 @@ void ThreadPool::search(const Search::Timer& timer, const Search::Limits& limits
     update_time(timer, limits);
 
     // Wake threads
-    m_cvar.notify_all();
-    lock.unlock();
+    send_signal(ThreadStatus::SEARCHING);
 
     if (wait)
-    {
-        std::unique_lock<std::mutex> wait_lock(m_mutex);
-        m_cvar.wait(wait_lock, [this]() { return m_status != ThreadStatus::SEARCHING; });
-    }
+        this->wait();
 }
 
 
 void ThreadPool::stop()
 {
-    //std::lock_guard<std::mutex> lock(m_mutex);
     m_status = ThreadStatus::WAITING;
-    m_cvar.notify_all();
+}
+
+
+void ThreadPool::wait()
+{
+    for (auto& thread : m_threads)
+        thread->wait();
 }
 
 
@@ -255,9 +273,8 @@ void Thread::search()
             std::cout << "info depth 0 score " << (m_position.is_check() ? "mate 0" : "cp 0") << std::endl;
             std::cout << "bestmove " << MOVE_NULL << std::endl;
             
-                // Stop the search
-            if (m_pool.status() == ThreadStatus::SEARCHING)
-                m_pool.stop();
+            // Stop the search
+            m_pool.stop();
         }
         return;
     }
@@ -345,6 +362,9 @@ void Thread::search()
     // Main thread is responsible for the bestmove output
     if (main_thread)
     {
+        // Stop the search
+        m_pool.stop();
+
         // Fetch best and ponder moves from best Pv line
         Move* best_pv = m_multiPV.front().pv;
         Move bestmove = *best_pv;
@@ -355,10 +375,6 @@ void Thread::search()
         if (pondermove != MOVE_NULL)
             std::cout << " ponder " << pondermove;
         std::cout << std::endl;
-
-        // Stop the search
-        if (m_pool.status() == ThreadStatus::SEARCHING)
-            m_pool.stop();
     }
 }
 
