@@ -81,7 +81,8 @@ namespace Search
             return std::numeric_limits<double>::infinity();
 
         // Remaining time is always the difference between now and the end time
-        return Timer::diff(m_end_time, std::chrono::steady_clock::now());
+        return Timer::diff(m_end_time.load(std::memory_order_relaxed),
+                           std::chrono::steady_clock::now());
     }
     
     bool SearchTime::time_management() const
