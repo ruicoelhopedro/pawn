@@ -121,36 +121,13 @@ namespace Search
         NON_PV,
     };
 
-    enum SearchFlags
-    {
-        NONE = 0,
-        ROOT_SEARCH = 1,
-        REDUCED = 2,
-        EXTENDED = 4,
-        DOUBLE_EXTENDED = 8,
-    };
-
-    inline SearchFlags  operator~  (SearchFlags  a) { return (SearchFlags)~(int)a; }
-    inline SearchFlags& operator|= (SearchFlags& a, SearchFlags b) { return (SearchFlags&)((int&)a |= (int)b); }
-    inline SearchFlags& operator^= (SearchFlags& a, SearchFlags b) { return (SearchFlags&)((int&)a ^= (int)b); }
-    inline SearchFlags& operator&= (SearchFlags& a, SearchFlags b) { return (SearchFlags&)((int&)a &= (int)b); }
-    inline SearchFlags  operator|  (SearchFlags  a, SearchFlags b) { return (SearchFlags)((int)a | (int)b); }
-    inline SearchFlags  operator^  (SearchFlags  a, SearchFlags b) { return (SearchFlags)((int)a ^ (int)b); }
-    inline SearchFlags  operator&  (SearchFlags  a, SearchFlags b) { return (SearchFlags)((int)a & (int)b); }
-
 
     class SearchData
     {
         int m_ply;
-        Depth& m_seldepth;
-        SearchFlags m_flags;
-        int m_reductions;
         int m_extensions;
-        Histories& m_histories;
         const SearchData* m_prev;
-        Move m_excluded_move;
         Thread& m_thread;
-        Score m_static_eval;
         Move m_move;
         Move* m_pv;
         Move* m_prev_pv;
@@ -159,37 +136,28 @@ namespace Search
     public:
         SearchData(Thread& thread);
 
-        SearchData next(Move move) const;
+        SearchData next(Move move, int extension = 0) const;
+
+        Depth& seldepth;
+        Score static_eval;
+        Move excluded_move;
+        Histories& histories;
 
         int ply() const;
-        int reductions() const;
         int extensions() const;
         bool in_pv() const;
         Move pv_move();
         Move last_move() const;
-        Move excluded_move() const;
         Move* pv();
         Move* prev_pv();
-        Score static_eval() const;
-        Score& static_eval();
-        Depth& seldepth();
         Thread& thread() const;
-        SearchFlags flags() const;
-        Histories& histories() const;
         uint64_t nodes_searched() const;
 
         const SearchData* previous(int distance = 1) const;
 
-        void exclude(Move move);
-
         void update_pv(Move best_move, Move* new_pv);
         void accept_pv();
         void clear_pv();
-
-        SearchData& operator|=(SearchFlags flag);
-        SearchData& operator^=(SearchFlags flag);
-        SearchData operator|(SearchFlags flag) const;
-        SearchData operator^(SearchFlags flag) const;
     };
 
 

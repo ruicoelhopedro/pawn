@@ -139,46 +139,32 @@ namespace Search
 
 
     SearchData::SearchData(Thread& thread)
-        : m_ply(0), m_seldepth(thread.m_seldepth), m_flags(NONE), m_reductions(0),
-          m_extensions(0), m_histories(thread.m_histories), m_prev(nullptr),
-          m_excluded_move(MOVE_NULL), m_thread(thread), m_static_eval(SCORE_NONE),
-          m_move(MOVE_NULL), m_pv(thread.m_pv.pv), m_prev_pv(thread.m_pv.prev_pv),
-          m_isPv(true)
-    {
-    }
+        : m_ply(0), m_extensions(0), m_prev(nullptr), m_thread(thread), m_move(MOVE_NULL),
+          m_pv(thread.m_pv.pv), m_prev_pv(thread.m_pv.prev_pv), m_isPv(true), 
+          seldepth(thread.m_seldepth), static_eval(SCORE_NONE), excluded_move(MOVE_NULL),
+          histories(thread.m_histories)
+    {}
 
-    int SearchData::reductions() const { return m_reductions; }
     int SearchData::extensions() const { return m_extensions; }
     int SearchData::ply() const { return m_ply; }
     bool SearchData::in_pv() const { return m_isPv; }
-    Move SearchData::excluded_move() const { return m_excluded_move; }
     Move SearchData::last_move() const { return m_move; }
     Move* SearchData::pv() { return m_pv; }
     Move* SearchData::prev_pv() { return m_prev_pv; }
     Move SearchData::pv_move() { return m_isPv ? m_prev_pv[m_ply] : MOVE_NULL; }
-    Score SearchData::static_eval() const { return m_static_eval; }
-    Score& SearchData::static_eval() { return m_static_eval; }
-    Depth& SearchData::seldepth() { return m_seldepth; }
     Thread& SearchData::thread() const { return m_thread; }
     uint64_t SearchData::nodes_searched() const { return m_thread.m_nodes_searched.load(std::memory_order_relaxed); }
-    Histories& SearchData::histories() const { return m_histories; }
-    SearchFlags SearchData::flags() const { return m_flags; }
 
-    SearchData SearchData::next(Move move) const
+    SearchData SearchData::next(Move move, int extension) const
     {
         SearchData result = *this;
         result.m_prev = this;
         result.m_move = move;
-        // Next flags
-        result.m_flags = NONE;
-        if (m_flags & REDUCED)
-            result.m_reductions++;
-        if (m_flags & EXTENDED)
-            result.m_extensions++;
         // Other parameters
         result.m_ply++;
-        result.m_static_eval = SCORE_NONE;
-        result.m_excluded_move = MOVE_NULL;
+        result.static_eval = SCORE_NONE;
+        result.m_extensions += extension;
+        result.excluded_move = MOVE_NULL;
         // New pv location
         result.m_pv += PV_LENGTH - m_ply;
         // Are we still in a PV line?
@@ -187,8 +173,6 @@ namespace Search
         m_thread.m_nodes_searched.fetch_add(1, std::memory_order_relaxed);
         return result;
     }
-    
-    void SearchData::exclude(Move move) { m_excluded_move = move; }
 
     const SearchData* SearchData::previous(int distance) const
     {
@@ -231,38 +215,6 @@ namespace Search
     }
 
 
-
-    SearchData& SearchData::operator|=(SearchFlags flag)
-    {
-        m_flags |= flag;
-        return *this;
-    }
-
-
-    SearchData& SearchData::operator^=(SearchFlags flag)
-    {
-        m_flags ^= flag;
-        return *this;
-    }
-
-
-    SearchData SearchData::operator|(SearchFlags flag) const
-    {
-        SearchData result = *this;
-        result |= flag;
-        return result;
-    }
-
-
-    SearchData SearchData::operator^(SearchFlags flag) const
-    {
-        SearchData result = *this;
-        result ^= flag;
-        return result;
-    }
-
-
-    
     void copy_pv(Move* src, Move* dst)
     {
         while (*src != MOVE_NULL)
@@ -298,7 +250,7 @@ namespace Search
 
             // Clear Pv output array and fetch previous Pv line for move ordering
             data.clear_pv();
-            data.seldepth() = 0;
+            data.seldepth = 0;
             copy_pv(pv.pv, data.prev_pv());
 
             // Do the search
@@ -311,7 +263,7 @@ namespace Search
             // Store results for this PV line
             pv.depth = depth;
             pv.score = score;
-            pv.seldepth = data.seldepth();
+            pv.seldepth = data.seldepth;
             pv.type = score <= alpha ? BoundType::UPPER_BOUND
                     : score >= beta  ? BoundType::LOWER_BOUND
                     :                  BoundType::EXACT;
@@ -346,7 +298,7 @@ namespace Search
         // Node data
         constexpr bool PvNode = ST != NON_PV;
         const bool RootSearch = ST == ROOT;
-        const bool HasExcludedMove = data.excluded_move() != MOVE_NULL;
+        const bool HasExcludedMove = data.excluded_move != MOVE_NULL;
         const bool IsCheck = position.is_check();
         const Turn Turn = position.get_turn();
         const Depth Ply = data.ply();
@@ -355,7 +307,7 @@ namespace Search
         {
             // Update seldepth and clear PV
             *(data.pv()) = MOVE_NULL;
-            data.seldepth() = std::max(data.seldepth(), Ply);
+            data.seldepth = std::max(data.seldepth, Ply);
         }
 
         // Timeout?
@@ -388,7 +340,7 @@ namespace Search
         Score tt_static_eval = SCORE_NONE;
         TranspositionEntry* entry = nullptr;
         EntryType tt_type = EntryType::EXACT;
-        Hash hash = HasExcludedMove ? position.hash() ^ Zobrist::get_move_hash(data.excluded_move()) : position.hash();
+        Hash hash = HasExcludedMove ? position.hash() ^ Zobrist::get_move_hash(data.excluded_move) : position.hash();
         bool tt_hit = ttable.query(hash, &entry);
         if (tt_hit)
         {
@@ -409,9 +361,9 @@ namespace Search
                 {
                     PieceType piece = position.board().get_piece_at(tt_move.from());
                     if (tt_score >= beta)
-                        data.histories().fail_high(tt_move, data.last_move(), Turn, depth, Ply, piece);
+                        data.histories.fail_high(tt_move, data.last_move(), Turn, depth, Ply, piece);
                     else
-                        data.histories().add_bonus(tt_move, Turn, piece, -depth);
+                        data.histories.add_bonus(tt_move, Turn, piece, -depth);
                 }
 
                 // Do not cutoff when we are approaching the 50 move rule
@@ -430,11 +382,11 @@ namespace Search
             if (tt_hit && tt_static_eval != SCORE_NONE)
                 static_eval = tt_static_eval;
             else if (data.last_move() == MOVE_NULL && Ply > 1)
-                static_eval = -data.previous(1)->static_eval();
+                static_eval = -data.previous(1)->static_eval;
             else
                 static_eval = turn_to_color(Turn) * evaluation(position);
         }
-        data.static_eval() = static_eval;
+        data.static_eval = static_eval;
 
         // Can we use the TT value for a better static evaluation?
         if (tt_hit && tt_score != SCORE_NONE &&
@@ -459,7 +411,7 @@ namespace Search
         {
             int reduction = 3 + (static_eval - beta) / 200;
             Depth new_depth = reduce(depth, 1 + reduction);
-            SearchData curr_data = data.next(MOVE_NULL) | REDUCED;
+            SearchData curr_data = data.next(MOVE_NULL);
             position.make_null_move();
             Score null = -negamax<NON_PV>(position, new_depth, -beta, -beta + 1, curr_data);
             position.unmake_null_move();
@@ -480,7 +432,7 @@ namespace Search
         Move quiet_list[NUM_MAX_MOVES];
         MoveList quiets_searched(quiet_list);
         Move hash_move = (data.in_pv() && data.pv_move() != MOVE_NULL) ? data.pv_move() : tt_move;
-        MoveOrder orderer = MoveOrder(position, Ply, depth, hash_move, data.histories(), data.last_move());
+        MoveOrder orderer = MoveOrder(position, Ply, depth, hash_move, data.histories, data.last_move());
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;
@@ -491,13 +443,13 @@ namespace Search
             }
 
             // Skip excluded moves
-            if (move == data.excluded_move())
+            if (move == data.excluded_move)
                 continue;
 
             // New search parameters
+            int extension = 0;
             Depth curr_depth = depth;
             uint64_t move_nodes = data.nodes_searched();
-            SearchFlags flags = SearchFlags::NONE;
 
             // For the root node, only search the stored root moves
             if (RootSearch && !data.thread().is_root_move(move))
@@ -548,17 +500,14 @@ namespace Search
                 Depth singularDepth = (depth - 1) / 2;
 
                 // Search with the move excluded
-                data.exclude(move);
-                data |= REDUCED;
+                data.excluded_move = move;
                 Score score = negamax<NON_PV>(position, singularDepth, singularBeta - 1, singularBeta, data);
-                data ^= REDUCED;
-                data.exclude(MOVE_NULL);
+                data.excluded_move = MOVE_NULL;
 
                 if (score < singularBeta)
                 {
                     // TT move is singular, we are extending it
-                    flags |= EXTENDED;
-                    curr_depth++;
+                    extension = 1;
                 }
                 else if (singularBeta >= beta)
                 {
@@ -572,8 +521,15 @@ namespace Search
             Score score;
             bool captureOrPromotion = move.is_capture() || move.is_promotion();
             PieceType piece = static_cast<PieceType>(position.board().get_piece_at(move.from()));
-            SearchData curr_data = data.next(move) | flags;
             position.make_move(move);
+
+            // Check extensions
+            if (IsCheck && data.extensions() < 3 && depth < 4)
+                extension = 1;
+
+            // Update depth and search data
+            curr_depth = depth + extension;
+            SearchData curr_data = data.next(move, extension);
 
             // Late move reductions
             bool do_full_search = true;
@@ -588,19 +544,10 @@ namespace Search
                 Depth new_depth = reduce(depth, 1 + reduction);
 
                 // Reduced depth search
-                curr_data |= REDUCED;
                 score = -negamax<NON_PV>(position, new_depth, -alpha - 1, -alpha, curr_data);
-                curr_data ^= REDUCED;
 
                 // Only carry a full search if this reduced move fails high
                 do_full_search = score >= alpha;
-            }
-
-            // Check extensions
-            if (IsCheck && data.extensions() < 3 && depth < 4)
-            {
-                curr_data |= EXTENDED;
-                curr_depth++;
             }
 
             // PVS
@@ -626,7 +573,7 @@ namespace Search
                     if (PvNode && score > alpha && score < beta)
                     {
                         // But before add a bonus to the move
-                        data.histories().add_bonus(move, Turn, piece, depth);
+                        data.histories.add_bonus(move, Turn, piece, depth);
                         score = -negamax<PV>(position, curr_depth - 1, -beta, -alpha, curr_data);
                     }
                 }
@@ -643,7 +590,7 @@ namespace Search
             if (didLMR && do_full_search)
             {
                 int bonus = score > best_score ? depth : -depth;
-                data.histories().add_bonus(move, Turn, piece, bonus);
+                data.histories.add_bonus(move, Turn, piece, bonus);
             }
 
             // New best move
@@ -661,14 +608,14 @@ namespace Search
             // Update low-ply history
             move_nodes = data.nodes_searched() - move_nodes;
             if (Ply < NUM_LOW_PLY)
-                data.histories().update_low_ply(move, Ply, piece, move_nodes / 10000);
+                data.histories.update_low_ply(move, Ply, piece, move_nodes / 10000);
 
             // Pruning
             if (alpha >= beta)
             {
                 data.update_pv(best_move, nullptr);
                 if (!move.is_capture())
-                    data.histories().fail_high(move, data.last_move(), Turn, depth, Ply, piece);
+                    data.histories.fail_high(move, data.last_move(), Turn, depth, Ply, piece);
                 break;
             }
         }
@@ -677,7 +624,7 @@ namespace Search
         if (best_score >= alpha)
             for (auto move : quiets_searched)
                 if (move != best_move)
-                    data.histories().add_bonus(move, Turn, position.board().get_piece_at(move.from()), -depth * depth / 4);
+                    data.histories.add_bonus(move, Turn, position.board().get_piece_at(move.from()), -depth * depth / 4);
 
         // Check for game end
         if (n_moves == 0)
@@ -692,11 +639,11 @@ namespace Search
         // TT store (except at root in non-main threads)
         if (!(RootSearch && !data.thread().is_main()))
         {
-            Hash hash = HasExcludedMove ? position.hash() ^ Zobrist::get_move_hash(data.excluded_move()) : position.hash();
+            Hash hash = HasExcludedMove ? position.hash() ^ Zobrist::get_move_hash(data.excluded_move) : position.hash();
             EntryType type = best_score >= beta                  ? EntryType::LOWER_BOUND
                            : (PvNode && best_score > alpha_init) ? EntryType::EXACT
                            :                                       EntryType::UPPER_BOUND;
-            ttable.store(hash, depth, score_to_tt(best_score, Ply), best_move, type, data.static_eval());
+            ttable.store(hash, depth, score_to_tt(best_score, Ply), best_move, type, data.static_eval);
         }
 
         return best_score;
@@ -716,7 +663,7 @@ namespace Search
         {
             // Update seldepth and clear PV
             *(data.pv()) = MOVE_NULL;
-            data.seldepth() = std::max(data.seldepth(), Ply);
+            data.seldepth = std::max(data.seldepth, Ply);
         }
 
         // Early check for draw or maximum depth reached
@@ -788,7 +735,7 @@ namespace Search
         Move move;
         int n_moves = 0;
         Move best_move = MOVE_NULL;
-        MoveOrder orderer = MoveOrder(position, Ply, 0, tt_move, data.histories(), MOVE_NULL, true);
+        MoveOrder orderer = MoveOrder(position, Ply, 0, tt_move, data.histories, MOVE_NULL, true);
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;
@@ -844,6 +791,7 @@ namespace Search
 
         return best_score;
     }
+
 
 
     bool legality_tests(Position& position, MoveList& move_list)
