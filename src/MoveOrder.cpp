@@ -184,7 +184,7 @@ Move MoveOrder::next_move()
         else if (m_stage == MoveStage::CAPTURES_END)
         {
             // Stop providing moves in non-check quiescence
-            if (m_quiescence && !m_position.is_check())
+            if (m_quiescence && !m_position.in_check())
                 return MOVE_NULL;
             ++m_stage;
         }

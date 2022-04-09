@@ -270,7 +270,7 @@ void Thread::search()
         if (main_thread)
         {
             // Even in this case, output a score and bestmove
-            std::cout << "info depth 0 score " << (m_position.is_check() ? "mate 0" : "cp 0") << std::endl;
+            std::cout << "info depth 0 score " << (m_position.in_check() ? "mate 0" : "cp 0") << std::endl;
             std::cout << "bestmove " << MOVE_NULL << std::endl;
             
             // Stop the search
@@ -321,10 +321,10 @@ void Thread::search()
 
             // Sort Pv lines by depth and score
             std::sort(m_multiPV.begin(), m_multiPV.end(),
-                        [](Search::MultiPVData a, Search::MultiPVData b)
-                        {
-                            return a.depth >= b.depth && a.score > b.score;
-                        });
+                      [](Search::MultiPVData a, Search::MultiPVData b)
+                      {
+                          return a.depth >= b.depth && a.score > b.score;
+                      });
 
             // Output all searched Pv lines
             if (main_thread)

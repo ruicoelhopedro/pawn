@@ -297,9 +297,9 @@ namespace Search
     {
         // Node data
         constexpr bool PvNode = ST != NON_PV;
-        const bool RootSearch = ST == ROOT;
+        constexpr bool RootSearch = ST == ROOT;
         const bool HasExcludedMove = data.excluded_move != MOVE_NULL;
-        const bool IsCheck = position.is_check();
+        const bool InCheck = position.in_check();
         const Turn Turn = position.get_turn();
         const Depth Ply = data.ply();
 
@@ -314,7 +314,7 @@ namespace Search
         if (depth > 1 && data.thread().timeout())
             return SCORE_NONE;
 
-        // Mate distance prunning: don't bother searching if we are deeper than the shortest mate up to this point
+        // Mate distance pruning: don't bother searching if we are deeper than the shortest mate up to this point
         if (!RootSearch)
         {
             alpha = std::max(alpha, static_cast<Score>(-SCORE_MATE + Ply));
@@ -374,7 +374,7 @@ namespace Search
 
         // Position static evaluation (when not in check)
         Score static_eval = SCORE_NONE;
-        if (!IsCheck)
+        if (!InCheck)
         {
             // We don't recompute static eval if
             // 1. We have a valid TT hit
@@ -396,7 +396,7 @@ namespace Search
             static_eval = tt_score;
 
         // Futility pruning
-        if (!PvNode && depth < 5 && !IsCheck && !is_mate(static_eval))
+        if (!PvNode && depth < 5 && !InCheck && !is_mate(static_eval))
         {
             Score margin = 200 * depth;
             if (static_eval - margin >= beta)
@@ -404,7 +404,7 @@ namespace Search
         }
 
         // Null move pruning
-        if (!PvNode && !IsCheck && !HasExcludedMove &&
+        if (!PvNode && !InCheck && !HasExcludedMove &&
             static_eval >= beta &&
             data.last_move() != MOVE_NULL &&
             position.board().non_pawn_material(Turn))
@@ -420,7 +420,7 @@ namespace Search
         }
 
         // TT-based reduction idea
-        if (PvNode && !IsCheck && depth >= 6 && !tt_hit)
+        if (PvNode && !InCheck && depth >= 6 && !tt_hit)
             depth -= 2;
 
         // Regular move search
@@ -463,7 +463,7 @@ namespace Search
                           << " currmovenumber " << n_moves << std::endl;
 
             // Shallow depth prunings
-            if (!RootSearch && position.board().non_pawn_material(Turn) && !IsCheck && best_score > -SCORE_MATE_FOUND)
+            if (!RootSearch && position.board().non_pawn_material(Turn) && !InCheck && best_score > -SCORE_MATE_FOUND)
             {
                 if (move.is_capture() || move.is_promotion())
                 {
@@ -489,7 +489,7 @@ namespace Search
                 tt_hit &&
                 depth > 8 &&
                 !HasExcludedMove &&
-                !IsCheck &&
+                !InCheck &&
                 move == tt_move &&
                 tt_depth >= depth - 3 &&
                 tt_type == EntryType::LOWER_BOUND &&
@@ -524,7 +524,7 @@ namespace Search
             position.make_move(move);
 
             // Check extensions
-            if (IsCheck && data.extensions() < 3 && depth < 4)
+            if (InCheck && data.extensions() < 3 && depth < 4)
                 extension = 1;
 
             // Update depth and search data
@@ -630,7 +630,7 @@ namespace Search
         if (n_moves == 0)
         {
             // Checkmate or stalemate?
-            if (position.is_check())
+            if (position.in_check())
                 best_score = -SCORE_MATE + Ply;
             else
                 best_score = SCORE_DRAW;
@@ -655,7 +655,7 @@ namespace Search
     Score quiescence(Position& position, Score alpha, Score beta, SearchData& data)
     {
         constexpr bool PvNode = ST == PV;
-        const bool IsCheck = position.is_check();
+        const bool InCheck = position.in_check();
         const Turn Turn = position.get_turn();
         const Depth Ply = data.ply();
 
@@ -693,7 +693,7 @@ namespace Search
             tt_static_eval = entry->static_eval();
 
             // In quiescence ensure the tt_move is a capture in non-check positions
-            if (!IsCheck && !tt_move.is_capture())
+            if (!InCheck && !tt_move.is_capture())
                 tt_move = MOVE_NULL;
 
             // TT cutoff in non-PV nodes
@@ -709,7 +709,7 @@ namespace Search
         // Position static evaluation (when not in check)
         Score static_eval = SCORE_NONE;
         Score best_score = -SCORE_INFINITE;
-        if (!IsCheck)
+        if (!InCheck)
         {
             // Don't recompute static eval if we have a valid TT hit
             if (tt_hit && tt_static_eval != SCORE_NONE)
@@ -741,7 +741,7 @@ namespace Search
             n_moves++;
 
             // Only search captures with positive SEE
-            if (!IsCheck && position.board().see(move) < 0)
+            if (!InCheck && position.board().see(move) < 0)
                 continue;
 
             // PVS
@@ -780,7 +780,7 @@ namespace Search
         }
 
         // Checkmate?
-        if (n_moves == 0 && IsCheck)
+        if (n_moves == 0 && InCheck)
             return -SCORE_MATE + Ply;
 
         // TT store

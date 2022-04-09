@@ -644,7 +644,7 @@ bool Position::is_draw(bool unique) const
 }
 
 
-bool Position::is_check() const
+bool Position::in_check() const
 {
     return board().checkers();
 }

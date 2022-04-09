@@ -655,7 +655,7 @@ public:
     bool is_draw(bool unique) const;
 
 
-    bool is_check() const;
+    bool in_check() const;
 
 
     Turn get_turn() const;
