@@ -31,7 +31,6 @@ class Histories
     int m_butterfly[NUM_COLORS][NUM_SQUARES][NUM_SQUARES];
     int m_piece_type[NUM_PIECE_TYPES][NUM_SQUARES];
     Move m_countermoves[NUM_SQUARES][NUM_SQUARES];
-    int m_low_ply_history[NUM_LOW_PLY][NUM_PIECE_TYPES][NUM_SQUARES];
 
 public:
     Histories();
@@ -40,12 +39,10 @@ public:
 
     void add_bonus(Move move, Turn turn, PieceType piece, int bonus);
     void fail_high(Move move, Move prev_move, Turn turn, Depth depth, Depth ply, PieceType piece);
-    void update_low_ply(Move move, Depth ply, PieceType piece, int value);
 
     bool is_killer(Move move, Depth ply) const;
     int butterfly_score(Move move, Turn turn) const;
     int piece_type_score(Move move, PieceType piece) const;
-    int low_ply_score(Move move, PieceType piece, Depth ply) const;
     Move countermove(Move move) const;
     Move get_killer(int index, Depth ply) const;
 };

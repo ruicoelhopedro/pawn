@@ -449,7 +449,6 @@ namespace Search
             // New search parameters
             int extension = 0;
             Depth curr_depth = depth;
-            uint64_t move_nodes = data.nodes_searched();
 
             // For the root node, only search the stored root moves
             if (RootSearch && !data.thread().is_root_move(move))
@@ -604,11 +603,6 @@ namespace Search
                 if (PvNode)
                     data.update_pv(best_move, curr_data.pv());
             }
-
-            // Update low-ply history
-            move_nodes = data.nodes_searched() - move_nodes;
-            if (Ply < NUM_LOW_PLY)
-                data.histories.update_low_ply(move, Ply, piece, move_nodes / 10000);
 
             // Pruning
             if (alpha >= beta)

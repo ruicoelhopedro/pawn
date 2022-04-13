@@ -31,11 +31,6 @@ void Histories::clear()
     for (int i = 0; i < NUM_SQUARES; i++)
         for (int j = 0; j < NUM_SQUARES; j++)
             m_countermoves[i][j] = MOVE_NULL;
-
-    for (int i = 0; i < NUM_LOW_PLY; i++)
-        for (int j = 0; j < NUM_PIECE_TYPES; j++)
-            for (int k = 0; k < NUM_SQUARES; k++)
-                m_low_ply_history[i][j][k] = 0;
 }
 
 
@@ -60,12 +55,6 @@ void Histories::fail_high(Move move, Move prev_move, Turn turn, Depth depth, Dep
     for (int i = NUM_KILLERS - 1; i > 0; i--)
         m_killers[i][ply] = m_killers[i - 1][ply];
     m_killers[0][ply] = move;
-}
-
-
-void Histories::update_low_ply(Move move, Depth ply, PieceType piece, int value)
-{
-    m_low_ply_history[ply][piece][move.to()] += value;
 }
 
 
@@ -99,12 +88,6 @@ Move Histories::get_killer(int index, Depth ply) const
 Move Histories::countermove(Move move) const
 {
     return m_countermoves[move.from()][move.to()];
-}
-
-
-int Histories::low_ply_score(Move move, PieceType piece, Depth ply) const
-{
-    return ply < NUM_LOW_PLY ? m_low_ply_history[ply][piece][move.to()] : 0;
 }
 
 
@@ -147,11 +130,9 @@ int MoveOrder::quiet_score(Move move) const
     // Quiets are scored based on:
     // 1. Butterfly histories
     // 2. Piece type-destination histories
-    // 3. Low ply histories (based on node counts)
     PieceType piece = m_position.board().get_piece_at(move.from());
     return m_histories.butterfly_score(move, m_position.get_turn())
-         + m_histories.piece_type_score(move, piece)
-         + m_histories.low_ply_score(move, piece, m_ply);
+         + m_histories.piece_type_score(move, piece);
 }
 
 

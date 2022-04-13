@@ -53,8 +53,6 @@ Furthermore, the following non-standard commands are available:
 - Killer moves and countermoves
 - Quiet move ordering
   - History heuristic with butterfly and piece-to boards
-  - Piece-square difference
-  - Low-ply histories based on nodes searched
 
 ## Compiling from sources
 To compile with `g++`, simply call
