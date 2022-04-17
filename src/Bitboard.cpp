@@ -50,6 +50,20 @@ namespace Bitboards
         build_between_bbs();
     }
 
+    Bitboard isolated_mask(Bitboard open_files)
+    {
+        constexpr Direction Left = -1;
+        constexpr Direction Right = 1;
+        Bitboard l_bb = (open_files & a_file).shift< Left>() | h_file;
+        Bitboard r_bb = (open_files & h_file).shift<Right>() | a_file;
+        return l_bb & r_bb;
+    }
+    
+    int file_count(Bitboard file_bb)
+    {
+        return (file_bb & rank_1).count();
+    }
+
     Bitboard between(Square s1, Square s2)
     {
         return between_squares[s1][s2];

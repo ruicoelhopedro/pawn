@@ -141,6 +141,7 @@ class MixedScore
     Score eg;
 
 public:
+    inline constexpr MixedScore() : mg(0), eg(0) {}
     inline constexpr MixedScore(Score smg, Score seg) : mg(smg), eg(seg) {}
 
     inline constexpr Score middlegame() const { return mg; }
@@ -261,6 +262,10 @@ inline constexpr Square vertical_mirror(Square square)
     return file(square) + (7 - rank(square));
 }
 
+template<Turn TURN>
+inline int rank(Square s) { return TURN == WHITE ? rank(s) : 7 - rank(s); }
+
+constexpr int rank(Square s, Turn turn) { return turn == WHITE ? rank(s) : 7 - rank(s); }
 
 std::string get_square(Square square);
 

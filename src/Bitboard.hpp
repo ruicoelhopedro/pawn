@@ -208,7 +208,7 @@ public:
 
 
     // Bit-scan
-    constexpr int bitscan_forward() const noexcept
+    constexpr Square bitscan_forward() const noexcept
     {
 #if defined(__GNUC__)
         return __builtin_ctzll(m_data);
@@ -415,6 +415,19 @@ namespace Bitboards
         return pawn_attacks[TURN][square];
     }
 
+    template <Turn TURN>
+    Bitboard get_attacks_pawns(Bitboard pawns)
+    {
+        constexpr Direction Up = TURN == WHITE ? 8 : -8;
+        constexpr Direction Left = -1;
+        constexpr Direction Right = 1;
+        return (pawns & ~Bitboards::a_file).shift<Up + Left >() |
+               (pawns & ~Bitboards::h_file).shift<Up + Right>();
+    }
+
+    Bitboard isolated_mask(Bitboard open_files);
+
+    int file_count(Bitboard file_bb);
 
     Bitboard between(Square s1, Square s2);
 

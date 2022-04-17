@@ -6,387 +6,382 @@
 #include <cassert>
 #include <stdlib.h>
 
-
-MixedScore material(Board board)
+namespace Evaluation
 {
-    MixedScore result(0, 0);
 
-    for (auto piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
-        result += piece_value[piece] * (board.get_pieces(WHITE, piece).count() -
-            board.get_pieces(BLACK, piece).count());
-
-    return result;
+EvalData::EvalData(const Board& board)
+{
+    Square kings[] = { board.get_pieces<WHITE, KING>().bitscan_forward(),
+                       board.get_pieces<BLACK, KING>().bitscan_forward() };
+    for (auto turn : { WHITE, BLACK })
+        king_zone[turn] = Bitboards::get_attacks<KING>(kings[turn], Bitboard());
 }
 
 
-MixedScore piece_square_value(Board board, int eg)
+MixedScore material(Board board, EvalData& eval)
 {
+    eval.fields[WHITE].material = MixedScore(0, 0);
+    eval.fields[BLACK].material = MixedScore(0, 0);
+
+    for (auto piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
+    {
+        eval.fields[WHITE].material += piece_value[piece] * board.get_pieces(WHITE, piece).count();
+        eval.fields[BLACK].material += piece_value[piece] * board.get_pieces(BLACK, piece).count();
+    }
+    return eval.fields[WHITE].material - eval.fields[BLACK].material;
+}
+
+
+MixedScore piece_square_value(Board board, EvalData& eval)
+{
+    eval.fields[WHITE].placement = MixedScore(0, 0);
+    eval.fields[BLACK].placement = MixedScore(0, 0);
     Bitboard bb;
-    S sum(0, 0);
 
     for (auto piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
     {
         for (auto turn : { WHITE, BLACK })
         {
-            Color color = turn_to_color(turn);
             bb = board.get_pieces(turn, piece);
             while (bb)
-                sum += piece_square(piece, bb.bitscan_forward_reset(), turn) * color;
+                eval.fields[turn].placement += piece_square(piece, bb.bitscan_forward_reset(), turn);
         }
     }
 
-    return sum;
+    return eval.fields[WHITE].placement - eval.fields[BLACK].placement;
 }
 
-
-MixedScore pawn_structure(Bitboard white_pawns, Bitboard black_pawns)
+MixedScore pawns(const Board& board, EvalData& data)
 {
-    constexpr MixedScore DoubledPenalty(13, 51);
-    constexpr MixedScore IsolatedPenalty(3, 15);
-    constexpr MixedScore BackwardPenalty(9, 22);
-    constexpr MixedScore IslandPenalty(3, 12);
+    // Bonuses and penalties
+    constexpr MixedScore DoubledPenalty(-13, -51);
+    constexpr MixedScore IsolatedPenalty(-3, -15);
+    constexpr MixedScore BackwardPenalty(-9, -22);
+    constexpr MixedScore IslandPenalty(-3, -12);
+    constexpr MixedScore NonPushedCentralPenalty(-35, -50);
     constexpr MixedScore PassedBonus[] = { MixedScore(  0,   0), MixedScore(  0,   0),
                                            MixedScore(  7,  27), MixedScore( 16,  32),
                                            MixedScore( 17,  40), MixedScore( 64,  71),
-                                           MixedScore(170, 174), MixedScore(278, 262)  };
+                                           MixedScore(170, 174), MixedScore(278, 262) };
 
+    // Some helpers
     constexpr Direction Up = 8;
-    constexpr Direction Left = -1;
-    constexpr Direction Right = 1;
+    PawnStructure& wps = data.pawns[WHITE];
+    PawnStructure& bps = data.pawns[BLACK];
+    const Bitboard pawns[] = { board.get_pieces<WHITE, PAWN>(), board.get_pieces<BLACK, PAWN>() };
 
-    Bitboard white_front_span = white_pawns.fill< Up>();
-    Bitboard black_front_span = black_pawns.fill<-Up>();
-    Bitboard white_back_span  = white_pawns.fill<-Up>();
-    Bitboard black_back_span  = black_pawns.fill< Up>();
+    // Build fields required in other evaluation terms
+    wps.attacks    = Bitboards::get_attacks_pawns<WHITE>(pawns[WHITE]);
+    bps.attacks    = Bitboards::get_attacks_pawns<BLACK>(pawns[BLACK]);
+    wps.span       = wps.attacks.fill< Up>();
+    bps.span       = bps.attacks.fill<-Up>();
+    wps.outposts   = pawns[WHITE].shift< Up>() & ~wps.span;
+    bps.outposts   = pawns[BLACK].shift<-Up>() & ~bps.span;
+    wps.open_files = ~(pawns[WHITE].fill< Up>().fill<-Up>());
+    bps.open_files = ~(pawns[BLACK].fill<-Up>().fill< Up>());
+    wps.passed     = pawns[WHITE] & ~(bps.span | pawns[BLACK].fill<-Up>());
+    bps.passed     = pawns[BLACK] & ~(wps.span | pawns[WHITE].fill< Up>());
 
-    Bitboard white_file_span = white_front_span | white_back_span;
-    Bitboard black_file_span = black_front_span | black_back_span;
+    // Isolated pawns
+    Bitboard isolated[] = { pawns[WHITE] & Bitboards::isolated_mask(wps.open_files),
+                            pawns[BLACK] & Bitboards::isolated_mask(bps.open_files) };
 
-    Bitboard white_attack_span = (white_front_span & ~Bitboards::a_file).shift<Left >() |
-                                 (white_front_span & ~Bitboards::h_file).shift<Right>();
-    Bitboard black_attack_span = (black_front_span & ~Bitboards::a_file).shift<Left >() |
-                                 (black_front_span & ~Bitboards::h_file).shift<Right>();
+    // Doubled pawns (excluding the frontmost doubled pawn)
+    Bitboard doubled[] = { pawns[WHITE] & pawns[WHITE].fill_excluded<-Up>(),
+                           pawns[BLACK] & pawns[BLACK].fill_excluded< Up>() };
 
-    Bitboard white_attack_span_file = (white_file_span & ~Bitboards::a_file).shift<Left >() |
-                                      (white_file_span & ~Bitboards::h_file).shift<Right>();
-    Bitboard black_attack_span_file = (black_file_span & ~Bitboards::a_file).shift<Left >() |
-                                      (black_file_span & ~Bitboards::h_file).shift<Right>();
+    // Backward pawns (not defended and cannot safely push)
+    Bitboard backward[] = { pawns[WHITE] & (~wps.span.shift<-Up>() & bps.attacks).shift<-Up>(),
+                            pawns[BLACK] & (~bps.span.shift< Up>() & wps.attacks).shift< Up>() };
 
-    Bitboard white_doubled_pawns = white_pawns & white_pawns.fill_excluded<-Up>();
-    Bitboard black_doubled_pawns = black_pawns & black_pawns.fill_excluded< Up>();
+    // Build pawn structure scores
+    for (auto turn : { WHITE, BLACK })
+    {
+        // Basic penalties
+        data.fields[turn].pieces[PAWN] = DoubledPenalty  * doubled[turn].count()
+                                       + IsolatedPenalty * isolated[turn].count()
+                                       + BackwardPenalty * backward[turn].count()
+                                       + IslandPenalty   * Bitboards::file_count(data.pawns[turn].open_files);
+        
+        // Passed pawn scores
+        Bitboard b = data.pawns[turn].passed;
+        while (b)
+            data.fields[turn].pieces[PAWN] += PassedBonus[rank(b.bitscan_forward_reset(), turn)];
+        
+        // Update attack tables
+        data.attacks[turn].push<PAWN>(data.pawns[turn].attacks);
+    }
 
-    Bitboard white_passed_pawns = white_pawns & ~(black_front_span | black_attack_span.shift<-Up>()) & ~white_doubled_pawns;
-    Bitboard black_passed_pawns = black_pawns & ~(white_front_span | white_attack_span.shift< Up>()) & ~black_doubled_pawns;
-
-    Bitboard white_isolated_pawns = white_pawns & ~white_attack_span_file;
-    Bitboard black_isolated_pawns = black_pawns & ~black_attack_span_file;
-
-    Bitboard white_backward_pawns = white_pawns & ~white_isolated_pawns & ~white_attack_span;
-    Bitboard black_backward_pawns = black_pawns & ~black_isolated_pawns & ~black_attack_span;
-
-    int white_islands = (~white_file_span & Bitboards::rank_1).count();
-    int black_islands = (~black_file_span & Bitboards::rank_1).count();
-
-    // Build passed pawn scores
-    MixedScore result(0, 0);
-    while (white_passed_pawns)
-        result += PassedBonus[rank(white_passed_pawns.bitscan_forward_reset())];
-    while (black_passed_pawns)
-        result -= PassedBonus[7 - rank(black_passed_pawns.bitscan_forward_reset())];
-
-    // Penalty for non-pushed central pawns
-    result += MixedScore(-35, -50) * (white_pawns.test(SQUARE_E2) + white_pawns.test(SQUARE_D2));
-    result -= MixedScore(-35, -50) * (black_pawns.test(SQUARE_E7) + black_pawns.test(SQUARE_D7));
-
-    return result
-         - IsolatedPenalty * (white_isolated_pawns.count() - black_isolated_pawns.count())
-         - BackwardPenalty * (white_backward_pawns.count() - black_backward_pawns.count())
-         - DoubledPenalty * (white_doubled_pawns.count() - black_doubled_pawns.count())
-         - IslandPenalty * (white_islands - black_islands);
+    return data.fields[WHITE].pieces[PAWN] - data.fields[BLACK].pieces[PAWN];
 }
 
 
-template <PieceType PIECE_TYPE, Turn TURN>
-MixedScore piece(const Board& board, Bitboard occupancy, Bitboard filter, Bitboard safe_squares_from_pawns, Bitboard our_pawn_attacks, Bitboard& our_attacks)
+template <PieceType PIECE, Turn TURN>
+MixedScore piece(const Board& board, Bitboard occupancy, EvalData& data)
 {
-    constexpr Direction Up = (TURN == WHITE) ? 8 : -8;
-    constexpr Bitboard rank7 = (TURN == WHITE) ? Bitboards::rank_7 : Bitboards::rank_2;
+    // Various bonuses and penalties
+    constexpr MixedScore RooksConnected(15, 5);
+    constexpr MixedScore RookOn7th(10, 15);
+    constexpr MixedScore RookOnOpen(20, 7);
+    constexpr MixedScore BehindEnemyLines(5, 4);
+    constexpr MixedScore SafeBehindEnemyLines(25, 10);
+    constexpr MixedScore BishopPair(10, 20);
+    constexpr MixedScore DefendedByPawn(5, 1);
 
-    constexpr MixedScore score_per_move(10, 10);
-    constexpr MixedScore nominal_moves = PIECE_TYPE == KNIGHT ? MixedScore(4, 4)
-                                       : PIECE_TYPE == BISHOP ? MixedScore(5, 5)
-                                       : PIECE_TYPE == ROOK   ? MixedScore(4, 6)
-                                       :                        MixedScore(7, 9); // QUEEN
-    MixedScore mobility(0, 0);
-    MixedScore placement(0, 0);
+    // Mobility scores
+    constexpr MixedScore BonusPerMove(10, 10);
+    constexpr MixedScore NominalMoves = PIECE == KNIGHT ? MixedScore(4, 4)
+                                      : PIECE == BISHOP ? MixedScore(5, 5)
+                                      : PIECE == ROOK   ? MixedScore(4, 6)
+                                      :                   MixedScore(7, 9); // QUEEN
 
-    Bitboard b = board.get_pieces<TURN, PIECE_TYPE>();
+    MixedScore score(0, 0);
+
+    Bitboard b = board.get_pieces<TURN, PIECE>();
     while (b)
     {
         Square square = b.bitscan_forward_reset();
-        Bitboard attacks = Bitboards::get_attacks<PIECE_TYPE>(square, occupancy);
-        our_attacks |= attacks;
-        attacks &= filter;
+        Bitboard attacks = Bitboards::get_attacks<PIECE>(square, occupancy);
+        data.attacks[TURN].push<PIECE>(attacks);
 
-        int safe_squares = attacks.count();
+        if (attacks & data.king_zone[~TURN])
+            data.king_attackers[~TURN].set(square);
 
-        mobility += (MixedScore(safe_squares, safe_squares) - nominal_moves) * score_per_move;
+        int safe_squares = (attacks & ~data.attacks[~TURN].get_less_valuable<PIECE>()).count();
+        score += (MixedScore(safe_squares, safe_squares) - NominalMoves) * BonusPerMove;
 
         // TODO: other terms
-        if (PIECE_TYPE == KNIGHT)
+        if (PIECE == KNIGHT)
         {
 
         }
-        else if (PIECE_TYPE == BISHOP)
+        else if (PIECE == BISHOP)
         {
 
         }
-        else if (PIECE_TYPE == ROOK)
+        else if (PIECE == ROOK)
         {
             // Connects to another rook?
-            placement += MixedScore(15, 5) * (b & attacks).count();
+            score += RooksConnected * (b & attacks).count();
         }
-        else if (PIECE_TYPE == QUEEN)
+        else if (PIECE == QUEEN)
         {
 
         }
     }
 
     // General placement terms
-    b = board.get_pieces<TURN, PIECE_TYPE>();
+    b = board.get_pieces<TURN, PIECE>();
     // Behind enemy lines?
-    placement += MixedScore(5, 4) * nominal_moves * (b & safe_squares_from_pawns).count();
+    score += BehindEnemyLines * NominalMoves * (b & ~data.pawns[~TURN].span).count();
 
     // Set-wise terms
-    MixedScore group_scores(0, 0);
-    if (PIECE_TYPE == KNIGHT)
+    if (PIECE == KNIGHT)
     {
         // Defended by pawns?
-        placement += MixedScore(5, 1) * (b & our_pawn_attacks).count();
+        score += DefendedByPawn * (b & data.pawns[TURN].attacks).count();
         // Additional bonus if behind enemy lines and defended by pawns
-        placement += MixedScore(25, 10) * (b & safe_squares_from_pawns & our_pawn_attacks).count();
+        score += SafeBehindEnemyLines * (b & ~data.pawns[~TURN].span & data.pawns[TURN].attacks).count();
     }
-    else if (PIECE_TYPE == BISHOP)
+    else if (PIECE == BISHOP)
     {
         // Defended by pawns?
-        placement += MixedScore(5, 1) * (b & our_pawn_attacks).count();
+        score += DefendedByPawn * (b & data.pawns[TURN].attacks).count();
         // Additional bonus if behind enemy lines and defended by pawns
-        placement += MixedScore(25, 10) * (b & safe_squares_from_pawns & our_pawn_attacks).count();
+        score += SafeBehindEnemyLines * (b & ~data.pawns[~TURN].span & data.pawns[TURN].attacks).count();
 
         // Bishop pair?
         if ((b & Bitboards::square_color[WHITE]) && (b & Bitboards::square_color[BLACK]))
-            group_scores += MixedScore(10, 20);
+            score += BishopPair;
     }
-    else if (PIECE_TYPE == ROOK)
+    else if (PIECE == ROOK)
     {
         // Rooks on 7th rank?
-        placement += MixedScore(10, 5) * (b & rank7).count();
+        constexpr Bitboard rank7 = TURN == WHITE ? Bitboards::rank_7 : Bitboards::rank_2;
+        score += RookOn7th * (b & rank7).count();
         // Files for each rook: check if open or semi-open
-        Bitboard files = b.fill<Up>();
-        placement += MixedScore(20, 7) * (2 * b.count() - (files & (board.get_pieces<WHITE, PAWN>() | board.get_pieces<BLACK, PAWN>())).count());
+        score += RookOnOpen * (b & data.pawns[TURN].open_files).count();
     }
-    else if (PIECE_TYPE == QUEEN)
+    else if (PIECE == QUEEN)
     {
 
     }
 
-    return mobility + placement;
+    data.fields[TURN].pieces[PIECE] = score;
+    return score;
 }
 
 
-MixedScore pieces(const Board& board)
+MixedScore pieces(const Board& board, EvalData& data)
 {
-    constexpr Direction Up = 8;
-    constexpr Direction Left = -1;
-    constexpr Direction Right = 1;
-
-    Bitboard white_pawn_attacks = (board.get_pieces<WHITE, PAWN>() & ~Bitboards::a_file).shift< Up + Left >()
-                                | (board.get_pieces<WHITE, PAWN>() & ~Bitboards::h_file).shift< Up + Right>();
-    Bitboard black_pawn_attacks = (board.get_pieces<BLACK, PAWN>() & ~Bitboards::a_file).shift<-Up + Left >()
-                                | (board.get_pieces<BLACK, PAWN>() & ~Bitboards::h_file).shift<-Up + Right>();
-
-    Bitboard white_pawn_attack_span = white_pawn_attacks.fill< Up>();
-    Bitboard black_pawn_attack_span = black_pawn_attacks.fill<-Up>();
-
-    Bitboard white_filter = ~black_pawn_attacks | ~board.get_pieces<WHITE>();
-    Bitboard black_filter = ~white_pawn_attacks | ~board.get_pieces<BLACK>();
+    MixedScore result(0, 0);
     Bitboard occupancy = board.get_pieces<WHITE>() | board.get_pieces<BLACK>();
 
-    Bitboard white_attacks = white_pawn_attacks;
-    Bitboard black_attacks = black_pawn_attacks;
-
-    MixedScore result(0, 0);
-
-    result += piece<KNIGHT, WHITE>(board, occupancy, white_filter, ~black_pawn_attack_span, white_pawn_attacks, white_attacks)
-            - piece<KNIGHT, BLACK>(board, occupancy, black_filter, ~white_pawn_attack_span, black_pawn_attacks, black_attacks);
-    result += piece<BISHOP, WHITE>(board, occupancy, white_filter, ~black_pawn_attack_span, white_pawn_attacks, white_attacks)
-            - piece<BISHOP, BLACK>(board, occupancy, black_filter, ~white_pawn_attack_span, black_pawn_attacks, black_attacks);
-    white_filter &= ~black_attacks;
-    black_filter &= ~white_attacks;
-    result += piece<  ROOK, WHITE>(board, occupancy, white_filter, ~black_pawn_attack_span, white_pawn_attacks, white_attacks)
-            - piece<  ROOK, BLACK>(board, occupancy, black_filter, ~white_pawn_attack_span, black_pawn_attacks, black_attacks);
-    white_filter &= ~black_attacks;
-    black_filter &= ~white_attacks;
-    result += piece< QUEEN, WHITE>(board, occupancy, white_filter, ~black_pawn_attack_span, white_pawn_attacks, white_attacks)
-            - piece< QUEEN, BLACK>(board, occupancy, black_filter, ~white_pawn_attack_span, black_pawn_attacks, black_attacks);
-    white_filter &= ~black_attacks;
-    black_filter &= ~white_attacks;
-
-    Bitboard white_control = white_attacks & ~black_attacks;
-    Bitboard black_control = black_attacks & ~white_attacks;
-
-    // King mobility
-    Bitboard white_king_safe_squares = Bitboards::get_attacks<KING>(board.get_pieces<WHITE, KING>().bitscan_forward(), occupancy) & white_filter;
-    Bitboard black_king_safe_squares = Bitboards::get_attacks<KING>(board.get_pieces<BLACK, KING>().bitscan_forward(), occupancy) & black_filter;
-    white_attacks |= white_king_safe_squares;
-    black_attacks |= black_king_safe_squares;
-
-    // Global mobility
-    result += MixedScore(0, 100) * (std::min(10, white_attacks.count()) - std::min(10, black_attacks.count()));
-
-    // Space and square control
-    Bitboard center = Bitboards::zone1 | Bitboards::zone2;
-    result += MixedScore(15, 1) * ((white_control & center).count() - (black_control & center).count());
+    result += piece<KNIGHT, WHITE>(board, occupancy, data)
+            - piece<KNIGHT, BLACK>(board, occupancy, data);
+    result += piece<BISHOP, WHITE>(board, occupancy, data)
+            - piece<BISHOP, BLACK>(board, occupancy, data);
+    result += piece<  ROOK, WHITE>(board, occupancy, data)
+            - piece<  ROOK, BLACK>(board, occupancy, data);
+    result += piece< QUEEN, WHITE>(board, occupancy, data)
+            - piece< QUEEN, BLACK>(board, occupancy, data);
 
     return result;
 }
 
 
-MixedScore king_safety(const Board& board)
+template<Turn TURN>
+MixedScore king_safety(const Board& board, EvalData& data)
 {
-    constexpr Direction Up = 8;
+    constexpr Direction Up = (TURN == WHITE) ? 8 : -8;
     constexpr Direction Left = -1;
     constexpr Direction Right = 1;
+    constexpr Bitboard Rank1 = (TURN == WHITE) ? Bitboards::rank_1 : Bitboards::rank_8;
 
-    constexpr MixedScore pawn_shelter[10] = { MixedScore(-100,   0), MixedScore(-25,   0), MixedScore( 0,   0),
-                                              MixedScore(  25,   0), MixedScore( 35,  -5), MixedScore(40,  -5),
-                                              MixedScore(  40, -10), MixedScore( 41, -15), MixedScore(42, -20),
-                                              MixedScore(  43, -25) };
+    constexpr MixedScore BackRankBonus(50, -50);
+    constexpr MixedScore OpenRay(-15, 8);
+    constexpr MixedScore KingOnOpenFile(-75, 0);
+    constexpr MixedScore KingNearOpenFile(-35, 0);
+    constexpr MixedScore PawnShelter[] = { MixedScore(-100,   0), MixedScore(-25,   0), MixedScore( 0,   0),
+                                           MixedScore(  25,   0), MixedScore( 35,  -5), MixedScore(40,  -5),
+                                           MixedScore(  40, -10), MixedScore( 41, -15), MixedScore(42, -20) };
 
-    constexpr MixedScore king_attacks[5] = { MixedScore(0, 0), MixedScore(10, 5), MixedScore(50, 0), MixedScore(100, 0), MixedScore(200, 0) };
-    constexpr MixedScore king_slider_attacks[4] = { MixedScore(-150, -100), MixedScore(-50, -20), MixedScore(-15, -2), MixedScore(0, 0) };
+    constexpr MixedScore SquaresAttacked[] = { MixedScore(   0, 0), MixedScore( -10, 0),
+                                               MixedScore( -50, 0), MixedScore( -75, 0),
+                                               MixedScore(-100, 0), MixedScore(-150, 0),
+                                               MixedScore(-200, 0), MixedScore(-225, 0),
+                                               MixedScore(-250, 0), MixedScore(-250, 0) };
+    constexpr MixedScore SliderAttackers[] = { MixedScore(-150, -100), MixedScore(-50, -20),
+                                               MixedScore( -15,   -2), MixedScore(  0,   0),
+                                               MixedScore(   0,    0), MixedScore(  0,   0),
+                                               MixedScore(   0,    0) };
 
     Bitboard occupancy = board.get_pieces();
 
-    Bitboard white_king = board.get_pieces<WHITE, KING>();
-    Bitboard black_king = board.get_pieces<BLACK, KING>();
+    const Bitboard king_bb = board.get_pieces<TURN, KING>();
+    const Bitboard pawns_bb = board.get_pieces<TURN, PAWN>();
+    const Square king_sq = king_bb.bitscan_forward();
+    const Bitboard mask = Bitboards::get_attacks<KING>(king_sq, occupancy) | king_bb;
 
-    Bitboard white_mask = Bitboards::get_attacks<KING>(white_king.bitscan_forward(), occupancy) | white_king;
-    Bitboard black_mask = Bitboards::get_attacks<KING>(black_king.bitscan_forward(), occupancy) | black_king;
+    MixedScore score(0, 0);
 
-    Bitboard white_pawns = board.get_pieces<WHITE, PAWN>();
-    Bitboard black_pawns = board.get_pieces<BLACK, PAWN>();
-
-    MixedScore king_shelter = pawn_shelter[((white_mask | white_mask.shift< 2 * Up>()) & white_pawns).count()]
-                            - pawn_shelter[((black_mask | black_mask.shift<-2 * Up>()) & black_pawns).count()];
+    // Pawn shelter
+    Bitboard shelter_zone = mask | mask.shift<2*Up>();
+    score += PawnShelter[(pawns_bb & shelter_zone).count()];
 
     // Back-rank bonus
-    king_shelter += MixedScore(50, -50) * (white_king & Bitboards::rank_1).count();
-    king_shelter -= MixedScore(50, -50) * (black_king & Bitboards::rank_8).count();
+    score += BackRankBonus * Rank1.test(king_sq);
 
-    // X-rays with enemy sliders?
-    Bitboard white_rooks   = board.get_pieces<WHITE, ROOK>()   | board.get_pieces<WHITE, QUEEN>();
-    Bitboard white_bishops = board.get_pieces<WHITE, BISHOP>() | board.get_pieces<WHITE, QUEEN>();
-    Bitboard black_rooks   = board.get_pieces<BLACK, ROOK>()   | board.get_pieces<BLACK, QUEEN>();
-    Bitboard black_bishops = board.get_pieces<BLACK, BISHOP>() | board.get_pieces<BLACK, QUEEN>();
-
-    MixedScore x_rays(0, 0);
-    Square white_king_sq = white_king.bitscan_forward();
-    Square black_king_sq = black_king.bitscan_forward();
-    Bitboard white_pieces = board.get_pieces<WHITE>();
-    Bitboard black_pieces = board.get_pieces<BLACK>();
-    Bitboard white_slider_attackers = (Bitboards::ranks_files[white_king.bitscan_forward()] & black_rooks)
-                                    | (Bitboards::diagonals  [white_king.bitscan_forward()] & black_bishops);
-    Bitboard black_slider_attackers = (Bitboards::ranks_files[black_king.bitscan_forward()] & white_rooks)
-                                    | (Bitboards::diagonals  [black_king.bitscan_forward()] & white_bishops);
-    while (white_slider_attackers)
-        x_rays += king_slider_attacks[std::min(3, Bitboards::between(white_king_sq, white_slider_attackers.bitscan_forward_reset()).count())];
-    while (black_slider_attackers)
-        x_rays -= king_slider_attacks[std::min(3, Bitboards::between(black_king_sq, black_slider_attackers.bitscan_forward_reset()).count())];
-
+    // X-rays with enemy sliders
+    Bitboard their_rooks   = board.get_pieces<~TURN,   ROOK>() | board.get_pieces<~TURN, QUEEN>();
+    Bitboard their_bishops = board.get_pieces<~TURN, BISHOP>() | board.get_pieces<~TURN, QUEEN>();
+    Bitboard slider_attackers = (Bitboards::ranks_files[king_sq] & their_rooks)
+                              | (Bitboards::diagonals[king_sq]   & their_bishops);
+    while (slider_attackers)
+        score += SliderAttackers[Bitboards::between(king_sq, slider_attackers.bitscan_forward_reset()).count()];
 
     // Attackers to the squares near the king
-    int white_attacked = 0;
-    int black_attacked = 0;
-    while (white_mask)
-        white_attacked += board.attackers_battery<BLACK>(white_mask.bitscan_forward_reset(), occupancy).count();
-    while (black_mask)
-        black_attacked += board.attackers_battery<WHITE>(black_mask.bitscan_forward_reset(), occupancy).count();
+    int attacked_squares = 0;
+    Bitboard b = mask;
+    while(b)
+        attacked_squares += board.attackers_battery<~TURN>(b.bitscan_forward_reset(), occupancy).count();
+    score += SquaresAttacked[std::min(9, attacked_squares)];
 
-    MixedScore king_threats = king_attacks[std::min(4, black_attacked)] - king_attacks[std::min(4, white_attacked)];
-
-
-    // King out in the open?
-    Bitboard white_slides = Bitboards::get_attacks<BISHOP>(white_king.bitscan_forward(), occupancy)
-                          | Bitboards::get_attacks<  ROOK>(white_king.bitscan_forward(), occupancy);
-    Bitboard black_slides = Bitboards::get_attacks<BISHOP>(black_king.bitscan_forward(), occupancy)
-                          | Bitboards::get_attacks<  ROOK>(black_king.bitscan_forward(), occupancy);
-    int white_possible_dirs = white_mask.count() - 1;
-    int black_possible_dirs = black_mask.count() - 1;
-    int white_safe_dirs = (white_slides & white_pieces).count();
-    int black_safe_dirs = (black_slides & black_pieces).count();
-    king_threats += MixedScore(-15, 8) * (white_possible_dirs - white_safe_dirs - black_possible_dirs + black_safe_dirs);
-
-
+    // King out in the open
+    Bitboard rays = Bitboards::get_attacks<BISHOP>(king_sq, occupancy)
+                  | Bitboards::get_attacks<  ROOK>(king_sq, occupancy);
+    int safe_dirs = (rays & board.get_pieces<TURN>()).count();
+    score += OpenRay * std::max(0, mask.count() - safe_dirs - 3);
 
     // Open or semi-open files near the king
-    Bitboard white_file_king  = white_king.fill< Up>();
-    Bitboard black_file_king  = black_king.fill<-Up>();
-    Bitboard white_file_left  = (white_king & ~Bitboards::a_file).shift< Left>().fill< Up>();
-    Bitboard black_file_left  = (black_king & ~Bitboards::a_file).shift< Left>().fill<-Up>();
-    Bitboard white_file_right = (white_king & ~Bitboards::h_file).shift<Right>().fill< Up>();
-    Bitboard black_file_right = (black_king & ~Bitboards::h_file).shift<Right>().fill<-Up>();
-    king_threats += MixedScore(-75, 0) * !(white_file_king  & board.get_pieces<WHITE, PAWN>());
-    king_threats -= MixedScore(-75, 0) * !(black_file_king  & board.get_pieces<BLACK, PAWN>());
-    king_threats += MixedScore(-35, 0) * !(white_file_left  & board.get_pieces<WHITE, PAWN>());
-    king_threats -= MixedScore(-35, 0) * !(black_file_left  & board.get_pieces<BLACK, PAWN>());
-    king_threats += MixedScore(-35, 0) * !(white_file_right & board.get_pieces<WHITE, PAWN>());
-    king_threats -= MixedScore(-35, 0) * !(black_file_right & board.get_pieces<BLACK, PAWN>());
+    Bitboard king_file = king_bb.fill<Up>();
+    Bitboard left_king_file  = (king_file & ~Bitboards::a_file).shift< Left>();
+    Bitboard right_king_file = (king_file & ~Bitboards::h_file).shift<Right>();
+    score += KingOnOpenFile   * !(      king_file & pawns_bb)
+           + KingNearOpenFile * !( left_king_file & pawns_bb)
+           + KingNearOpenFile * !(right_king_file & pawns_bb);
 
-
-    return king_shelter + x_rays + king_threats;
+    data.fields[TURN].pieces[KING] = score;
+    return score;
 }
 
 
-Score evaluation(const Position& position, bool output)
+template<Turn TURN>
+MixedScore space(const Board& board, EvalData& data)
 {
-    auto board = position.board();
+    constexpr MixedScore CenterSquareControl(15, 1);
+
+    // Center control
+    Bitboard center = Bitboards::zone1 | Bitboards::zone2;
+    Bitboard control_bb = data.attacks[TURN].get() & ~data.attacks[~TURN].get();
+
+    data.fields[TURN].space = CenterSquareControl * (control_bb & center).count();
+    return data.fields[TURN].space;
+}
+
+
+Score evaluation(const Board& board, EvalData& data)
+{
     MixedScore mixed_result(0, 0);
 
     // Material and PSQT: incrementally updated in the position (with eg scaling)
-    MixedScore tmp = board.material_eval() / MixedScore(10, 5);
-    mixed_result += tmp;
-    if (output)
-        std::cout << "Material    " << (int)tmp.middlegame() << " " << (int)tmp.endgame() << std::endl;
+    mixed_result += board.material_eval() / MixedScore(10, 5);
 
     // Pawn structure
-    tmp = pawn_structure(board.get_pieces<WHITE, PAWN>(), board.get_pieces < BLACK, PAWN>());
-    mixed_result += tmp;
-    if (output)
-        std::cout << "Pawns       " << (int)tmp.middlegame() << " " << (int)tmp.endgame() << std::endl;
+    mixed_result += pawns(board, data);
 
-    // Mobility
-    tmp = pieces(board);
-    mixed_result += tmp;
-    if (output)
-        std::cout << "Mobility    " << (int)tmp.middlegame() << " " << (int)tmp.endgame() << std::endl;
+    // Piece scores
+    mixed_result += pieces(board, data);
 
     // King safety
-    tmp = king_safety(board);
-    mixed_result += tmp;
-    if (output)
-        std::cout << "King safety " << (int)tmp.middlegame() << " " << (int)tmp.endgame() << std::endl;
+    mixed_result += king_safety<WHITE>(board, data) - king_safety<BLACK>(board, data);
+
+    // Space
+    mixed_result += space<WHITE>(board, data) - space<BLACK>(board, data);
 
     // Tapered eval
     Score result = mixed_result.tapered(board.phase());
-    if (output)
-        std::cout << "Phase       " << (int)board.phase() << std::endl;
-    if (output)
-        std::cout << "Score       " << (int)result << std::endl;
 
     // We don't return exact draw scores -> add one centipawn to the moving side
     if (result == SCORE_DRAW)
         result += turn_to_color(board.turn());
 
     return result;
+}
+
+
+void eval_table(const Board& board, EvalData& data, Score score)
+{
+    // No eval printing when in check
+    if (board.checkers())
+    {
+        std::cout << "No eval: in check" << std::endl;
+        return;
+    }
+
+    // Update material and placement terms
+    material(board, data);
+    piece_square_value(board, data);
+
+    // Print the eval table
+    std::cout << "---------------------------------------------------------------"                                        << std::endl;
+    std::cout << "               |     White     |     Black     |     Total     "                                        << std::endl;
+    std::cout << " Term          |   MG     EG   |   MG     EG   |   MG     EG   "                                        << std::endl;
+    std::cout << "---------------------------------------------------------------"                                        << std::endl;
+    std::cout << " Material      | " << Term< true>(data.fields[WHITE].material  / 10, data.fields[BLACK].material  / 10) << std::endl;
+    std::cout << " Placement     | " << Term< true>(data.fields[WHITE].placement / 10, data.fields[BLACK].placement / 10) << std::endl;
+    std::cout << " Pawns         | " << Term<false>(data.fields[WHITE].pieces[PAWN],   data.fields[BLACK].pieces[PAWN])   << std::endl;
+    std::cout << " Knights       | " << Term<false>(data.fields[WHITE].pieces[KNIGHT], data.fields[BLACK].pieces[KNIGHT]) << std::endl;
+    std::cout << " Bishops       | " << Term<false>(data.fields[WHITE].pieces[BISHOP], data.fields[BLACK].pieces[BISHOP]) << std::endl;
+    std::cout << " Rooks         | " << Term<false>(data.fields[WHITE].pieces[ROOK],   data.fields[BLACK].pieces[ROOK])   << std::endl;
+    std::cout << " Queens        | " << Term<false>(data.fields[WHITE].pieces[QUEEN],  data.fields[BLACK].pieces[QUEEN])  << std::endl;
+    std::cout << " King safety   | " << Term<false>(data.fields[WHITE].pieces[KING],   data.fields[BLACK].pieces[KING])   << std::endl;
+    std::cout << " Space         | " << Term<false>(data.fields[WHITE].space,          data.fields[BLACK].space)          << std::endl;
+    std::cout << "---------------------------------------------------------------"                                        << std::endl;
+    std::cout << "                                         Phase |    " << std::setw(4) << (int)board.phase()             << std::endl;
+    std::cout << "                                         Final | "    << std::setw(5) << score / 100.0 << " (White)"    << std::endl;
+    std::cout << "---------------------------------------------------------------"                                        << std::endl;
+    std::cout << std::endl;
+}
+    
 }
