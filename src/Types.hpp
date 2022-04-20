@@ -19,7 +19,7 @@ constexpr int NUM_CASTLE_SIDES = 2;
 
 
 constexpr int NUM_MAX_MOVES = 256;
-constexpr int NUM_MAX_PLY = 200;
+constexpr int NUM_MAX_PLY = 255;
 constexpr Depth NUM_MAX_DEPTH = 200;
 
 
@@ -116,7 +116,7 @@ enum ScoreType : Score
     SCORE_ZERO = 0,
     SCORE_DRAW = 0,
     SCORE_MATE = 32000,
-    SCORE_MATE_FOUND = SCORE_MATE - NUM_MAX_DEPTH - 1,
+    SCORE_MATE_FOUND = SCORE_MATE - NUM_MAX_PLY - 1,
     SCORE_INFINITE = 32001,
     SCORE_NONE = 32002
 };

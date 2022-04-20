@@ -306,7 +306,7 @@ namespace Search
         if (PvNode)
         {
             // Update seldepth and clear PV
-            *(data.pv()) = MOVE_NULL;
+            data.update_pv(MOVE_NULL, nullptr);
             data.seldepth = std::max(data.seldepth, Ply);
         }
 
@@ -596,21 +596,30 @@ namespace Search
             if (score > best_score)
             {
                 best_score = score;
-                best_move = move;
-                alpha = std::max(alpha, score);
 
-                // Update PV when we have a bestmove
-                if (PvNode)
-                    data.update_pv(best_move, curr_data.pv());
-            }
+                if (score > alpha)
+                {
+                    alpha = score;
+                    best_move = move;
 
-            // Pruning
-            if (alpha >= beta)
-            {
-                data.update_pv(best_move, nullptr);
-                if (!move.is_capture())
-                    data.histories.fail_high(move, data.last_move(), Turn, depth, Ply, piece);
-                break;
+                    // Pruning
+                    if (alpha >= beta)
+                    {
+                        // Track the move causing the fail-high
+                        if (PvNode)
+                            data.update_pv(best_move, nullptr);
+
+                        // Update quiets stats
+                        if (!move.is_capture())
+                            data.histories.fail_high(move, data.last_move(), Turn, depth, Ply, piece);
+
+                        break;
+                    }
+
+                    // Update PV when we have a new bestmove
+                    if (PvNode)
+                        data.update_pv(best_move, curr_data.pv());
+                }
             }
         }
 
@@ -656,7 +665,7 @@ namespace Search
         if (PvNode)
         {
             // Update seldepth and clear PV
-            *(data.pv()) = MOVE_NULL;
+            data.update_pv(MOVE_NULL, nullptr);
             data.seldepth = std::max(data.seldepth, Ply);
         }
 
@@ -760,16 +769,24 @@ namespace Search
             if (score > best_score)
             {
                 best_score = score;
-                best_move = move;
-                alpha = std::max(alpha, best_score);
 
-                // Update PV in PvNodes
-                if (PvNode)
-                    data.update_pv(best_move, curr_data.pv());
+                if (score > alpha)
+                {
+                    alpha = score;
+                    best_move = move;
 
-                // Pruning
-                if (alpha >= beta)
-                    break;
+                    // Pruning
+                    if (alpha >= beta)
+                    {
+                        if (PvNode)
+                            data.update_pv(best_move, nullptr);
+                        break;
+                    }
+
+                    // Update PV in PvNodes
+                    if (PvNode)
+                        data.update_pv(best_move, curr_data.pv());
+                }
             }
         }
 
