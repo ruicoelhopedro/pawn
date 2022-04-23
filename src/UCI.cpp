@@ -104,13 +104,16 @@ namespace UCI
 
 
 
-    void main_loop()
+    void main_loop(std::string args)
     {
         std::string token;
         while (token != "quit")
         {
             std::string cmd;
-            std::getline(std::cin, cmd);
+            if (args == "")
+                std::getline(std::cin, cmd);
+            else
+                cmd = args;
             Stream stream(cmd);
 
             // Read the first token
@@ -141,6 +144,8 @@ namespace UCI
                 std::cout << pool->position().board() << std::endl;
             else if (token == "eval")
                 evaluate<true>(pool->position());
+            else if (token == "bench")
+                bench(stream);
             else if (token == "test")
             {
                 int t1 = Tests::perft_tests();
@@ -156,7 +161,19 @@ namespace UCI
                 std::cout << "  TT + Orderer: " << t4 << " failed cases" << std::endl;
                 std::cout << "  Legality:     " << t5 << " failed cases" << std::endl;
             }
+
+            // Unknown command
+            else if (token != "")
+                std::cout << "Unknown command " << token << std::endl;
+        
+            // Quit if a single command has been passed
+            if (args != "")
+                break;
         }
+
+        // Wait for completion, then kill threads
+        pool->wait();
+        pool->kill_threads();
     }
 
 
@@ -257,7 +274,7 @@ namespace UCI
 
     void quit(Stream& stream)
     {
-        pool->kill_threads();
+        pool->stop();
     }
 
 
@@ -318,6 +335,28 @@ namespace UCI
     {
         // Mandatory readyok output when all set
         std::cout << "readyok" << std::endl;
+    }
+
+
+
+    void bench(Stream& stream)
+    {
+        Depth depth = 11;
+        int threads = 1;
+        int hash = 16;
+        
+        std::string token;
+        if (stream >> token)
+            depth = std::stoi(token);
+        if (stream >> token)
+            threads = std::stoi(token);
+        if (stream >> token)
+            hash = std::stoi(token);
+
+        Search::Limits limits;
+        limits.depth = depth;
+
+        Tests::bench(limits, threads, hash);
     }
 
 

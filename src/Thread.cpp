@@ -130,7 +130,7 @@ void ThreadPool::update_position_threads()
 }
 
 
-void ThreadPool::search(const Search::Timer& timer, const Search::Limits& limits, bool wait)
+void ThreadPool::search(const Search::Timer& timer, const Search::Limits& limits)
 {
     // Ensure all threads are stopped before we start searching
     this->wait();
@@ -144,9 +144,6 @@ void ThreadPool::search(const Search::Timer& timer, const Search::Limits& limits
 
     // Wake threads
     send_signal(ThreadStatus::SEARCHING);
-
-    if (wait)
-        this->wait();
 }
 
 

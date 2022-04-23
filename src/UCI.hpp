@@ -85,7 +85,7 @@ namespace UCI
     void init_options();
 
 
-    void main_loop();
+    void main_loop(std::string args);
     void setoption(Stream& stream);
     void uci(Stream& stream);
     void go(Stream& stream);
@@ -96,6 +96,7 @@ namespace UCI
     void ucinewgame(Stream& stream);
     void isready(Stream& stream);
 
+    void bench(Stream& stream);
 
     Move move_from_uci(Position& position, std::string move_str);
 }

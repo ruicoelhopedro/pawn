@@ -6,8 +6,9 @@
 #include "UCI.hpp"
 #include "Thread.hpp"
 #include <chrono>
+#include <sstream>
 
-int main()
+int main(int argc, char** argv)
 {
     Bitboards::init_bitboards();
     Zobrist::build_rnd_hashes();
@@ -15,6 +16,13 @@ int main()
     ttable = HashTable<TranspositionEntry>(16);
     pool = new ThreadPool();
 
-    UCI::main_loop();
+    // Handle passed arguments
+    std::stringstream ss;
+    if (argc > 1)
+        for (int i = 1; i < argc; i++)
+            ss << argv[i] << ' ';
+
+    UCI::main_loop(ss.str());
+
     pool->kill_threads();
 }

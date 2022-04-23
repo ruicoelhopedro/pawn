@@ -90,7 +90,7 @@ public:
 
     void update_position_threads();
 
-    void search(const Search::Timer& timer, const Search::Limits& limits, bool wait = false);
+    void search(const Search::Timer& timer, const Search::Limits& limits);
 
     void stop();
 

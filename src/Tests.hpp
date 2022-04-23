@@ -27,9 +27,13 @@ namespace Tests
 
 
     std::vector<PerftTest> test_suite();
+    std::vector<std::string> bench_suite();
 
 
     int perft_tests();
+    
+
+    void bench(Search::Limits limits, int threads, int hash);
 
 
     template<bool USE_ORDER, bool TT, bool LEGALITY>
