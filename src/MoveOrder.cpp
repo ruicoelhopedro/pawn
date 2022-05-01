@@ -117,10 +117,9 @@ bool MoveOrder::hash_move(Move& move)
 int MoveOrder::capture_score(Move move) const
 {
     // MVV-LVA
-    constexpr int piece_score[] = { 10, 30, 31, 50, 90, 1000 };
     PieceType from = m_position.board().get_piece_at(move.from());
     PieceType to = move.is_ep_capture() ? PAWN : m_position.board().get_piece_at(move.to());
-    return piece_score[to] - piece_score[from];
+    return piece_value_mg[to] - piece_value_mg[from];
 }
 
 

@@ -8,7 +8,7 @@
 using Square = int8_t;
 using Hash = uint64_t;
 using Direction = int8_t;
-using Score = int16_t;
+using Score = int32_t;
 using Depth = uint8_t;
 
 
@@ -158,11 +158,6 @@ public:
     inline constexpr MixedScore& operator*=(const MixedScore& other) { mg *= other.mg; eg *= other.eg; return *this; }
     inline constexpr MixedScore& operator/=(const MixedScore& other) { mg /= other.mg; eg /= other.eg; return *this; }
 
-    inline constexpr MixedScore& operator+=(const Score& other) { mg += other; eg += other; return *this; }
-    inline constexpr MixedScore& operator-=(const Score& other) { mg -= other; eg -= other; return *this; }
-    inline constexpr MixedScore& operator*=(const Score& other) { mg *= other; eg *= other; return *this; }
-    inline constexpr MixedScore& operator/=(const Score& other) { mg /= other; eg /= other; return *this; }
-
     inline constexpr MixedScore& operator+=(int other) { mg += other; eg += other; return *this; }
     inline constexpr MixedScore& operator-=(int other) { mg -= other; eg -= other; return *this; }
     inline constexpr MixedScore& operator*=(int other) { mg *= other; eg *= other; return *this; }
@@ -172,11 +167,6 @@ public:
     inline constexpr MixedScore operator-(const MixedScore& other) const { return MixedScore(mg - other.mg, eg - other.eg); }
     inline constexpr MixedScore operator*(const MixedScore& other) const { return MixedScore(mg * other.mg, eg * other.eg); }
     inline constexpr MixedScore operator/(const MixedScore& other) const { return MixedScore(mg / other.mg, eg / other.eg); }
-
-    inline constexpr MixedScore operator+(const Score& other) const { return MixedScore(mg + other, eg + other); }
-    inline constexpr MixedScore operator-(const Score& other) const { return MixedScore(mg - other, eg - other); }
-    inline constexpr MixedScore operator*(const Score& other) const { return MixedScore(mg * other, eg * other); }
-    inline constexpr MixedScore operator/(const Score& other) const { return MixedScore(mg / other, eg / other); }
 
     inline constexpr MixedScore operator+(int other) const { return MixedScore(mg + other, eg + other); }
     inline constexpr MixedScore operator-(int other) const { return MixedScore(mg - other, eg - other); }

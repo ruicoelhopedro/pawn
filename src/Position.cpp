@@ -345,7 +345,7 @@ bool Board::is_valid() const
         for (Turn turn : { WHITE, BLACK })
         {
             Bitboard bb = get_pieces(turn, piece);
-            eval += piece_value[piece] * bb.count() * turn_to_color(turn);
+            eval += piece_value[piece] * bb.count() * turn_to_color(turn) * MATERIAL_SCALE;
             phase -= bb.count() * Phases::Pieces[piece];
             while (bb)
                 eval += piece_square(piece, bb.bitscan_forward_reset(), turn) * turn_to_color(turn);
@@ -456,16 +456,14 @@ Square Board::least_valuable(Bitboard bb) const
 }
 
 
-Score Board::see(Move move, int threshold) const
+Score Board::see(Move move, Score threshold) const
 {
     // Static-Exchange evaluation with pruning
-    constexpr Score piece_score[] = { 10, 30, 30, 50, 90, 1000, 0, 0 };
-
     Square target = move.to();
 
     // Make the initial capture
     PieceType last_attacker = get_piece_at(move.from());
-    Score gain = piece_score[move.is_ep_capture() ? PAWN : get_piece_at(target)] - threshold / 10;
+    Score gain = piece_value_mg[move.is_ep_capture() ? PAWN : get_piece_at(target)] - threshold;
     Bitboard from_bb = Bitboard::from_square(move.from());
     Bitboard occupancy = get_pieces() ^ from_bb;
     Turn side_to_move = ~m_turn;
@@ -478,14 +476,14 @@ Score Board::see(Move move, int threshold) const
         // If the side to move is already ahead they can stop the capture sequence,
         // so we can prune the remaining iterations
         if (color * gain > 0)
-            return 10 * gain;
+            return gain;
 
         // Get least valuable attacker
         Square attacker = least_valuable(attacks_target);
         Bitboard attacker_bb = Bitboard::from_square(attacker);
 
         // Make the capture
-        gain += color * piece_score[last_attacker];
+        gain += color * piece_value_mg[last_attacker];
         last_attacker = get_piece_at(attacker);
         occupancy ^= attacker_bb;
         side_to_move = ~side_to_move;
@@ -495,13 +493,13 @@ Score Board::see(Move move, int threshold) const
         attacks_target = attackers(target, occupancy, side_to_move) & occupancy;
     }
 
-    return 10 * gain;
+    return gain;
 }
 
 
 MixedScore Board::material_eval() const
 {
-    return m_psq;
+    return m_psq / MATERIAL_SCALE;
 }
 
 

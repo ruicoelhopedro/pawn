@@ -59,11 +59,11 @@ class TranspositionEntry
     Hash m_hash;
     Depth m_depth;
     uint8_t m_type;
-    Score m_score;
+    int16_t m_score;
     Move m_best_move;
-    Score m_static_eval;
+    int16_t m_static_eval;
 
-    static Hash data_hash(Depth depth, Score score, Move best_move, EntryType type, Score static_eval)
+    static Hash data_hash(Depth depth, int16_t score, Move best_move, EntryType type, int16_t static_eval)
     {
         return (static_cast<Hash>(depth) << 0)
              | (static_cast<Hash>(score) << 8)

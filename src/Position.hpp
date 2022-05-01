@@ -17,6 +17,8 @@ enum class MoveGenType
 
 class Board
 {
+    constexpr static int MATERIAL_SCALE = 10;
+
     // Required fields
     Bitboard m_pieces[NUM_PIECE_TYPES][NUM_COLORS];
     Turn m_turn;
@@ -260,7 +262,7 @@ protected:
         m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
         m_board_pieces[square] = get_piece(piece, turn);
         m_psq += piece_square(piece, square, turn) * turn_to_color(turn);
-        m_psq += piece_value[piece] * turn_to_color(turn);
+        m_psq += piece_value[piece] * turn_to_color(turn) * MATERIAL_SCALE;
         m_phase -= Phases::Pieces[piece];
     }
 
@@ -271,7 +273,7 @@ protected:
         m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
         m_board_pieces[square] = NO_PIECE;
         m_psq -= piece_square(piece, square, turn) * turn_to_color(turn);
-        m_psq -= piece_value[piece] * turn_to_color(turn);
+        m_psq -= piece_value[piece] * turn_to_color(turn) * MATERIAL_SCALE;
         m_phase += Phases::Pieces[piece];
     }
 
@@ -605,7 +607,7 @@ public:
     Square least_valuable(Bitboard bb) const;
 
 
-    Score see(Move move, int threshold = 0) const;
+    Score see(Move move, Score threshold = 0) const;
 
 
     MixedScore material_eval() const;

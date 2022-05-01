@@ -3,13 +3,39 @@
 
 using S = MixedScore;
 
-constexpr S piece_value[] = { S(1000, 1250),   // Pawn
-                              S(3000, 2950),   // Knight
-                              S(3100, 3250),   // Bishop
-                              S(5000, 5100),   // Rook
-                              S(9000, 9500),   // Queen
-                              S(   0,    0) }; // King
+constexpr S   PawnValue(  100,   125);
+constexpr S KnightValue(  400,   395);
+constexpr S BishopValue(  420,   450);
+constexpr S   RookValue(  600,   650);
+constexpr S  QueenValue( 1100,  1200);
+constexpr S   KingValue(10000, 10000); // Needed for SEE and MVV-LVA
 
+constexpr S piece_value[] = { PawnValue,
+                              KnightValue,
+                              BishopValue,
+                              RookValue,
+                              QueenValue,
+                              KingValue,
+                              S(0, 0), // Empty
+                              S(0, 0) }; // PIECE_NONE
+
+constexpr Score piece_value_mg[] = { PawnValue.middlegame(),
+                                     KnightValue.middlegame(),
+                                     BishopValue.middlegame(),
+                                     RookValue.middlegame(),
+                                     QueenValue.middlegame(),
+                                     KingValue.middlegame(),
+                                     0,    // Empty
+                                     0 };  // PIECE_NONE
+
+constexpr Score piece_value_eg[] = { PawnValue.endgame(),
+                                     KnightValue.endgame(),
+                                     BishopValue.endgame(),
+                                     RookValue.endgame(),
+                                     QueenValue.endgame(),
+                                     KingValue.endgame(),
+                                     0,    // Empty
+                                     0 };  // PIECE_NONE
 
 // Tables stolen from Stockfish using the implicitly mirrored convention
 constexpr S psq_table[][8][4] = {

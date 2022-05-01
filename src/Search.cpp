@@ -282,9 +282,9 @@ namespace Search
             else
                 r_window *= 2;
 
-            // Increase window in the failed side exponentially (without overflowing)
-            alpha = std::max(((init_score - l_window) > init_score) ? (-SCORE_INFINITE) : (init_score - l_window), -SCORE_INFINITE);
-            beta  = std::min(((init_score + r_window) < init_score) ? (+SCORE_INFINITE) : (init_score + r_window), +SCORE_INFINITE);
+            // Increase window in the failed side exponentially
+            alpha = std::max(init_score - l_window, -SCORE_INFINITE);
+            beta  = std::min(init_score + r_window, +SCORE_INFINITE);
         }
 
         return score;
