@@ -181,7 +181,7 @@ namespace Search
     bool legality_tests(Position& position, MoveList& move_list);
 
 
-    template<bool OUTPUT, bool USE_ORDER = false, bool TT = false, bool LEGALITY = false>
+    template<bool OUTPUT, bool USE_ORDER = false, bool TT = false, bool LEGALITY = false, bool VALIDITY = false>
     int64_t perft(Position& position, Depth depth)
     {
         // TT lookup
@@ -204,11 +204,14 @@ namespace Search
                 if (LEGALITY && !legality_tests(position, move_list))
                     return 0;
 
+                if (VALIDITY && !position.board().is_valid())
+                    return 0;
+
                 int64_t count = 1;
                 if (depth > 1)
                 {
                     position.make_move(move);
-                    count = perft<false, USE_ORDER, TT>(position, depth - 1);
+                    count = perft<false, USE_ORDER, TT, VALIDITY>(position, depth - 1);
                     position.unmake_move();
                 }
                 n_nodes += count;
@@ -228,8 +231,11 @@ namespace Search
                     if (LEGALITY && !legality_tests(position, move_list))
                         return 0;
 
+                    if (VALIDITY && !position.board().is_valid())
+                        return 0;
+
                     position.make_move(move);
-                    count = perft<false, USE_ORDER, TT>(position, depth - 1);
+                    count = perft<false, USE_ORDER, TT, VALIDITY>(position, depth - 1);
                     position.unmake_move();
 
                     n_nodes += count;
