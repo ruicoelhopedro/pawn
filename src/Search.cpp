@@ -396,9 +396,9 @@ namespace Search
             static_eval = tt_score;
 
         // Futility pruning
-        if (!PvNode && depth < 5 && !InCheck && !is_mate(static_eval))
+        if (!PvNode && depth < 9 && !InCheck && !is_mate(static_eval))
         {
-            Score margin = 200 * depth;
+            Score margin = 150 * depth;
             if (static_eval - margin >= beta)
                 return static_eval;
         }
