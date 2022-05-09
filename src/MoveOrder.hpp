@@ -29,7 +29,7 @@ class Histories
 {
     Move m_killers[NUM_KILLERS][NUM_MAX_DEPTH];
     int m_butterfly[NUM_COLORS][NUM_SQUARES][NUM_SQUARES];
-    int m_piece_type[NUM_PIECE_TYPES][NUM_SQUARES];
+    int m_continuation[NUM_SQUARES][NUM_SQUARES][NUM_PIECE_TYPES][NUM_SQUARES];
     Move m_countermoves[NUM_SQUARES][NUM_SQUARES];
 
 public:
@@ -37,16 +37,21 @@ public:
 
     void clear();
 
-    void add_bonus(Move move, Turn turn, PieceType piece, int bonus);
-    void fail_high(Move move, Move prev_move, Turn turn, Depth depth, Depth ply, PieceType piece);
+    void add_bonus(Move move, Turn turn, PieceType piece, Move prev_move, int bonus);
+    void bestmove(Move move, Move prev_move, Turn turn, Depth depth, Depth ply, PieceType piece);
 
     bool is_killer(Move move, Depth ply) const;
     int butterfly_score(Move move, Turn turn) const;
-    int piece_type_score(Move move, PieceType piece) const;
+    int continuation_score(Move move, PieceType piece, Move prev_move) const;
     Move countermove(Move move) const;
     Move get_killer(int index, Depth ply) const;
 };
 
+template<int MAX>
+void saturate_add(int& entry, int bonus)
+{
+    entry += bonus - entry * abs(bonus) / MAX;
+}
 
 class MoveOrder
 {

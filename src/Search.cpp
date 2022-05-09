@@ -361,9 +361,9 @@ namespace Search
                 {
                     PieceType piece = position.board().get_piece_at(tt_move.from());
                     if (tt_score >= beta)
-                        data.histories.fail_high(tt_move, data.last_move(), Turn, depth, Ply, piece);
+                        data.histories.bestmove(tt_move, data.last_move(), Turn, depth, Ply, piece);
                     else
-                        data.histories.add_bonus(tt_move, Turn, piece, -depth);
+                        data.histories.add_bonus(tt_move, Turn, piece, data.last_move(), -depth);
                 }
 
                 // Do not cutoff when we are approaching the 50 move rule
@@ -474,7 +474,7 @@ namespace Search
                     if (depth < 7 && n_moves > 3 + depth * depth)
                         continue;
 
-                    if (depth < 5 && orderer.quiet_score(move) < -3000 * (depth - 1))
+                    if (depth < 5 && orderer.quiet_score(move) < -1000 * (depth - 1))
                         continue;
 
                     if (depth < 7 && position.board().see(move, -20 * (depth + (int)depth * depth)) < 0)
@@ -572,7 +572,7 @@ namespace Search
                     if (PvNode && score > alpha && score < beta)
                     {
                         // But before add a bonus to the move
-                        data.histories.add_bonus(move, Turn, piece, depth);
+                        data.histories.add_bonus(move, Turn, piece, data.last_move(), depth);
                         score = -negamax<PV>(position, curr_depth - 1, -beta, -alpha, curr_data);
                     }
                 }
@@ -589,7 +589,7 @@ namespace Search
             if (didLMR && do_full_search)
             {
                 int bonus = score > best_score ? depth : -depth;
-                data.histories.add_bonus(move, Turn, piece, bonus);
+                data.histories.add_bonus(move, Turn, piece, data.last_move(), bonus);
             }
 
             // New best move
@@ -609,10 +609,6 @@ namespace Search
                         if (PvNode)
                             data.update_pv(best_move, nullptr);
 
-                        // Update quiets stats
-                        if (!move.is_capture())
-                            data.histories.fail_high(move, data.last_move(), Turn, depth, Ply, piece);
-
                         break;
                     }
 
@@ -623,11 +619,17 @@ namespace Search
             }
         }
 
-        // Update quiet histories (penalise searched moves if some move raised alpha)
-        if (best_score >= alpha)
+        // Update quiet histories
+        if (best_move != MOVE_NULL && !best_move.is_capture())
+        {
+            // Update stats for bestmove
+            data.histories.bestmove(move, data.last_move(), Turn, depth, Ply, position.board().get_piece_at(move.from()));
+
+            // Penalty any non-best move
             for (auto move : quiets_searched)
                 if (move != best_move)
-                    data.histories.add_bonus(move, Turn, position.board().get_piece_at(move.from()), -depth * depth / 4);
+                    data.histories.add_bonus(move, Turn, position.board().get_piece_at(move.from()), data.last_move(), -depth * (depth - 1));
+        }
 
         // Check for game end
         if (n_moves == 0)
