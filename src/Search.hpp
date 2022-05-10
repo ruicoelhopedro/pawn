@@ -125,7 +125,6 @@ namespace Search
     class SearchData
     {
         int m_ply;
-        int m_extensions;
         const SearchData* m_prev;
         Thread& m_thread;
         Move m_move;
@@ -136,7 +135,7 @@ namespace Search
     public:
         SearchData(Thread& thread);
 
-        SearchData next(Move move, int extension = 0) const;
+        SearchData next(Move move) const;
 
         Depth& seldepth;
         Score static_eval;
@@ -144,7 +143,6 @@ namespace Search
         Histories& histories;
 
         int ply() const;
-        int extensions() const;
         bool in_pv() const;
         Move pv_move();
         Move last_move() const;

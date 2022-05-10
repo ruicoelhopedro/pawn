@@ -139,13 +139,12 @@ namespace Search
 
 
     SearchData::SearchData(Thread& thread)
-        : m_ply(0), m_extensions(0), m_prev(nullptr), m_thread(thread), m_move(MOVE_NULL),
+        : m_ply(0), m_prev(nullptr), m_thread(thread), m_move(MOVE_NULL),
           m_pv(thread.m_pv.pv), m_prev_pv(thread.m_pv.prev_pv), m_isPv(true), 
           seldepth(thread.m_seldepth), static_eval(SCORE_NONE), excluded_move(MOVE_NULL),
           histories(thread.m_histories)
     {}
 
-    int SearchData::extensions() const { return m_extensions; }
     int SearchData::ply() const { return m_ply; }
     bool SearchData::in_pv() const { return m_isPv; }
     Move SearchData::last_move() const { return m_move; }
@@ -155,7 +154,7 @@ namespace Search
     Thread& SearchData::thread() const { return m_thread; }
     uint64_t SearchData::nodes_searched() const { return m_thread.m_nodes_searched.load(std::memory_order_relaxed); }
 
-    SearchData SearchData::next(Move move, int extension) const
+    SearchData SearchData::next(Move move) const
     {
         SearchData result = *this;
         result.m_prev = this;
@@ -163,7 +162,6 @@ namespace Search
         // Other parameters
         result.m_ply++;
         result.static_eval = SCORE_NONE;
-        result.m_extensions += extension;
         result.excluded_move = MOVE_NULL;
         // New pv location
         result.m_pv += PV_LENGTH - m_ply;
@@ -491,9 +489,8 @@ namespace Search
                 !InCheck &&
                 move == tt_move &&
                 tt_depth >= depth - 3 &&
-                tt_type == EntryType::LOWER_BOUND &&
-                !is_mate(tt_score) &&
-                data.extensions() < 3)
+                (tt_type == EntryType::LOWER_BOUND || tt_type == EntryType::EXACT) &&
+                !is_mate(tt_score))
             {
                 Score singularBeta = tt_score - 2 * depth;
                 Depth singularDepth = (depth - 1) / 2;
@@ -523,12 +520,12 @@ namespace Search
             position.make_move(move);
 
             // Check extensions
-            if (InCheck && data.extensions() < 3 && depth < 4)
+            if (InCheck && depth < 4)
                 extension = 1;
 
             // Update depth and search data
             curr_depth = depth + extension;
-            SearchData curr_data = data.next(move, extension);
+            SearchData curr_data = data.next(move);
 
             // Late move reductions
             bool do_full_search = true;
