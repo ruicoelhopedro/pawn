@@ -393,7 +393,7 @@ namespace Search
              (tt_type == EntryType::UPPER_BOUND && tt_score < static_eval)))
             static_eval = tt_score;
 
-        bool improving = !InCheck && data.previous(2) && (data.static_eval > data.previous(2)->static_eval);
+        bool improving = !InCheck && Ply >= 2 && data.previous(2) && (data.static_eval > data.previous(2)->static_eval);
 
         // Futility pruning
         if (!PvNode && depth < 9 && !InCheck && !is_mate(static_eval))
