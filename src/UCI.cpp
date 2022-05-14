@@ -257,7 +257,8 @@ namespace UCI
         // Check if perft search
         if (perft_depth > 0)
         {
-            int64_t nodes = Search::perft<true>(pool->position(), perft_depth);
+            Histories hists;
+            int64_t nodes = Search::perft<true>(pool->position(), perft_depth, hists);
             std::cout << "\nNodes searched: " << nodes << std::endl;
             return;
         }

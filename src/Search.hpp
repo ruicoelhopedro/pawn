@@ -180,7 +180,7 @@ namespace Search
 
 
     template<bool OUTPUT, bool USE_ORDER = false, bool TT = false, bool LEGALITY = false, bool VALIDITY = false>
-    int64_t perft(Position& position, Depth depth)
+    int64_t perft(Position& position, Depth depth, Histories& hists)
     {
         // TT lookup
         PerftEntry* entry = nullptr;
@@ -196,7 +196,7 @@ namespace Search
         {
             // Use move orderer (slower but the actual method used during search)
             Move move;
-            MoveOrder orderer = MoveOrder(position, 0, depth, MOVE_NULL, Histories(), MOVE_NULL);
+            MoveOrder orderer = MoveOrder(position, 0, depth, MOVE_NULL, hists, MOVE_NULL);
             while ((move = orderer.next_move()) != MOVE_NULL)
             {
                 if (LEGALITY && !legality_tests(position, move_list))
@@ -209,7 +209,7 @@ namespace Search
                 if (depth > 1)
                 {
                     position.make_move(move);
-                    count = perft<false, USE_ORDER, TT, VALIDITY>(position, depth - 1);
+                    count = perft<false, USE_ORDER, TT, VALIDITY>(position, depth - 1, hists);
                     position.unmake_move();
                 }
                 n_nodes += count;
@@ -233,7 +233,7 @@ namespace Search
                         return 0;
 
                     position.make_move(move);
-                    count = perft<false, USE_ORDER, TT, VALIDITY>(position, depth - 1);
+                    count = perft<false, USE_ORDER, TT, VALIDITY>(position, depth - 1, hists);
                     position.unmake_move();
 
                     n_nodes += count;
