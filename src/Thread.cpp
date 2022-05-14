@@ -136,6 +136,7 @@ void ThreadPool::search(const Search::Timer& timer, const Search::Limits& limits
     this->wait();
 
     // Set the search data before waking the threads
+    ttable.new_search();
     m_status = ThreadStatus::SEARCHING;
     m_limits = limits;
 

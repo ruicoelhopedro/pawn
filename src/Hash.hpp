@@ -4,10 +4,12 @@
 #include <vector>
 
 
+using Age = uint8_t;
+
 class TableEntry
 {
-    virtual bool query(Hash hash, TableEntry** entry) = 0;
-    virtual void store(Hash hash, Depth depth) = 0;
+    virtual bool query(Age age, Hash hash, TableEntry** entry) = 0;
+    virtual void store(Age age, Hash hash, Depth depth) = 0;
     virtual bool empty() const = 0;
 };
 
@@ -23,13 +25,15 @@ public:
         : m_hash(0), m_depth(0), m_nodes(0)
     {}
 
-    inline bool query(Hash hash, PerftEntry** entry)
+    inline bool query(Age age, Hash hash, PerftEntry** entry)
     {
+        (void)age;
         *entry = this;
         return hash == m_hash;
     }
-    inline void store(Hash hash, Depth depth, uint64_t n_nodes)
+    inline void store(Age age, Hash hash, Depth depth, uint64_t n_nodes)
     {
+        (void)age;
         m_hash = hash;
         m_depth = depth;
         m_nodes = n_nodes;
@@ -56,6 +60,9 @@ enum class EntryType
 
 class TranspositionEntry
 {
+    static constexpr int GEN_DATA_BITS = 2;
+    static constexpr uint8_t GEN_DATA_MASK = (1 << GEN_DATA_BITS) - 1;
+
     Hash m_hash;
     Depth m_depth;
     uint8_t m_type;
@@ -63,37 +70,46 @@ class TranspositionEntry
     Move m_best_move;
     int16_t m_static_eval;
 
-    static Hash data_hash(Depth depth, int16_t score, Move best_move, EntryType type, int16_t static_eval)
+    static Hash data_hash(Depth depth, int16_t score, Move best_move, uint8_t type, int16_t static_eval)
     {
         return (static_cast<Hash>(depth) << 0)
              | (static_cast<Hash>(score) << 8)
              | (static_cast<Hash>(best_move.to_int()) << 24)
-             | (static_cast<Hash>(type) << 40)
+             | (static_cast<Hash>(type & GEN_DATA_MASK) << 40)
              | (static_cast<Hash>(static_eval) << 48);
     }
 
-    Hash data_hash() const { return data_hash(depth(), score(), hash_move(), type(), static_eval()); }
+    Hash data_hash() const { return data_hash(depth(), score(), hash_move(), m_type, static_eval()); }
 
-    uint8_t gen_type(EntryType type) { return static_cast<uint8_t>(type); }
+    uint8_t gen_type(Age age, EntryType type) { return (age << GEN_DATA_BITS) | static_cast<uint8_t>(type); }
+    inline Age age() const { return static_cast<Age>(m_type >> GEN_DATA_BITS); }
 
 public:
     TranspositionEntry()
-        : m_type(gen_type(EntryType::EMPTY))
+        : m_type(gen_type(0, EntryType::EMPTY))
     {}
 
-    inline bool query(Hash hash, TranspositionEntry** entry)
+    inline bool query(Age age, Hash hash, TranspositionEntry** entry)
     {
         *entry = this;
-        return hash == (m_hash ^ data_hash());
-    }
-    inline void store(Hash hash, Depth depth, Score score, Move best_move, EntryType type, Score static_eval)
-    {
-        Hash old_hash = m_hash ^ data_hash();
-        if (depth >= m_depth || hash != old_hash)
+        if (hash == this->hash())
         {
-            m_hash = hash ^ data_hash(depth, score, best_move, type, static_eval);
+            // Bump up the age of this entry
+            m_type = gen_type(age, type());
+            return true;
+        }
+        return false;
+    }
+    inline void store(Age age, Hash hash, Depth depth, Score score, Move best_move, EntryType type, Score static_eval)
+    {
+        bool replace = type == EntryType::EXACT
+                    || age != this->age()
+                    || depth > m_depth - (hash == this->hash() ? 0 : 3);
+        if (replace)
+        {
+            m_hash = hash ^ data_hash(depth, score, best_move, gen_type(age, type), static_eval);
             m_depth = depth;
-            m_type = gen_type(type);
+            m_type = gen_type(age, type);
             m_score = score;
             m_best_move = best_move;
             m_static_eval = static_eval;
@@ -101,7 +117,7 @@ public:
     }
     bool empty() const { return type() == EntryType::EMPTY; }
 
-    inline Hash hash() const { return m_hash; }
+    inline Hash hash() const { return m_hash ^ data_hash(); }
     inline Depth depth() const { return m_depth; }
     inline EntryType type() const { return static_cast<EntryType>(m_type & 0b11); }
     inline Score score() const { return m_score; }
@@ -115,6 +131,7 @@ class HashTable
 {
     std::vector<Entry> m_table;
     std::size_t m_full;
+    Age m_age;
 
     static std::size_t size_from_mb(std::size_t mb)   { return mb * 1024 / sizeof(Entry) * 1024 + 1; }
     static std::size_t mb_from_size(std::size_t size) { return (size - 1) / 1024 * sizeof(Entry) / 1024; }
@@ -128,13 +145,14 @@ public:
 
     HashTable(std::size_t size_mb)
         : m_table(size_from_mb(size_mb)),
-          m_full(0)
+          m_full(0),
+          m_age(0)
     {}
 
     template<typename EntryReturn>
     bool query(Hash hash, EntryReturn** entry_ptr)
     {
-        return m_table[index(hash)].query(hash, entry_ptr);
+        return m_table[index(hash)].query(m_age, hash, entry_ptr);
     }
 
     template<typename... Args>
@@ -142,13 +160,19 @@ public:
     {
         auto& entry = m_table[index(hash)];
         m_full += entry.empty();
-        entry.store(hash, args...);
+        entry.store(m_age, hash, args...);
     }
 
     void clear()
     {
         m_full = 0;
+        m_age = 0;
         std::fill(m_table.begin(), m_table.end(), Entry());
+    }
+
+    void new_search()
+    {
+        m_age++;
     }
 
     int max_size() const { return 262144; }
