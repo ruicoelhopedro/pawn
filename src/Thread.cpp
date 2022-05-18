@@ -185,7 +185,7 @@ void ThreadPool::update_time(const Search::Timer& timer, const Search::Limits& l
     else if (limits.time[turn] >= 0)
     {
         // Number of expected remaining moves
-        int n_expected_moves = limits.movestogo >= 0 ? std::min(50, limits.movestogo) : 50;
+        int n_expected_moves = limits.movestogo >= 0 ? std::min(30, limits.movestogo) : 30;
         int time_remaining = limits.time[turn] + limits.incr[turn] * (n_expected_moves - 1);
 
         // This move will use 1/n_expected_moves of the remaining time
