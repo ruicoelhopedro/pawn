@@ -59,10 +59,6 @@ MixedScore pawns(const Board& board, EvalData& data)
     constexpr MixedScore BackwardPenalty(-9, -22);
     constexpr MixedScore IslandPenalty(-3, -12);
     constexpr MixedScore NonPushedCentralPenalty(-35, -50);
-    constexpr MixedScore PassedBonus[] = { MixedScore(  0,   0), MixedScore(  0,   0),
-                                           MixedScore(  7,  27), MixedScore( 16,  32),
-                                           MixedScore( 17,  40), MixedScore( 64,  71),
-                                           MixedScore(170, 174), MixedScore(278, 262) };
 
     // Some helpers
     constexpr Direction Up = 8;
@@ -102,11 +98,6 @@ MixedScore pawns(const Board& board, EvalData& data)
                                        + IsolatedPenalty * isolated[turn].count()
                                        + BackwardPenalty * backward[turn].count()
                                        + IslandPenalty   * Bitboards::file_count(data.pawns[turn].open_files);
-        
-        // Passed pawn scores
-        Bitboard b = data.pawns[turn].passed;
-        while (b)
-            data.fields[turn].pieces[PAWN] += PassedBonus[rank(b.bitscan_forward_reset(), turn)];
         
         // Update attack tables
         data.attacks[turn].push<PAWN>(data.pawns[turn].attacks);
@@ -315,6 +306,57 @@ MixedScore space(const Board& board, EvalData& data)
 }
 
 
+template<Turn TURN>
+MixedScore passed(const Board& board, EvalData& data)
+{
+    constexpr Direction Up = (TURN == WHITE) ? 8 : -8;
+
+    constexpr MixedScore PassedBonus[] = { MixedScore(  0,   0), MixedScore(  0,   0),
+                                           MixedScore(  7,  27), MixedScore( 16,  32),
+                                           MixedScore( 17,  40), MixedScore( 64,  71),
+                                           MixedScore(170, 174), MixedScore(278, 262) };
+
+    MixedScore score(0, 0);
+
+    // Score each passed pawn
+    Bitboard passed = data.pawns[TURN].passed;
+    while (passed)
+    {
+        Square p = passed.bitscan_forward_reset();
+
+        // Basic score based on rank
+        int r = rank(p, TURN);
+        score += PassedBonus[r];
+
+        // More bonuses if the pawn can push forward and is above 3rd rank
+        Square block = p + Up;
+        if (!board.get_pieces().test(block) && r >= 3)
+        {
+            int bonus = 0;
+            int weight = std::max(0, 5 * r - 10);
+            Bitboard span = Bitboard::from_single_bit(p).fill_excluded<Up>();
+
+            // No enemies in the pawn span?
+            if (!(board.get_pieces<~TURN>() & span))
+                bonus += 10;
+            
+            // Enemy does not attack pawn span?
+            if (!(data.attacks[~TURN].get() & span))
+                bonus += 20;
+            
+            // Otherwise, check if we can safely push
+            else if (!data.attacks[~TURN].get().test(block))
+                bonus += 5;
+
+            score += MixedScore(bonus * weight, bonus * weight);
+        }
+    }
+
+    data.fields[TURN].passed = score;
+    return score;
+}
+
+
 Score evaluation(const Board& board, EvalData& data)
 {
     MixedScore mixed_result(0, 0);
@@ -333,6 +375,9 @@ Score evaluation(const Board& board, EvalData& data)
 
     // Space
     mixed_result += space<WHITE>(board, data) - space<BLACK>(board, data);
+
+    // Passed pawn scores
+    mixed_result += passed<WHITE>(board, data) - passed<BLACK>(board, data);
 
     // Tapered eval
     Score result = mixed_result.tapered(board.phase());
@@ -372,6 +417,7 @@ void eval_table(const Board& board, EvalData& data, Score score)
     std::cout << " Queens        | " << Term<false>(data.fields[WHITE].pieces[QUEEN],  data.fields[BLACK].pieces[QUEEN])  << std::endl;
     std::cout << " King safety   | " << Term<false>(data.fields[WHITE].pieces[KING],   data.fields[BLACK].pieces[KING])   << std::endl;
     std::cout << " Space         | " << Term<false>(data.fields[WHITE].space,          data.fields[BLACK].space)          << std::endl;
+    std::cout << " Passed pawns  | " << Term<false>(data.fields[WHITE].passed,         data.fields[BLACK].passed)         << std::endl;
     std::cout << "---------------------------------------------------------------"                                        << std::endl;
     std::cout << "                                         Phase |    " << std::setw(4) << (int)board.phase()             << std::endl;
     std::cout << "                                         Final | "    << std::setw(5) << score / 100.0 << " (White)"    << std::endl;
