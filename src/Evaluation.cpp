@@ -246,11 +246,6 @@ MixedScore king_safety(const Board& board, EvalData& data)
                                            MixedScore(  25,   0), MixedScore( 35,  -5), MixedScore(40,  -5),
                                            MixedScore(  40, -10), MixedScore( 41, -15), MixedScore(42, -20) };
 
-    constexpr MixedScore SquaresAttacked[] = { MixedScore(   0, 0), MixedScore( -10, 0),
-                                               MixedScore( -50, 0), MixedScore( -75, 0),
-                                               MixedScore(-100, 0), MixedScore(-150, 0),
-                                               MixedScore(-200, 0), MixedScore(-225, 0),
-                                               MixedScore(-250, 0), MixedScore(-250, 0) };
     constexpr MixedScore SliderAttackers[] = { MixedScore(-150, -100), MixedScore(-50, -20),
                                                MixedScore( -15,   -2), MixedScore(  0,   0),
                                                MixedScore(   0,    0), MixedScore(  0,   0),
@@ -285,7 +280,7 @@ MixedScore king_safety(const Board& board, EvalData& data)
     Bitboard b = mask;
     while(b)
         attacked_squares += board.attackers_battery<~TURN>(b.bitscan_forward_reset(), occupancy).count();
-    score += SquaresAttacked[std::min(9, attacked_squares)];
+    score += MixedScore(-10, 0) * std::min(9, attacked_squares) * std::min(9, attacked_squares);
 
     // King out in the open
     Bitboard rays = Bitboards::get_attacks<BISHOP>(king_sq, occupancy)
