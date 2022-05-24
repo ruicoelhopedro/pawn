@@ -355,14 +355,8 @@ namespace Search
                  (tt_type == EntryType::LOWER_BOUND && tt_score >= beta)))
             {
                 // Update histories for quiet TT moves
-                if (tt_move != MOVE_NULL && !tt_move.is_capture() && !tt_move.is_promotion())
-                {
-                    PieceType piece = position.board().get_piece_at(tt_move.from());
-                    if (tt_score >= beta)
-                        data.histories.bestmove(tt_move, data.last_move(), Turn, depth, Ply, piece);
-                    else
-                        data.histories.add_bonus(tt_move, Turn, piece, data.last_move(), -depth);
-                }
+                if (tt_move != MOVE_NULL && !tt_move.is_capture() && tt_score >= beta)
+                    data.histories.bestmove(tt_move, data.last_move(), Turn, depth, Ply, position.board().get_piece_at(tt_move.from()));
 
                 // Do not cutoff when we are approaching the 50 move rule
                 if (position.board().half_move_clock() < 90)
@@ -622,12 +616,12 @@ namespace Search
         if (best_move != MOVE_NULL && !best_move.is_capture())
         {
             // Update stats for bestmove
-            data.histories.bestmove(move, data.last_move(), Turn, depth, Ply, position.board().get_piece_at(move.from()));
+            data.histories.bestmove(best_move, data.last_move(), Turn, depth, Ply, position.board().get_piece_at(best_move.from()));
 
-            // Penalty any non-best move
+            // Penalty for any non-best quiet
             for (auto move : quiets_searched)
                 if (move != best_move)
-                    data.histories.add_bonus(move, Turn, position.board().get_piece_at(move.from()), data.last_move(), -depth * (depth - 1));
+                    data.histories.add_bonus(move, Turn, position.board().get_piece_at(move.from()), data.last_move(), -depth * depth);
         }
 
         // Check for game end
