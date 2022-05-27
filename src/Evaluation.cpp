@@ -225,14 +225,10 @@ template<Turn TURN>
 MixedScore king_safety(const Board& board, EvalData& data)
 {
     constexpr Direction Up = (TURN == WHITE) ? 8 : -8;
-    constexpr Direction Left = -1;
-    constexpr Direction Right = 1;
     constexpr Bitboard Rank1 = (TURN == WHITE) ? Bitboards::rank_1 : Bitboards::rank_8;
 
     constexpr MixedScore BackRankBonus(50, -50);
     constexpr MixedScore OpenRay(-15, 8);
-    constexpr MixedScore KingOnOpenFile(-75, 0);
-    constexpr MixedScore KingNearOpenFile(-35, 0);
     constexpr MixedScore PawnShelter[] = { MixedScore(-100,   0), MixedScore(-25,   0), MixedScore( 0,   0),
                                            MixedScore(  25,   0), MixedScore( 35,  -5), MixedScore(40,  -5),
                                            MixedScore(  40, -10), MixedScore( 41, -15), MixedScore(42, -20) };
@@ -278,14 +274,6 @@ MixedScore king_safety(const Board& board, EvalData& data)
                   | Bitboards::get_attacks<  ROOK>(king_sq, occupancy);
     int safe_dirs = (rays & board.get_pieces<TURN>()).count();
     score += OpenRay * std::max(0, mask.count() - safe_dirs - 3);
-
-    // Open or semi-open files near the king
-    Bitboard king_file = king_bb.fill<Up>();
-    Bitboard left_king_file  = (king_file & ~Bitboards::a_file).shift< Left>();
-    Bitboard right_king_file = (king_file & ~Bitboards::h_file).shift<Right>();
-    score += KingOnOpenFile   * !(      king_file & pawns_bb)
-           + KingNearOpenFile * !( left_king_file & pawns_bb)
-           + KingNearOpenFile * !(right_king_file & pawns_bb);
 
     data.fields[TURN].pieces[KING] = score;
     return score;
