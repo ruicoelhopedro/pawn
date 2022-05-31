@@ -108,7 +108,7 @@ constexpr MixedScore piece_square(PieceType piece, Square square, Turn turn)
     // Correct piece position for table lookup
     int sq_rank = (turn == WHITE) ? rank(square) : (7 - rank(square));
     if (piece == PAWN)
-        return psq_table_pawns[sq_rank - 1][file(square)] * 2;
+        return psq_table_pawns[sq_rank - 1][file(square)] * 10;
     else
-        return psq_table[piece - 1][sq_rank][horizontal_distance(square)] * 2;
+        return psq_table[piece - 1][sq_rank][horizontal_distance(square)] * 5;
 }
