@@ -15,6 +15,8 @@ enum class MoveStage
     KILLERS,
     QUIET_INIT,
     QUIET,
+    BAD_CAPTURES_INIT,
+    BAD_CAPTURES,
     NO_MOVES
 };
 
@@ -67,6 +69,8 @@ class MoveOrder
     Move m_countermove;
     Move m_killer;
     Move* m_curr;
+    MoveList m_captures;
+    Move* m_bad_captures;
 
     bool hash_move(Move& move);
 
@@ -81,9 +85,9 @@ class MoveOrder
     }
 
 
-    bool next(Move& move)
+    bool next(Move& move, Move* end)
     {
-        if (m_curr == m_moves.end())
+        if (m_curr == end)
             return false;
 
         move = *(m_curr++);

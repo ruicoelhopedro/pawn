@@ -115,10 +115,9 @@ bool MoveOrder::hash_move(Move& move)
 
 int MoveOrder::capture_score(Move move) const
 {
-    // MVV-LVA
-    PieceType from = m_position.board().get_piece_at(move.from());
+    // MVV
     PieceType to = move.is_ep_capture() ? PAWN : m_position.board().get_piece_at(move.to());
-    return piece_value_mg[to] - piece_value_mg[from];
+    return piece_value_mg[to];
 }
 
 
@@ -148,16 +147,24 @@ Move MoveOrder::next_move()
         else if (m_stage == MoveStage::CAPTURES_INIT)
         {
             ++m_stage;
-            m_moves = m_position.move_list();
-            m_position.board().generate_moves(m_moves, MoveGenType::CAPTURES);
-            sort_moves<true>(m_moves);
-            m_curr = m_moves.begin();
+            m_captures = m_position.move_list();
+            m_position.board().generate_moves(m_captures, MoveGenType::CAPTURES);
+            sort_moves<true>(m_captures);
+            m_curr = m_captures.begin();
+            m_bad_captures = m_captures.end();
         }
         else if (m_stage == MoveStage::CAPTURES)
         {
-            while (next(move))
+            while (next(move, m_bad_captures))
                 if (move != m_hash_move)
-                    return move;
+                {
+                    // At this stage only return good captures
+                    if (m_position.board().see(move) >= 0)
+                        return move;
+
+                    // Move bad captures to be tried later
+                    std::swap(*(--m_curr), *(--m_bad_captures));
+                }
             ++m_stage;
         }
         else if (m_stage == MoveStage::CAPTURES_END)
@@ -197,15 +204,27 @@ Move MoveOrder::next_move()
         else if (m_stage == MoveStage::QUIET_INIT)
         {
             ++m_stage;
-            m_moves = m_position.move_list();
+            m_moves = MoveList(m_captures.end());
             m_position.board().generate_moves(m_moves, MoveGenType::QUIETS);
             sort_moves<false>(threshold_moves<false>(m_moves, -1000 * m_depth));
             m_curr = m_moves.begin();
         }
         else if (m_stage == MoveStage::QUIET)
         {
-            while (next(move))
+            while (next(move, m_moves.end()))
                 if (move != m_hash_move && move != m_killer && move != m_countermove)
+                    return move;
+            ++m_stage;
+        }
+        else if (m_stage == MoveStage::BAD_CAPTURES_INIT)
+        {
+            ++m_stage;
+            m_curr = m_bad_captures;
+        }
+        else if (m_stage == MoveStage::BAD_CAPTURES)
+        {
+            while (next(move, m_captures.end()))
+                if (move != m_hash_move)
                     return move;
             ++m_stage;
         }
