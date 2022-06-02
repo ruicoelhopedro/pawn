@@ -196,7 +196,7 @@ namespace Search
         {
             // Use move orderer (slower but the actual method used during search)
             Move move;
-            MoveOrder orderer = MoveOrder(position, 0, depth, MOVE_NULL, hists, MOVE_NULL);
+            MoveOrder orderer = MoveOrder(position, 0, depth, MOVE_NULL, hists);
             while ((move = orderer.next_move()) != MOVE_NULL)
             {
                 if (LEGALITY && !legality_tests(position, move_list))

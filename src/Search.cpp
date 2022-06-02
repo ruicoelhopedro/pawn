@@ -426,7 +426,7 @@ namespace Search
         Move quiet_list[NUM_MAX_MOVES];
         MoveList quiets_searched(quiet_list);
         Move hash_move = (data.in_pv() && data.pv_move() != MOVE_NULL) ? data.pv_move() : tt_move;
-        MoveOrder orderer = MoveOrder(position, Ply, depth, hash_move, data.histories, data.last_move());
+        MoveOrder orderer = MoveOrder(position, Ply, depth, hash_move, data.histories);
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;
@@ -468,7 +468,7 @@ namespace Search
                     if (depth < 7 && n_moves > 3 + depth * depth)
                         continue;
 
-                    if (depth < 5 && orderer.quiet_score(move) < -1000 * (depth - 1))
+                    if (depth < 5 && orderer.quiet_score(move) < -500 * (depth - 1))
                         continue;
 
                     if (depth < 7 && position.board().see(move, -20 * (depth + (int)depth * depth)) < 0)
@@ -733,7 +733,7 @@ namespace Search
         Move move;
         int n_moves = 0;
         Move best_move = MOVE_NULL;
-        MoveOrder orderer = MoveOrder(position, Ply, 0, tt_move, data.histories, MOVE_NULL, true);
+        MoveOrder orderer = MoveOrder(position, Ply, 0, tt_move, data.histories, true);
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;

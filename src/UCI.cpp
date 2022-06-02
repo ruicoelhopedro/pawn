@@ -330,6 +330,7 @@ namespace UCI
     void ucinewgame(Stream& stream)
     {
         ttable.clear();
+        pool->clear();
     }
 
 

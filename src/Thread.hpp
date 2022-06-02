@@ -62,6 +62,8 @@ public:
 
     void wait();
 
+    void clear();
+
     int id() const;
     bool is_main() const;
     ThreadPool& pool() const;
@@ -112,6 +114,8 @@ public:
     int size() const;
 
     void wait();
+
+    void clear();
 };
 
 

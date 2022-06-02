@@ -755,6 +755,12 @@ bool Position::reduced() const
 }
 
 
+Move Position::last_move() const
+{
+    return m_moves.size() > 0 ? m_moves.back().move : MOVE_NULL;
+}
+
+
 std::ostream& operator<<(std::ostream& out, const Board& board)
 {
     out << "   +------------------------+\n";

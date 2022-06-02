@@ -51,6 +51,12 @@ void Thread::wait()
 }
 
 
+void Thread::clear()
+{
+    m_histories.clear();
+}
+
+
 void Thread::wake(ThreadStatus status)
 {
     std::unique_lock<std::mutex> lock(m_mutex);
@@ -158,6 +164,13 @@ void ThreadPool::wait()
 {
     for (auto& thread : m_threads)
         thread->wait();
+}
+
+
+void ThreadPool::clear()
+{
+    for (auto& thread : m_threads)
+        thread->clear();
 }
 
 
@@ -285,7 +298,6 @@ void Thread::search()
     std::fill(m_multiPV.begin(), m_multiPV.end(), Search::MultiPVData());
 
     // Clear data
-    m_histories.clear();
     m_nodes_searched.store(0);
 
     // Iterative deepening

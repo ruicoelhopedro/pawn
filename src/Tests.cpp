@@ -236,6 +236,8 @@ namespace Tests
         // Resize thread pool and hash
         pool->resize(threads);
         ttable.resize(hash);
+        pool->clear();
+        ttable.clear();
 
         // Start master timer
         Search::Timer time;

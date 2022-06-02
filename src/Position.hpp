@@ -700,6 +700,9 @@ public:
 
 
     bool reduced() const;
+
+
+    Move last_move() const;
 };
 
 

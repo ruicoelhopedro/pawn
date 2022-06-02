@@ -90,9 +90,9 @@ Move Histories::countermove(Move move) const
 }
 
 
-MoveOrder::MoveOrder(Position& pos, Depth ply, Depth depth, Move hash_move, const Histories& histories, Move prev_move, bool quiescence)
+MoveOrder::MoveOrder(Position& pos, Depth ply, Depth depth, Move hash_move, const Histories& histories, bool quiescence)
     : m_position(pos), m_ply(ply), m_depth(depth), m_hash_move(hash_move), m_histories(histories),
-      m_prev_move(prev_move), m_quiescence(quiescence), m_stage(MoveStage::HASH),
+      m_prev_move(pos.last_move()), m_quiescence(quiescence), m_stage(MoveStage::HASH),
       m_countermove(MOVE_NULL), m_killer(MOVE_NULL)
 {
 }
