@@ -430,11 +430,7 @@ namespace Search
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;
-            if (!move.is_capture() && !move.is_promotion())
-            {
-                quiets_searched.push(move);
-                move_number++;
-            }
+            move_number += !move.is_capture();
 
             // Skip excluded moves
             if (move == data.excluded_move)
@@ -610,6 +606,10 @@ namespace Search
                         data.update_pv(best_move, curr_data.pv());
                 }
             }
+
+            // Update list of searched moves
+            if (!move.is_capture())
+                quiets_searched.push(move);
         }
 
         // Update quiet histories
