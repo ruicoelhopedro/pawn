@@ -451,7 +451,7 @@ namespace Search
                           << " currmove " << move.to_uci()
                           << " currmovenumber " << n_moves << std::endl;
 
-            // Shallow depth prunings
+            // Shallow depth pruning
             if (!RootSearch && position.board().non_pawn_material(Turn) && !InCheck && best_score > -SCORE_MATE_FOUND)
             {
                 if (move.is_capture() || move.is_promotion())
@@ -464,7 +464,7 @@ namespace Search
                     if (depth < 7 && n_moves > 3 + depth * depth)
                         continue;
 
-                    if (depth < 5 && orderer.quiet_score(move) < -500 * (depth - 1))
+                    if (orderer.quiet_score(move) < -100 * (depth - 1) - 50 * int(depth) * depth * depth)
                         continue;
 
                     if (depth < 7 && position.board().see(move, -20 * (depth + (int)depth * depth)) < 0)
