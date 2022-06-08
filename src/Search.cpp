@@ -456,7 +456,7 @@ namespace Search
             {
                 if (move.is_capture() || move.is_promotion())
                 {
-                    if (depth < 7 && position.board().see(move, -200 * depth) < 0)
+                    if (depth < 10 && position.board().see(move, -140 * depth) < 0)
                         continue;
                 }
                 else
@@ -467,7 +467,7 @@ namespace Search
                     if (orderer.quiet_score(move) < -100 * (depth - 1) - 50 * int(depth) * depth * depth)
                         continue;
 
-                    if (depth < 7 && position.board().see(move, -20 * (depth + (int)depth * depth)) < 0)
+                    if (depth < 10 && position.board().see(move, -10 * (depth + (int)depth * depth)) < 0)
                         continue;
                 }
             }
