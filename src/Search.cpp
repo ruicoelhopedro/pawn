@@ -535,7 +535,7 @@ namespace Search
                 score = -negamax<NON_PV>(position, new_depth, -alpha - 1, -alpha, curr_data);
 
                 // Only carry a full search if this reduced move fails high
-                do_full_search = score >= alpha;
+                do_full_search = score > alpha;
             }
 
             // PVS
