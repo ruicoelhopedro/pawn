@@ -57,6 +57,7 @@ namespace Evaluation
         MixedScore placement;
         MixedScore space;
         MixedScore passed;
+        MixedScore threats;
         std::array<MixedScore, NUM_PIECE_TYPES> pieces;
     };
 

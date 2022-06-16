@@ -345,6 +345,23 @@ MixedScore passed(const Board& board, EvalData& data)
 }
 
 
+template<Turn TURN>
+MixedScore threats(const Board& board, EvalData& data)
+{
+    constexpr MixedScore Hanging(75, 75);
+
+    MixedScore mixed_result(0, 0);
+
+    Bitboard opp_pieces = board.get_pieces<~TURN>() & ~board.get_pieces<~TURN, PAWN>();
+    Bitboard controlled = data.attacks[TURN].get() & ~data.attacks[~TURN].get();
+
+    mixed_result += Hanging * (opp_pieces & controlled).count();
+
+    data.fields[TURN].threats = mixed_result;
+    return mixed_result;
+}
+
+
 Score evaluation(const Board& board, EvalData& data)
 {
     MixedScore mixed_result(0, 0);
@@ -363,6 +380,9 @@ Score evaluation(const Board& board, EvalData& data)
 
     // Space
     mixed_result += space<WHITE>(board, data) - space<BLACK>(board, data);
+
+    // Threats
+    mixed_result += threats<WHITE>(board, data) - threats<BLACK>(board, data);
 
     // Passed pawn scores
     mixed_result += passed<WHITE>(board, data) - passed<BLACK>(board, data);
@@ -396,7 +416,7 @@ void eval_table(const Board& board, EvalData& data, Score score)
     std::cout << "               |     White     |     Black     |     Total     "                                        << std::endl;
     std::cout << " Term          |   MG     EG   |   MG     EG   |   MG     EG   "                                        << std::endl;
     std::cout << "---------------------------------------------------------------"                                        << std::endl;
-    std::cout << " Material      | " << Term< true>(data.fields[WHITE].material  / 10, data.fields[BLACK].material  / 10) << std::endl;
+    std::cout << " Material      | " << Term< true>(data.fields[WHITE].material,       data.fields[BLACK].material)       << std::endl;
     std::cout << " Placement     | " << Term< true>(data.fields[WHITE].placement / 10, data.fields[BLACK].placement / 10) << std::endl;
     std::cout << " Pawns         | " << Term<false>(data.fields[WHITE].pieces[PAWN],   data.fields[BLACK].pieces[PAWN])   << std::endl;
     std::cout << " Knights       | " << Term<false>(data.fields[WHITE].pieces[KNIGHT], data.fields[BLACK].pieces[KNIGHT]) << std::endl;
@@ -405,6 +425,7 @@ void eval_table(const Board& board, EvalData& data, Score score)
     std::cout << " Queens        | " << Term<false>(data.fields[WHITE].pieces[QUEEN],  data.fields[BLACK].pieces[QUEEN])  << std::endl;
     std::cout << " King safety   | " << Term<false>(data.fields[WHITE].pieces[KING],   data.fields[BLACK].pieces[KING])   << std::endl;
     std::cout << " Space         | " << Term<false>(data.fields[WHITE].space,          data.fields[BLACK].space)          << std::endl;
+    std::cout << " Threats       | " << Term<false>(data.fields[WHITE].threats,        data.fields[BLACK].threats)        << std::endl;
     std::cout << " Passed pawns  | " << Term<false>(data.fields[WHITE].passed,         data.fields[BLACK].passed)         << std::endl;
     std::cout << "---------------------------------------------------------------"                                        << std::endl;
     std::cout << "                                         Phase |    " << std::setw(4) << (int)board.phase()             << std::endl;
