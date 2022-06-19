@@ -20,11 +20,15 @@ ThreadPool* pool;
 Thread::Thread(int id, ThreadPool& pool)
     : m_id(id),
       m_pool(pool),
-      m_status(ThreadStatus::WAITING),
+      m_status(ThreadStatus::STARTING),
       m_nodes_searched(0),
       m_multiPV(UCI::Options::MultiPV)
 {
     m_thread = std::thread(&Thread::thread_loop, this);
+
+    // Wait here until the thread has started
+    std::unique_lock<std::mutex> lock(m_mutex);
+    m_cvar.wait(lock, [this]{ return m_status != ThreadStatus::STARTING; });
 }
 
 

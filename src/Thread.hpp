@@ -16,6 +16,7 @@ enum class ThreadStatus
 {
     WAITING,
     SEARCHING,
+    STARTING,
     QUITTING
 };
 
