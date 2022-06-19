@@ -212,7 +212,10 @@ namespace UCI
             while (stream >> token)
                 value += value.empty() ? token : (" " + token);
 
-            OptionsMap.at(name).set(value);
+            if (OptionsMap.find(name) != OptionsMap.end())
+                OptionsMap.at(name).set(value);
+            else
+                std::cout << "Unknown option " << name << std::endl;
         }
     }
 
