@@ -2,6 +2,7 @@
 #include "Types.hpp"
 #include "Position.hpp"
 #include <iomanip>
+#include <array>
 
 
 namespace Evaluation
