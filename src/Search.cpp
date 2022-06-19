@@ -344,7 +344,7 @@ namespace Search
         {
             tt_type = entry->type();
             tt_depth = entry->depth();
-            tt_score = score_from_tt(entry->score(), Ply);
+            tt_score = score_from_tt(entry->score(), Ply, position.board().half_move_clock());
             tt_move = entry->hash_move();
             tt_static_eval = entry->static_eval();
 
@@ -686,7 +686,7 @@ namespace Search
         if (tt_hit)
         {
             tt_type = entry->type();
-            tt_score = score_from_tt(entry->score(), Ply);
+            tt_score = score_from_tt(entry->score(), Ply, position.board().half_move_clock());
             tt_move = entry->hash_move();
             tt_static_eval = entry->static_eval();
 
@@ -717,7 +717,7 @@ namespace Search
             best_score = static_eval;
 
             // Can we use the TT value for a better static evaluation?
-            if (tt_hit && abs(tt_score) < SCORE_MATE_FOUND &&
+            if (tt_hit &&
                 ((tt_type == EntryType::EXACT) ||
                  (tt_type == EntryType::LOWER_BOUND && tt_score > static_eval) ||
                  (tt_type == EntryType::UPPER_BOUND && tt_score < static_eval)))

@@ -218,12 +218,16 @@ constexpr Score score_to_tt(const Score& score, int ply)
 }
 
 
-constexpr Score score_from_tt(const Score& score, int ply)
+constexpr Score score_from_tt(const Score& score, int ply, int half_move)
 {
-    if (!is_mate(score))
+    if (score >= SCORE_MATE_FOUND)
+        return (SCORE_MATE - score > 99 - half_move) ? (SCORE_MATE_FOUND - 1)
+                                                     : (score - ply);
+    else if (score <= -SCORE_MATE_FOUND)
+        return (SCORE_MATE + score > 99 - half_move) ? -(SCORE_MATE_FOUND - 1)
+                                                     : (score + ply);
+    else
         return score;
-
-    return (score > 0) ? (score - ply) : (score + ply);
 }
 
 

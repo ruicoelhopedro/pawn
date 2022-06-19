@@ -355,9 +355,8 @@ void Thread::search()
                 !limits.infinite)
             {
                 double remaining = time.remaining();
-                // Best move mate or do we expect not to have time for one more iteration?
-                if (is_mate(score) ||
-                    (remaining > 0 && remaining < timer_depth.elapsed() * 1.5))
+                // Do we expect not to have time for one more iteration?
+                if (remaining > 0 && remaining < timer_depth.elapsed() * 1.5)
                     break;
             }
 
