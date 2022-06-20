@@ -45,7 +45,7 @@ void Histories::add_bonus(Move move, Turn turn, PieceType piece, Move prev_move,
 
 void Histories::bestmove(Move move, Move prev_move, Turn turn, Depth depth, Depth ply, PieceType piece)
 {
-    add_bonus(move, turn, piece, prev_move, depth * depth);
+    add_bonus(move, turn, piece, prev_move, hist_bonus(depth));
     m_countermoves[prev_move.from()][prev_move.to()] = move;
 
     // Exit if killer already in the list

@@ -49,11 +49,19 @@ public:
     Move get_killer(int index, Depth ply) const;
 };
 
+
 template<int MAX>
 void saturate_add(int& entry, int bonus)
 {
     entry += bonus - entry * abs(bonus) / MAX;
 }
+
+
+constexpr int hist_bonus(Depth d)
+{
+    return std::min(2000, 5 * (d + 10) * d);
+}
+
 
 class MoveOrder
 {

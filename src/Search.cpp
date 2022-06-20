@@ -621,7 +621,7 @@ namespace Search
             // Penalty for any non-best quiet
             for (auto move : quiets_searched)
                 if (move != best_move)
-                    data.histories.add_bonus(move, Turn, position.board().get_piece_at(move.from()), data.last_move(), -depth * depth);
+                    data.histories.add_bonus(move, Turn, position.board().get_piece_at(move.from()), data.last_move(), -hist_bonus(depth));
         }
 
         // Check for game end
