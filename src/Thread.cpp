@@ -334,14 +334,14 @@ void Thread::search()
             m_root_moves.pop(std::find(m_root_moves.begin(), m_root_moves.end(), *pv.pv));
 
             // Sort Pv lines by depth and score
-            std::sort(m_multiPV.begin(), m_multiPV.end(),
-                      [](Search::MultiPVData a, Search::MultiPVData b)
-                      {
-                          return a.depth >= b.depth && a.score > b.score;
-                      });
+            std::stable_sort(m_multiPV.begin(), m_multiPV.end(),
+                             [](Search::MultiPVData a, Search::MultiPVData b)
+                             {
+                                 return a.depth >= b.depth && a.score > b.score;
+                             });
 
             // Output all searched Pv lines
-            if (main_thread)
+            if (main_thread && (iPv + 1 == maxPv || time.elapsed() > 3))
                 output_pvs();
         }
 
