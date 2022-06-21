@@ -269,6 +269,13 @@ MixedScore king_safety(const Board& board, EvalData& data)
         attacked_squares += board.attackers_battery<~TURN>(b.bitscan_forward_reset(), occupancy).count();
     score += MixedScore(-10, 0) * std::min(9, attacked_squares) * std::min(9, attacked_squares);
 
+    // Possible checkers
+    Bitboard checkers = (Bitboards::get_attacks_pawns<TURN>(king_sq)        &  data.attacks[~TURN].get<PAWN>())
+                      | (Bitboards::get_attacks<KNIGHT>(king_sq, occupancy) &  data.attacks[~TURN].get<KNIGHT>())
+                      | (Bitboards::get_attacks<BISHOP>(king_sq, occupancy) & (data.attacks[~TURN].get<BISHOP>() | data.attacks[~TURN].get<QUEEN>()))
+                      | (Bitboards::get_attacks<  ROOK>(king_sq, occupancy) & (data.attacks[~TURN].get<  ROOK>() | data.attacks[~TURN].get<QUEEN>()));
+    score += MixedScore(-75, 0) * (checkers & ~data.attacks[TURN].get()).count();
+
     // King out in the open
     Bitboard rays = Bitboards::get_attacks<BISHOP>(king_sq, occupancy)
                   | Bitboards::get_attacks<  ROOK>(king_sq, occupancy);
