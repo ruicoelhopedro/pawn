@@ -6,6 +6,8 @@
 #include "UCI.hpp"
 #include "Thread.hpp"
 #include <array>
+#include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -13,7 +15,7 @@
 
 namespace UCI
 {
-    std::map<std::string, Option> OptionsMap;
+    std::map<std::string, Option, OptionNameCompare> OptionsMap;
 
 
     namespace Options
@@ -379,5 +381,15 @@ namespace UCI
                 return move;
 
         return MOVE_NULL;
+    }
+
+
+    bool OptionNameCompare::operator()(const std::string& a, const std::string& b) const
+    {
+        return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end(),
+                                            [](char c1, char c2)
+                                            {
+                                                return tolower(c1) < tolower(c2);
+                                            });
     }
 }

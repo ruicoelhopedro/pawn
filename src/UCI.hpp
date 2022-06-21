@@ -70,7 +70,13 @@ namespace UCI
     std::ostream& operator<<(std::ostream& out, const Option& option);
 
 
-    extern std::map<std::string, Option> OptionsMap;
+    struct OptionNameCompare
+    {
+        bool operator()(const std::string& a, const std::string& b) const;
+    };
+
+
+    extern std::map<std::string, Option, OptionNameCompare> OptionsMap;
 
 
     namespace Options
