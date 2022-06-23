@@ -129,6 +129,13 @@ MixedScore piece(const Board& board, Bitboard occupancy, EvalData& data)
     MixedScore score(0, 0);
 
     Bitboard b = board.get_pieces<TURN, PIECE>();
+
+    // Ignore friendly sliders
+    if (PIECE == BISHOP || PIECE == QUEEN)
+        occupancy &= ~(board.get_pieces<TURN, BISHOP>() | board.get_pieces<TURN, QUEEN>());
+    if (PIECE == ROOK || PIECE == QUEEN)
+        occupancy &= ~(board.get_pieces<TURN, ROOK>() | board.get_pieces<TURN, QUEEN>());
+
     while (b)
     {
         Square square = b.bitscan_forward_reset();
