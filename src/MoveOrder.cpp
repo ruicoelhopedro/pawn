@@ -149,7 +149,7 @@ Move MoveOrder::next_move()
             ++m_stage;
             m_captures = m_position.move_list();
             m_position.board().generate_moves(m_captures, MoveGenType::CAPTURES);
-            sort_moves<true>(m_captures);
+            partial_sort<true>(m_captures, 0);
             m_curr = m_captures.begin();
             m_bad_captures = m_captures.end();
         }
@@ -206,7 +206,7 @@ Move MoveOrder::next_move()
             ++m_stage;
             m_moves = MoveList(m_captures.end());
             m_position.board().generate_moves(m_moves, MoveGenType::QUIETS);
-            sort_moves<false>(threshold_moves<false>(m_moves, -1000 * m_depth));
+            partial_sort<false>(m_moves, -1000 * m_depth);
             m_curr = m_moves.begin();
         }
         else if (m_stage == MoveStage::QUIET)

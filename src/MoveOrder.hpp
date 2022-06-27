@@ -104,30 +104,32 @@ class MoveOrder
 
 
     template<bool CAPTURES>
-    MoveList threshold_moves(MoveList& list, int threshold)
+    void partial_sort(MoveList& list, int threshold)
     {
-        Move* pos = list.begin();
-        for (auto list_move = list.begin(); list_move != list.end(); list_move++)
+        // Partial move sorting based on Stockfish's partial insertion sort
+        Move* sorted_end = list.begin();
+        for (Move* i = list.begin() + 1; i < list.end(); i++)
         {
-            if (move_score<CAPTURES>(*list_move) > threshold)
+            // Only sort moves above the threshold
+            int i_score = move_score<CAPTURES>(*i);
+            if (i_score > threshold)
             {
-                if (pos != list_move)
-                    std::swap(*pos, *list_move);
-                pos++;
+                // Store a copy of the move to assign later
+                Move curr = *i;
+
+                // Little hack: instead of doing the insertion sort from the current position,
+                // shortcut the entries below threshold. To do so, the current entry is swapped
+                // with the end of the sorted region. The unsorted entry is set right away,
+                // while the sorted one is only inserted at the end.
+                *i = *(++sorted_end);
+                Move* j = sorted_end;
+
+                // Actual insertion sorting
+                for (; j > list.begin() && i_score > move_score<CAPTURES>(*(j - 1)); j--)
+                    *j = *(j - 1);
+                *j = curr;
             }
         }
-
-        return MoveList(list.begin(), pos);
-    }
-
-
-    template<bool CAPTURES>
-    void sort_moves(MoveList list) const
-    {
-        std::sort(list.begin(), list.end(), [this](Move a, Move b)
-                  {
-                      return move_score<CAPTURES>(a) > move_score<CAPTURES>(b);
-                  });
     }
 
 
