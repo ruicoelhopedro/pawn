@@ -69,6 +69,7 @@ namespace Search
     {
         Timer m_timer;
         bool m_managed;
+        double m_optimum;
         uint64_t m_movetime_ms;
         std::atomic_bool m_pondering;
         std::atomic<std::chrono::steady_clock::time_point> m_end_time;
@@ -78,12 +79,15 @@ namespace Search
 
         void init(const Timer& timer, bool ponder);
         void init(const Timer& timer, uint64_t movetime_ms, bool ponder);
+        void init(const Timer& timer, uint64_t movetime_ms, uint64_t optimum_ms, bool ponder);
 
         void ponderhit();
 
         bool pondering() const;
 
         double elapsed() const;
+
+        double optimum() const;
 
         double remaining() const;
 

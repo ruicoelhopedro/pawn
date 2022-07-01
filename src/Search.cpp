@@ -53,6 +53,17 @@ namespace Search
         m_timer = timer;
         m_managed = true;
         m_movetime_ms = movetime_ms;
+        m_optimum = std::numeric_limits<double>::infinity();
+        m_pondering.store(ponder);
+        m_end_time.store(m_timer.begin() + std::chrono::milliseconds(movetime_ms));
+    }
+
+    void SearchTime::init(const Timer& timer, uint64_t movetime_ms, uint64_t optimum_ms, bool ponder)
+    {
+        m_timer = timer;
+        m_managed = true;
+        m_movetime_ms = movetime_ms;
+        m_optimum = optimum_ms / 1000.0;
         m_pondering.store(ponder);
         m_end_time.store(m_timer.begin() + std::chrono::milliseconds(movetime_ms));
     }
@@ -72,6 +83,11 @@ namespace Search
     double SearchTime::elapsed() const
     {
         return m_timer.elapsed();
+    }
+
+    double SearchTime::optimum() const
+    {
+        return m_optimum;
     }
 
     double SearchTime::remaining() const

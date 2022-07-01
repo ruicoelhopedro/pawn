@@ -206,8 +206,9 @@ void ThreadPool::update_time(const Search::Timer& timer, const Search::Limits& l
         int time_remaining = limits.time[turn] + limits.incr[turn] * (n_expected_moves - 1);
 
         // This move will use 1/n_expected_moves of the remaining time
-        int movetime = time_remaining / n_expected_moves;
-        m_time.init(timer, movetime, limits.ponder);
+        int optimum = time_remaining / n_expected_moves;
+        int maximum = std::min(8 * limits.time[turn] / 10, optimum * 2);
+        m_time.init(timer, maximum, optimum, limits.ponder);
     }
 
     // No time management
@@ -301,6 +302,11 @@ void Thread::search()
     m_multiPV.resize(UCI::Options::MultiPV);
     std::fill(m_multiPV.begin(), m_multiPV.end(), Search::MultiPVData());
 
+    // Time management stuff
+    int best_move_changes = 0;
+    Move last_best_move = MOVE_NULL;
+    int iter_since_best_move_change = 0;
+
     // Clear data
     m_nodes_searched.store(0);
 
@@ -349,6 +355,16 @@ void Thread::search()
         if (timeout())
             break;
 
+        // Keep track of best move changes
+        if (*m_multiPV.front().pv != last_best_move)
+        {
+            last_best_move = *m_multiPV.front().pv;
+            iter_since_best_move_change = 0;
+            best_move_changes++;
+        }
+        else
+            iter_since_best_move_change++;
+
         // Additional task for main thread: check if we need to stop
         if (main_thread)
         {
@@ -358,7 +374,16 @@ void Thread::search()
                 !limits.ponder &&
                 !limits.infinite)
             {
-                double remaining = time.remaining();
+                double optimum = time.optimum();
+
+                // Adjust time based on the stability of the best move
+                double stability = std::clamp(1.0 - iter_since_best_move_change / (2.0 * iDepth), 0.75, 1.0);
+                double instability = std::clamp(0.9 + best_move_changes / (2.0 * iDepth), 1.0, 1.5);
+                optimum *= stability * instability;
+
+                // Compute corrected remaining time
+                double remaining = optimum - time.elapsed();
+
                 // Do we expect not to have time for one more iteration?
                 if (remaining > 0 && remaining < timer_depth.elapsed() * 1.5)
                     break;
