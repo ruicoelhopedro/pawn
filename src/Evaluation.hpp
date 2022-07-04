@@ -10,12 +10,14 @@ namespace Evaluation
     class Attacks
     {
         Bitboard m_total;
+        Bitboard m_double;
         Bitboard m_attacks[NUM_PIECE_TYPES];
 
     public:
         template<PieceType PIECE>
         void push(Bitboard attacks)
         {
+            m_double |= attacks & m_total;
             m_attacks[PIECE] |= attacks;
             m_total |= attacks;
         }
@@ -39,6 +41,7 @@ namespace Evaluation
         }
 
         inline Bitboard get() const { return m_total; }
+        inline Bitboard get_double() const { return m_double; }
     };
 
 
@@ -70,6 +73,8 @@ namespace Evaluation
         Attacks attacks[NUM_COLORS];
         PawnStructure pawns[NUM_COLORS];
         Bitboard king_zone[NUM_COLORS];
+        int n_king_attacks[NUM_COLORS];
+        int king_attack_weight[NUM_COLORS];
         Bitboard king_attackers[NUM_COLORS];
         EvalFields fields[NUM_COLORS];
     };

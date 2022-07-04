@@ -14,7 +14,11 @@ EvalData::EvalData(const Board& board)
     Square kings[] = { board.get_pieces<WHITE, KING>().bitscan_forward(),
                        board.get_pieces<BLACK, KING>().bitscan_forward() };
     for (auto turn : { WHITE, BLACK })
+    {
         king_zone[turn] = Bitboards::get_attacks<KING>(kings[turn], Bitboard());
+        king_attack_weight[turn] = 0;
+        n_king_attacks[turn] = 0;
+    }
 }
 
 
@@ -126,6 +130,9 @@ MixedScore piece(const Board& board, Bitboard occupancy, EvalData& data)
                                       : PIECE == ROOK   ? MixedScore(4, 6)
                                       :                   MixedScore(7, 9); // QUEEN
 
+    // King attack weights (taken from SF)
+    constexpr int KingAttackWeight[] = { 0, 76, 46, 45, 14 };
+
     MixedScore score(0, 0);
 
     Bitboard b = board.get_pieces<TURN, PIECE>();
@@ -142,8 +149,13 @@ MixedScore piece(const Board& board, Bitboard occupancy, EvalData& data)
         Bitboard attacks = Bitboards::get_attacks<PIECE>(square, occupancy);
         data.attacks[TURN].push<PIECE>(attacks);
 
+        // Update king attack information
         if (attacks & data.king_zone[~TURN])
+        {
             data.king_attackers[~TURN].set(square);
+            data.king_attack_weight[~TURN] += KingAttackWeight[PIECE];
+            data.n_king_attacks[~TURN] += (attacks & data.king_zone[~TURN]).count();
+        }
 
         int safe_squares = (attacks & ~data.attacks[~TURN].get_less_valuable<PIECE>()).count();
         score += (MixedScore(safe_squares, safe_squares) - NominalMoves) * BonusPerMove;
@@ -235,15 +247,11 @@ MixedScore king_safety(const Board& board, EvalData& data)
     constexpr Bitboard Rank1 = (TURN == WHITE) ? Bitboards::rank_1 : Bitboards::rank_8;
 
     constexpr MixedScore BackRankBonus(50, -50);
-    constexpr MixedScore OpenRay(-15, 8);
     constexpr MixedScore PawnShelter[] = { MixedScore(-100,   0), MixedScore(-25,   0), MixedScore( 0,   0),
                                            MixedScore(  25,   0), MixedScore( 35,  -5), MixedScore(40,  -5),
                                            MixedScore(  40, -10), MixedScore( 41, -15), MixedScore(42, -20) };
 
-    constexpr MixedScore SliderAttackers[] = { MixedScore(-150, -100), MixedScore(-50, -20),
-                                               MixedScore( -15,   -2), MixedScore(  0,   0),
-                                               MixedScore(   0,    0), MixedScore(  0,   0),
-                                               MixedScore(   0,    0) };
+    constexpr int SliderAttackers[] = { 100, 25, 10, 0, 0, 0, 0 };
 
     Bitboard occupancy = board.get_pieces();
 
@@ -253,6 +261,7 @@ MixedScore king_safety(const Board& board, EvalData& data)
     const Bitboard mask = Bitboards::get_attacks<KING>(king_sq, occupancy) | king_bb;
 
     MixedScore score(0, 0);
+    int danger = 0;
 
     // Pawn shelter
     Bitboard shelter_zone = mask | mask.shift<2*Up>();
@@ -267,14 +276,11 @@ MixedScore king_safety(const Board& board, EvalData& data)
     Bitboard slider_attackers = (Bitboards::ranks_files[king_sq] & their_rooks)
                               | (Bitboards::diagonals[king_sq]   & their_bishops);
     while (slider_attackers)
-        score += SliderAttackers[Bitboards::between(king_sq, slider_attackers.bitscan_forward_reset()).count()];
+        danger += SliderAttackers[Bitboards::between(king_sq, slider_attackers.bitscan_forward_reset()).count()];
 
-    // Attackers to the squares near the king
-    int attacked_squares = 0;
-    Bitboard b = mask;
-    while(b)
-        attacked_squares += board.attackers_battery<~TURN>(b.bitscan_forward_reset(), occupancy).count();
-    score += MixedScore(-10, 0) * std::min(9, attacked_squares) * std::min(9, attacked_squares);
+    // Weak squares near the king
+    Bitboard weak = (data.attacks[~TURN].get_double() & ~data.attacks[TURN].get())
+                  | (data.attacks[~TURN].get() & ~data.attacks[TURN].get_less_valuable<QUEEN>());
 
     // Possible checkers
     Bitboard checkers = (Bitboards::get_attacks_pawns<TURN>(king_sq)        &  data.attacks[~TURN].get<PAWN>())
@@ -287,7 +293,16 @@ MixedScore king_safety(const Board& board, EvalData& data)
     Bitboard rays = Bitboards::get_attacks<BISHOP>(king_sq, occupancy)
                   | Bitboards::get_attacks<  ROOK>(king_sq, occupancy);
     int safe_dirs = (rays & board.get_pieces<TURN>()).count();
-    score += OpenRay * std::max(0, mask.count() - safe_dirs - 3);
+
+    // Build total danger score
+    danger +=       data.king_attackers[TURN].count() * data.king_attack_weight[TURN]
+            + 200 * (weak & mask).count()
+            +  50 * data.n_king_attacks[TURN]
+            +  20 * (mask.count() - safe_dirs - 3)
+            - 800 * !board.get_pieces<~TURN, QUEEN>();
+
+    if (danger > 0)
+        score -= MixedScore(danger * danger / 4096, danger / 32);
 
     data.fields[TURN].pieces[KING] = score;
     return score;
