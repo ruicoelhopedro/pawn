@@ -261,4 +261,6 @@ namespace Search
 
         return n_nodes;
     }
+
+    constexpr int ilog2(int v) { return 1 + Bitboard(v).bitscan_reverse(); }
 }

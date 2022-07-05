@@ -468,6 +468,7 @@ namespace Search
                           << " currmovenumber " << n_moves << std::endl;
 
             // Shallow depth pruning
+            int move_score = move.is_capture() ? 0 : orderer.quiet_score(move);
             if (!RootSearch && position.board().non_pawn_material(Turn) && !InCheck && best_score > -SCORE_MATE_FOUND)
             {
                 if (move.is_capture() || move.is_promotion())
@@ -480,7 +481,7 @@ namespace Search
                     if (depth < 7 && n_moves > 3 + depth * depth)
                         continue;
 
-                    if (orderer.quiet_score(move) < -100 * (depth - 1) - 50 * int(depth) * depth * depth)
+                    if (move_score < -100 * (depth - 1) - 50 * int(depth) * depth * depth)
                         continue;
 
                     if (depth < 10 && position.board().see(move, -10 * (depth + (int)depth * depth)) < 0)
@@ -536,50 +537,42 @@ namespace Search
             SearchData curr_data = data.next(move);
 
             // Late move reductions
-            bool do_full_search = true;
+            bool do_full_search = !(PvNode && n_moves == 1);
             bool didLMR = false;
             if (depth > 4 &&
-                move_number > 3 &&
+                n_moves > 1 + 2 * PvNode &&
                 (!PvNode || !captureOrPromotion) &&
                 data.thread().id() % 3 < 2)
             {
                 didLMR = true;
-                int reduction = 3 + (move_number - 4) / 8 - captureOrPromotion - PvNode;
-                Depth new_depth = reduce(depth, 1 + reduction);
+                int reduction = ilog2(n_moves)
+                              - (captureOrPromotion || PvNode)
+                              - (move_score + 15000) / 30000;
 
                 // Reduced depth search
+                Depth new_depth = reduce(depth, 1 + std::max(0, reduction));
                 score = -negamax<NON_PV>(position, new_depth, -alpha - 1, -alpha, curr_data);
 
                 // Only carry a full search if this reduced move fails high
-                do_full_search = score > alpha;
+                do_full_search = score > alpha && reduction > 0;
             }
 
-            // PVS
+            // NonPv node search when LMR is skipped or fails high
             if (do_full_search)
-            {
-                if (PvNode && n_moves == 1)
-                {
-                    score = -negamax<PV>(position, curr_depth - 1, -beta, -alpha, curr_data);
+                score = -negamax<NON_PV>(position, curr_depth - 1, -alpha - 1, -alpha, curr_data);
 
-                    // Return failed aspirated search immediately
-                    if (RootSearch && (score <= alpha || score >= beta))
-                    {
-                        position.unmake_move();
-                        data.update_pv(move, curr_data.pv());
-                        return score;
-                    }
-                }
-                else
+            // PvNode search at the first move in a PV node or when the nonPv search returns
+            // a possibly good move
+            if (PvNode && (n_moves == 1 || (score > alpha && (RootSearch || score < beta))))
+            {
+                score = -negamax<PV>(position, curr_depth - 1, -beta, -alpha, curr_data);
+
+                // Return failed aspirated search immediately
+                if (RootSearch && n_moves == 1 && (score <= alpha || score >= beta))
                 {
-                    // Regular non-PV node search
-                    score = -negamax<NON_PV>(position, curr_depth - 1, -alpha - 1, -alpha, curr_data);
-                    // Redo a PV node search if move not refuted
-                    if (PvNode && score > alpha && score < beta)
-                    {
-                        // But before add a bonus to the move
-                        data.histories.add_bonus(move, Turn, piece, data.last_move(), depth);
-                        score = -negamax<PV>(position, curr_depth - 1, -beta, -alpha, curr_data);
-                    }
+                    position.unmake_move();
+                    data.update_pv(move, curr_data.pv());
+                    return score;
                 }
             }
 
