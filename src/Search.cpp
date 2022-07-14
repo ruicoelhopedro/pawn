@@ -416,6 +416,7 @@ namespace Search
         // Null move pruning
         if (!PvNode && !InCheck && !HasExcludedMove &&
             static_eval >= beta &&
+            data.static_eval >= beta - 10 * depth - 20 * improving &&
             data.last_move() != MOVE_NULL &&
             position.board().non_pawn_material(Turn))
         {
