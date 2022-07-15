@@ -345,7 +345,7 @@ bool Board::is_valid() const
         for (Turn turn : { WHITE, BLACK })
         {
             Bitboard bb = get_pieces(turn, piece);
-            eval += piece_value[piece] * bb.count() * turn_to_color(turn) * MATERIAL_SCALE;
+            eval += piece_value[piece] * bb.count() * turn_to_color(turn);
             phase -= bb.count() * Phases::Pieces[piece];
             while (bb)
                 eval += piece_square(piece, bb.bitscan_forward_reset(), turn) * turn_to_color(turn);
@@ -499,7 +499,7 @@ Score Board::see(Move move, Score threshold) const
 
 MixedScore Board::material_eval() const
 {
-    return m_psq / MATERIAL_SCALE;
+    return m_psq;
 }
 
 
