@@ -21,7 +21,7 @@ Furthermore, the following non-standard commands are available:
 - `board` - show representation of the current board;
 - `eval` - print some of the evaluation terms;
 - `test` - test the move generation, transposition tables, move orderers and legality checks of the engine;
-- `bench` - search a set of positions to obtain a signature. Optionally, the following syntax is available: `bench depth threads hash`. By default, calling `bench` is equivalent to `bench 11 1 16`.
+- `bench` - search a set of positions to obtain a signature. Optionally, the following syntax is available: `bench depth threads hash`. By default, calling `bench` is equivalent to `bench 13 1 16`.
 - `go perft depth` - do the `perft` node count for the current position at depth `depth`.
 
 ## Main Features

@@ -350,7 +350,7 @@ namespace UCI
 
     void bench(Stream& stream)
     {
-        Depth depth = 11;
+        Depth depth = 13;
         int threads = 1;
         int hash = 16;
         
