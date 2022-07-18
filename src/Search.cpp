@@ -131,7 +131,7 @@ namespace Search
         if (is_mate(score))
             std::cout << " score mate " << mate_in(score);
         else
-            std::cout << " score cp " << score;
+            std::cout << " score cp " << 100 * int(score) / PawnValue.endgame();
 
         // Score bound (if any)
         if (type != BoundType::EXACT)

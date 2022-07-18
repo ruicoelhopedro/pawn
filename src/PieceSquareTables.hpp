@@ -3,11 +3,11 @@
 
 using S = MixedScore;
 
-constexpr S   PawnValue(  100,   125);
-constexpr S KnightValue(  400,   395);
-constexpr S BishopValue(  420,   450);
-constexpr S   RookValue(  600,   650);
-constexpr S  QueenValue( 1100,  1200);
+constexpr S   PawnValue(  125,   200);
+constexpr S KnightValue(  750,   850);
+constexpr S BishopValue(  800,   900);
+constexpr S   RookValue( 1200,  1400);
+constexpr S  QueenValue( 2500,  2600);
 constexpr S   KingValue(10000, 10000); // Needed for SEE and MVV-LVA
 
 constexpr S piece_value[] = { PawnValue,

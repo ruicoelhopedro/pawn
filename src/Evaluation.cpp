@@ -395,8 +395,8 @@ Score evaluation(const Board& board, EvalData& data)
 {
     MixedScore mixed_result(0, 0);
 
-    // Material and PSQT: incrementally updated in the position (with eg scaling)
-    mixed_result += board.material_eval() * MixedScore(1, 2);
+    // Material and PSQT: incrementally updated in the position
+    mixed_result += board.material_eval();
 
     // Pawn structure
     mixed_result += pawns(board, data);
