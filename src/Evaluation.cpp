@@ -441,12 +441,14 @@ void eval_table(const Board& board, EvalData& data, Score score)
     piece_square_value(board, data);
 
     // Print the eval table
+    std::cout << ""                                                                                                       << std::endl;
+    std::cout << "Evaluation in internal units"                                                                           << std::endl;
     std::cout << "---------------------------------------------------------------"                                        << std::endl;
     std::cout << "               |     White     |     Black     |     Total     "                                        << std::endl;
     std::cout << " Term          |   MG     EG   |   MG     EG   |   MG     EG   "                                        << std::endl;
     std::cout << "---------------------------------------------------------------"                                        << std::endl;
     std::cout << " Material      | " << Term< true>(data.fields[WHITE].material,       data.fields[BLACK].material)       << std::endl;
-    std::cout << " Placement     | " << Term< true>(data.fields[WHITE].placement / 10, data.fields[BLACK].placement / 10) << std::endl;
+    std::cout << " Placement     | " << Term< true>(data.fields[WHITE].placement,      data.fields[BLACK].placement)      << std::endl;
     std::cout << " Pawns         | " << Term<false>(data.fields[WHITE].pieces[PAWN],   data.fields[BLACK].pieces[PAWN])   << std::endl;
     std::cout << " Knights       | " << Term<false>(data.fields[WHITE].pieces[KNIGHT], data.fields[BLACK].pieces[KNIGHT]) << std::endl;
     std::cout << " Bishops       | " << Term<false>(data.fields[WHITE].pieces[BISHOP], data.fields[BLACK].pieces[BISHOP]) << std::endl;
@@ -460,6 +462,7 @@ void eval_table(const Board& board, EvalData& data, Score score)
     std::cout << "                                         Phase |    " << std::setw(4) << (int)board.phase()             << std::endl;
     std::cout << "                                         Final | "    << std::setw(5) << score / 100.0 << " (White)"    << std::endl;
     std::cout << "---------------------------------------------------------------"                                        << std::endl;
+    std::cout << "Final evaluation = " <<  100 * score / PawnValue.endgame() << " cp (White)" << std::endl;
     std::cout << std::endl;
 }
     
