@@ -24,6 +24,7 @@ namespace UCI
         int MultiPV;
         bool Ponder;
         int Threads;
+        int MoveOverhead;
     }
 
 
@@ -95,13 +96,14 @@ namespace UCI
 
     void init_options()
     {
-        OptionsMap.emplace("Clear Hash", Option(OnChange<>([]() { ttable.clear(); })));
-        OptionsMap.emplace("Hash",       Option(&Options::Hash, 16, 1, ttable.max_size(),
-                                                [](int v) { ttable.resize(v); }));
-        OptionsMap.emplace("MultiPV",    Option(&Options::MultiPV, 1, 1, 255));
-        OptionsMap.emplace("Threads",    Option(&Options::Threads, 1, 1, 512,
-                                                [](int v) { pool->resize(v); }));
-        OptionsMap.emplace("Ponder",     Option(&Options::Ponder, false));
+        OptionsMap.emplace("Clear Hash",    Option(OnChange<>([]() { ttable.clear(); })));
+        OptionsMap.emplace("Hash",          Option(&Options::Hash, 16, 1, ttable.max_size(),
+                                                   [](int v) { ttable.resize(v); }));
+        OptionsMap.emplace("MultiPV",       Option(&Options::MultiPV, 1, 1, 255));
+        OptionsMap.emplace("Threads",       Option(&Options::Threads, 1, 1, 512,
+                                                   [](int v) { pool->resize(v); }));
+        OptionsMap.emplace("Move Overhead", Option(&Options::MoveOverhead, 0, 0, 5000));
+        OptionsMap.emplace("Ponder",        Option(&Options::Ponder, false));
     }
 
 

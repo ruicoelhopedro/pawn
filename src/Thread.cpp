@@ -204,7 +204,7 @@ void ThreadPool::update_time(const Search::Timer& timer, const Search::Limits& l
 
     // Fixed movetime
     if (limits.movetime >= 0)
-        m_time.init(timer, limits.movetime, limits.ponder);
+        m_time.init(timer, std::max(1, limits.movetime - UCI::Options::MoveOverhead), limits.ponder);
 
     // With clock time
     else if (limits.time[turn] >= 0)
@@ -214,9 +214,9 @@ void ThreadPool::update_time(const Search::Timer& timer, const Search::Limits& l
         int time_remaining = limits.time[turn] + limits.incr[turn] * (n_expected_moves - 1);
 
         // This move will use 1/n_expected_moves of the remaining time
-        int optimum = time_remaining / n_expected_moves;
-        int maximum = std::min(8 * limits.time[turn] / 10, optimum * 2);
-        m_time.init(timer, maximum, optimum, limits.ponder);
+        int optimum = time_remaining / n_expected_moves - UCI::Options::MoveOverhead;
+        int maximum = std::min(8 * limits.time[turn] / 10, optimum * 2) - UCI::Options::MoveOverhead;
+        m_time.init(timer, std::max(1, maximum), std::max(1, optimum), limits.ponder);
     }
 
     // No time management

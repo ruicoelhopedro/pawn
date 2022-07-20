@@ -85,6 +85,7 @@ namespace UCI
         extern int MultiPV;
         extern bool Ponder;
         extern int Threads;
+        extern int MoveOverhead;
     }
 
 
