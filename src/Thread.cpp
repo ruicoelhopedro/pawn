@@ -171,6 +171,14 @@ void ThreadPool::wait()
 }
 
 
+void ThreadPool::wait(Thread* skip)
+{
+    for (auto& thread : m_threads)
+        if (thread.get() != skip)
+            thread->wait();
+}
+
+
 void ThreadPool::clear()
 {
     for (auto& thread : m_threads)
@@ -234,6 +242,31 @@ int64_t ThreadPool::nodes_searched() const
 
 
 int ThreadPool::size() const { return m_threads.size(); }
+
+
+Thread* ThreadPool::get_best_thread() const
+{
+    // Get minimum score
+    Score min_score = SCORE_INFINITE;
+    for (auto& thread : m_threads)
+        min_score = std::min(min_score, thread->m_multiPV[0].score);
+
+    // Build votes for each thread
+    int most_voted = 0;
+    Thread* best_thread;
+    for (auto& thread : m_threads)
+    {
+        int vote = (thread->m_multiPV[0].score - min_score + 20) * int(thread->m_multiPV[0].depth);
+
+        if (vote > most_voted)
+        {
+            best_thread = thread.get();
+            most_voted = vote;
+        }
+    }
+
+    return best_thread;
+}
 
 
 bool Thread::timeout() const
@@ -329,7 +362,7 @@ void Thread::search()
                 m_root_moves.push(*pv.pv);
 
             // Carry the aspirated search
-            Depth depth = iDepth + m_id / 2;
+            Depth depth = iDepth + m_id % 4;
             aspiration_search(m_position, pv, depth, data);
 
             // Timeout?
@@ -407,8 +440,18 @@ void Thread::search()
         // Stop the search
         m_pool.stop();
 
+        // Wait for other threads to finish
+        m_pool.wait(this);
+
+        // Select new best thread
+        Thread* best_thread = m_pool.get_best_thread();
+
+        // If best thread is not the main thread, re-send the last PV line
+        if (best_thread != this)
+            best_thread->output_pvs();
+
         // Fetch best and ponder moves from best Pv line
-        Move* best_pv = m_multiPV.front().pv;
+        Move* best_pv = best_thread->m_multiPV.front().pv;
         Move bestmove = *best_pv;
         Move pondermove = *(best_pv + 1);
 

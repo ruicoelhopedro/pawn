@@ -116,7 +116,11 @@ public:
 
     void wait();
 
+    void wait(Thread* skip);
+
     void clear();
+
+    Thread* get_best_thread() const;
 };
 
 
