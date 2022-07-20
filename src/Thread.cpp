@@ -129,6 +129,9 @@ void ThreadPool::resize(int n_threads)
     m_threads.clear();
     for (int i = 0; i < n_threads; i++)
         m_threads.push_back(std::make_unique<Thread>(i, *this));
+
+    // Ensure position is correct in all threads
+    update_position_threads();
 }
 
 
