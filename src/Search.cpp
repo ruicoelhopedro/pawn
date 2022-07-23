@@ -431,7 +431,7 @@ namespace Search
         }
 
         // TT-based reduction idea
-        if (PvNode && !InCheck && depth >= 6 && !tt_hit)
+        if (PvNode && !InCheck && depth >= 6 && !position.board().legal(tt_move))
             depth -= 2;
 
         // Regular move search

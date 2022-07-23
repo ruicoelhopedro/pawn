@@ -70,16 +70,15 @@ class TranspositionEntry
     Move m_best_move;
     int16_t m_static_eval;
 
-    static Hash data_hash(Depth depth, int16_t score, Move best_move, uint8_t type, int16_t static_eval)
+    static Hash data_hash(Depth depth, int16_t score, uint8_t type, int16_t static_eval)
     {
         return (static_cast<Hash>(depth) << 0)
              | (static_cast<Hash>(score) << 8)
-             | (static_cast<Hash>(best_move.to_int()) << 24)
              | (static_cast<Hash>(type & GEN_DATA_MASK) << 40)
              | (static_cast<Hash>(static_eval) << 48);
     }
 
-    Hash data_hash() const { return data_hash(depth(), score(), hash_move(), m_type, static_eval()); }
+    Hash data_hash() const { return data_hash(depth(), score(), m_type, static_eval()); }
 
     uint8_t gen_type(Age age, EntryType type) { return (age << GEN_DATA_BITS) | static_cast<uint8_t>(type); }
     inline Age age() const { return static_cast<Age>(m_type >> GEN_DATA_BITS); }
@@ -107,12 +106,15 @@ public:
                     || depth > m_depth - (hash == this->hash() ? 0 : 3);
         if (replace)
         {
-            m_hash = hash ^ data_hash(depth, score, best_move, gen_type(age, type), static_eval);
+            m_hash = hash ^ data_hash(depth, score, gen_type(age, type), static_eval);
             m_depth = depth;
             m_type = gen_type(age, type);
             m_score = score;
-            m_best_move = best_move;
             m_static_eval = static_eval;
+
+            // Only replace the best move if we have a new one to store
+            if (best_move != MOVE_NULL)
+                m_best_move = best_move;
         }
     }
     bool empty() const { return type() == EntryType::EMPTY; }
