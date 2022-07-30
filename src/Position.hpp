@@ -28,6 +28,7 @@ class Board
     // Updated fields
     Hash m_hash;
     Bitboard m_checkers;
+    MixedScore m_material[NUM_COLORS];
     MixedScore m_psq;
     uint8_t m_phase;
     Piece m_board_pieces[NUM_SQUARES];
@@ -260,7 +261,7 @@ protected:
         m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
         m_board_pieces[square] = get_piece(piece, turn);
         m_psq += piece_square(piece, square, turn) * turn_to_color(turn);
-        m_psq += piece_value[piece] * turn_to_color(turn);
+        m_material[turn] += piece_value[piece];
         m_phase -= Phases::Pieces[piece];
     }
 
@@ -271,7 +272,7 @@ protected:
         m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
         m_board_pieces[square] = NO_PIECE;
         m_psq -= piece_square(piece, square, turn) * turn_to_color(turn);
-        m_psq -= piece_value[piece] * turn_to_color(turn);
+        m_material[turn] -= piece_value[piece];
         m_phase += Phases::Pieces[piece];
     }
 
@@ -491,6 +492,10 @@ public:
     Bitboard get_pieces() const { return m_pieces[PIECE_TYPE][TURN]; }
 
 
+    template<PieceType PIECE_TYPE>
+    Bitboard get_pieces() const { return m_pieces[PIECE_TYPE][WHITE] | m_pieces[PIECE_TYPE][BLACK]; }
+
+
     template<Turn TURN>
     Bitboard get_pieces() const
     {
@@ -608,7 +613,13 @@ public:
     Score see(Move move, Score threshold = 0) const;
 
 
-    MixedScore material_eval() const;
+    MixedScore material() const;
+
+
+    MixedScore material(Turn turn) const;
+
+
+    MixedScore psq() const;
 
 
     uint8_t phase() const;

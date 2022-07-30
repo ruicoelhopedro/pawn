@@ -362,6 +362,9 @@ namespace Bitboards
                              & ~zone1 & ~zone2;
     constexpr Bitboard zone4 = full & ~zone1 & ~zone2 & ~zone3;
 
+    constexpr Bitboard  KingSide = e_file | f_file | g_file | h_file;
+    constexpr Bitboard QueenSide = a_file | b_file | c_file | d_file;
+
     class MagicBitboard
     {
         int m_bits;

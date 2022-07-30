@@ -497,7 +497,19 @@ Score Board::see(Move move, Score threshold) const
 }
 
 
-MixedScore Board::material_eval() const
+MixedScore Board::material() const
+{
+    return m_material[WHITE] - m_material[BLACK];
+}
+
+
+MixedScore Board::material(Turn turn) const
+{
+    return m_material[turn] - KingValue;
+}
+
+
+MixedScore Board::psq() const
 {
     return m_psq;
 }

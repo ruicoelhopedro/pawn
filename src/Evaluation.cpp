@@ -391,12 +391,51 @@ MixedScore threats(const Board& board, EvalData& data)
 }
 
 
+Score scale(const Board& board, EvalData& data, MixedScore mixed)
+{
+    Turn strong = (mixed.endgame() > 0) ? WHITE : BLACK;
+    Score material[] = { board.material(WHITE).endgame(), board.material(BLACK).endgame() };
+    Bitboard pawns[] = { board.get_pieces<WHITE, PAWN>(), board.get_pieces<BLACK, PAWN>() };
+    Bitboard all_pawns = pawns[WHITE] | pawns[BLACK];
+    Score material_diff = material[strong] - material[~strong];
+    Square kings[] = { board.get_pieces<WHITE, KING>().bitscan_forward(),
+                       board.get_pieces<BLACK, KING>().bitscan_forward() };
+                          
+    Score npm[] = { board.material(WHITE).endgame() - pawns[WHITE].count() * PawnValue.endgame(),
+                    board.material(BLACK).endgame() - pawns[BLACK].count() * PawnValue.endgame() };
+
+    int factor;
+
+    // Pawnless endgames without a significant material advantage are likely drawish
+    if (!pawns[strong] && material_diff <= BishopValue.endgame())
+        factor = npm[ strong] <  RookValue.endgame()   ? 0
+               : npm[~strong] <= BishopValue.endgame() ? 4
+               : 16;
+
+    // Rook endgames with all strong pawns in a single flank, the defending king close
+    // to its pawns and a small pawn advantage are generally drawish
+    else if (npm[strong] == RookValue.endgame() && npm[~strong] == RookValue.endgame() &&
+             bool(all_pawns & Bitboards::KingSide) != bool(all_pawns & Bitboards::QueenSide) &&
+             (!pawns[~strong] || bool(Bitboards::get_attacks<KING>(kings[~strong], Bitboard()) & pawns[~strong])) &&
+             pawns[strong].count() - pawns[~strong].count() <= 1)
+        factor = 36;
+
+    // No scaling
+    else
+        factor = 64;
+
+    MixedScore mixed_final = MixedScore(mixed.middlegame(), factor * int(mixed.endgame()) / 64);
+    data.fields[WHITE].scale = mixed_final - mixed;
+    return mixed_final.tapered(board.phase());
+}
+
+
 Score evaluation(const Board& board, EvalData& data)
 {
     MixedScore mixed_result(0, 0);
 
     // Material and PSQT: incrementally updated in the position
-    mixed_result += board.material_eval();
+    mixed_result += board.material() + board.psq();
 
     // Pawn structure
     mixed_result += pawns(board, data);
@@ -417,7 +456,7 @@ Score evaluation(const Board& board, EvalData& data)
     mixed_result += passed<WHITE>(board, data) - passed<BLACK>(board, data);
 
     // Tapered eval
-    Score result = mixed_result.tapered(board.phase());
+    Score result = scale(board, data, mixed_result);
 
     // We don't return exact draw scores -> add one centipawn to the moving side
     if (result == SCORE_DRAW)
@@ -458,6 +497,7 @@ void eval_table(const Board& board, EvalData& data, Score score)
     std::cout << " Space         | " << Term<false>(data.fields[WHITE].space,          data.fields[BLACK].space)          << std::endl;
     std::cout << " Threats       | " << Term<false>(data.fields[WHITE].threats,        data.fields[BLACK].threats)        << std::endl;
     std::cout << " Passed pawns  | " << Term<false>(data.fields[WHITE].passed,         data.fields[BLACK].passed)         << std::endl;
+    std::cout << " Scale         | " << Term< true>(data.fields[WHITE].scale,          data.fields[BLACK].scale)          << std::endl;
     std::cout << "---------------------------------------------------------------"                                        << std::endl;
     std::cout << "                                         Phase |    " << std::setw(4) << (int)board.phase()             << std::endl;
     std::cout << "                                         Final | "    << std::setw(5) << score / 100.0 << " (White)"    << std::endl;
