@@ -420,7 +420,7 @@ namespace Search
             data.last_move() != MOVE_NULL &&
             position.board().non_pawn_material(Turn))
         {
-            int reduction = 3 + (static_eval - beta) / 200;
+            int reduction = 3 + std::min(6, (static_eval - beta) / 200);
             Depth new_depth = reduce(depth, 1 + reduction);
             SearchData curr_data = data.next(MOVE_NULL);
             position.make_null_move();
