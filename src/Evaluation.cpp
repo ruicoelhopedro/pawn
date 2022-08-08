@@ -283,11 +283,14 @@ MixedScore king_safety(const Board& board, EvalData& data)
                   | (data.attacks[~TURN].get() & ~data.attacks[TURN].get_less_valuable<QUEEN>());
 
     // Possible checkers
-    Bitboard checkers = (Bitboards::get_attacks_pawns<TURN>(king_sq)        &  data.attacks[~TURN].get<PAWN>())
-                      | (Bitboards::get_attacks<KNIGHT>(king_sq, occupancy) &  data.attacks[~TURN].get<KNIGHT>())
+    Bitboard safe = (~data.attacks[ TURN].get() & ~mask)
+                  | ( data.attacks[~TURN].get_double() & (~data.attacks[TURN].get_double() & ~mask |
+                                                          ~data.attacks[TURN].get() & mask));
+    Bitboard checkers = (Bitboards::get_attacks<KNIGHT>(king_sq, occupancy) &  data.attacks[~TURN].get<KNIGHT>())
                       | (Bitboards::get_attacks<BISHOP>(king_sq, occupancy) & (data.attacks[~TURN].get<BISHOP>() | data.attacks[~TURN].get<QUEEN>()))
                       | (Bitboards::get_attacks<  ROOK>(king_sq, occupancy) & (data.attacks[~TURN].get<  ROOK>() | data.attacks[~TURN].get<QUEEN>()));
-    score += MixedScore(-75, 0) * (checkers & ~data.attacks[TURN].get()).count();
+    // Filter checker squares
+    checkers &= ~board.get_pieces<~TURN>();
 
     // King out in the open
     Bitboard rays = Bitboards::get_attacks<BISHOP>(king_sq, occupancy)
@@ -296,6 +299,7 @@ MixedScore king_safety(const Board& board, EvalData& data)
 
     // Build total danger score
     danger +=       data.king_attackers[TURN].count() * data.king_attack_weight[TURN]
+            + 500 * (checkers & safe).count()
             + 200 * (weak & mask).count()
             +  50 * data.n_king_attacks[TURN]
             +  20 * (mask.count() - safe_dirs - 3)
