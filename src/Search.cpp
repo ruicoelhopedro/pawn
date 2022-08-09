@@ -515,7 +515,7 @@ namespace Search
                     // TT move is singular, we are extending it
                     extension = 1;
                 }
-                else if (singularBeta >= beta)
+                else if (!PvNode && singularBeta >= beta)
                 {
                     // Multi-cut pruning: assuming our TT move fails high, at least one more move also fails high
                     // So we can probably safely prune the entire tree
