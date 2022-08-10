@@ -247,9 +247,9 @@ MixedScore king_safety(const Board& board, EvalData& data)
     constexpr Bitboard Rank1 = (TURN == WHITE) ? Bitboards::rank_1 : Bitboards::rank_8;
 
     constexpr MixedScore BackRankBonus(50, -50);
-    constexpr MixedScore PawnShelter[] = { MixedScore(-100,   0), MixedScore(-25,   0), MixedScore( 0,   0),
-                                           MixedScore(  25,   0), MixedScore( 35,  -5), MixedScore(40,  -5),
-                                           MixedScore(  40, -10), MixedScore( 41, -15), MixedScore(42, -20) };
+
+    constexpr int PawnShelterRanks[] = { 0, 25, 15, 0 };
+    constexpr int PawnShelterCount[] = { -100, -75, -50, -20, -5, 0, 2, 3, 4 };
 
     constexpr int SliderAttackers[] = { 100, 25, 10, 0, 0, 0, 0 };
 
@@ -265,7 +265,10 @@ MixedScore king_safety(const Board& board, EvalData& data)
 
     // Pawn shelter
     Bitboard shelter_zone = mask | mask.shift<2*Up>();
-    score += PawnShelter[(pawns_bb & shelter_zone).count()];
+    score += MixedScore(PawnShelterCount[(pawns_bb & shelter_zone).count()], 0);
+    Bitboard bb = shelter_zone & Bitboards::ranks[rank(king_sq)];
+    for (int r : { 0, 1, 2, 3 })
+        score += MixedScore(PawnShelterRanks[r] * (pawns_bb & bb.shift(r * Up)).count(), 0);
 
     // Back-rank bonus
     score += BackRankBonus * Rank1.test(king_sq);
