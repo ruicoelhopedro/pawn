@@ -465,7 +465,7 @@ Score evaluation(const Board& board, EvalData& data)
     // Tapered eval
     Score result = scale(board, data, mixed_result);
 
-    // We don't return exact draw scores -> add one centipawn to the moving side
+    // We don't return exact draw scores -> add one unit to the moving side
     if (result == SCORE_DRAW)
         result += turn_to_color(board.turn());
 
@@ -486,9 +486,19 @@ void eval_table(const Board& board, EvalData& data, Score score)
     material(board, data);
     piece_square_value(board, data);
 
+    // Compute total scores
+    MixedScore total[2];
+    for (Turn t : { WHITE, BLACK })
+    {
+        total[t] = data.fields[t].material + data.fields[t].placement
+                 + data.fields[t].space    + data.fields[t].threats
+                 + data.fields[t].passed   + data.fields[t].scale;
+        for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
+            total[t] += data.fields[t].pieces[p];
+    }
+
     // Print the eval table
     std::cout << ""                                                                                                       << std::endl;
-    std::cout << "Evaluation in internal units"                                                                           << std::endl;
     std::cout << "---------------------------------------------------------------"                                        << std::endl;
     std::cout << "               |     White     |     Black     |     Total     "                                        << std::endl;
     std::cout << " Term          |   MG     EG   |   MG     EG   |   MG     EG   "                                        << std::endl;
@@ -506,10 +516,10 @@ void eval_table(const Board& board, EvalData& data, Score score)
     std::cout << " Passed pawns  | " << Term<false>(data.fields[WHITE].passed,         data.fields[BLACK].passed)         << std::endl;
     std::cout << " Scale         | " << Term< true>(data.fields[WHITE].scale,          data.fields[BLACK].scale)          << std::endl;
     std::cout << "---------------------------------------------------------------"                                        << std::endl;
-    std::cout << "                                         Phase |    " << std::setw(4) << (int)board.phase()             << std::endl;
-    std::cout << "                                         Final | "    << std::setw(5) << score / 100.0 << " (White)"    << std::endl;
+    std::cout << " Final         | " << Term< true>(total[WHITE],                      total[BLACK])                      << std::endl;
     std::cout << "---------------------------------------------------------------"                                        << std::endl;
-    std::cout << "Final evaluation = " <<  100 * score / PawnValue.endgame() << " cp (White)" << std::endl;
+    std::cout << "Game Phase:       " << int(board.phase()) << std::endl;
+    std::cout << "Final evaluation: " <<  100 * score / PawnValue.endgame() << " cp (White)" << std::endl;
     std::cout << std::endl;
 }
     

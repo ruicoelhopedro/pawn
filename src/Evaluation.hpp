@@ -93,6 +93,8 @@ namespace Evaluation
         MixedScore m_white;
         MixedScore m_black;
 
+        inline double adjust(Score s) const { return double(s) / PawnValue.endgame(); }
+
     public:
         Term(MixedScore white, MixedScore black)
             : m_white(white), m_black(black)
@@ -113,16 +115,16 @@ namespace Evaluation
         }
         else
         {
-            out << std::setw(5) << term.m_white.middlegame() / 100.0 << "  ";
-            out << std::setw(5) << term.m_white.endgame()    / 100.0 << "  ";
+            out << std::setw(5) << term.adjust(term.m_white.middlegame()) << "  ";
+            out << std::setw(5) << term.adjust(term.m_white.endgame())    << "  ";
             out << "| ";
-            out << std::setw(5) << term.m_black.middlegame() / 100.0 << "  ";
-            out << std::setw(5) << term.m_black.endgame()    / 100.0 << "  ";
+            out << std::setw(5) << term.adjust(term.m_black.middlegame()) << "  ";
+            out << std::setw(5) << term.adjust(term.m_black.endgame())    << "  ";
             out << "| ";
         }
-        out << std::setw(5) << (term.m_white.middlegame() - term.m_black.middlegame()) / 100.0;
+        out << std::setw(5) << term.adjust(term.m_white.middlegame() - term.m_black.middlegame());
         out << "  ";
-        out << std::setw(5) << (term.m_white.endgame() - term.m_black.endgame()) / 100.0;
+        out << std::setw(5) << term.adjust(term.m_white.endgame() - term.m_black.endgame());
         out << "  ";
         return out;
     }
