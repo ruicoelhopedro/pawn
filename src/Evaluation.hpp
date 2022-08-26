@@ -78,6 +78,7 @@ namespace Evaluation
         int king_attack_weight[NUM_COLORS];
         Bitboard king_attackers[NUM_COLORS];
         EvalFields fields[NUM_COLORS];
+        Bitboard mobility_area[NUM_COLORS];
     };
 
 

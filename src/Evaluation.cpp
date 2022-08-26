@@ -118,17 +118,17 @@ MixedScore piece(const Board& board, Bitboard occupancy, EvalData& data)
     constexpr MixedScore RooksConnected(15, 5);
     constexpr MixedScore RookOn7th(10, 15);
     constexpr MixedScore RookOnOpen(20, 7);
-    constexpr MixedScore BehindEnemyLines(5, 4);
+    constexpr MixedScore BehindEnemyLines[] = { MixedScore(20, 16), MixedScore(25, 20),
+                                                MixedScore(20, 24), MixedScore(35, 36)};
     constexpr MixedScore SafeBehindEnemyLines(25, 10);
     constexpr MixedScore BishopPair(10, 20);
     constexpr MixedScore DefendedByPawn(5, 1);
 
     // Mobility scores
-    constexpr MixedScore BonusPerMove(10, 10);
-    constexpr MixedScore NominalMoves = PIECE == KNIGHT ? MixedScore(4, 4)
-                                      : PIECE == BISHOP ? MixedScore(5, 5)
-                                      : PIECE == ROOK   ? MixedScore(4, 6)
-                                      :                   MixedScore(7, 9); // QUEEN
+    constexpr MixedScore BonusPerMove[] = { MixedScore( 12,  13), MixedScore(  9,  11), 
+                                            MixedScore(  7,  16), MixedScore(  5,   8) };
+    constexpr MixedScore BaseScore[]    = { MixedScore(-64, -68), MixedScore(-36, -44), 
+                                            MixedScore(-53, -53), MixedScore(-31, -43) };
 
     // King attack weights (taken from SF)
     constexpr int KingAttackWeight[] = { 0, 76, 46, 45, 14 };
@@ -157,8 +157,8 @@ MixedScore piece(const Board& board, Bitboard occupancy, EvalData& data)
             data.n_king_attacks[~TURN] += (attacks & data.king_zone[~TURN]).count();
         }
 
-        int safe_squares = (attacks & ~data.attacks[~TURN].get_less_valuable<PIECE>()).count();
-        score += (MixedScore(safe_squares, safe_squares) - NominalMoves) * BonusPerMove;
+        int safe_squares = (attacks & data.mobility_area[TURN]).count();
+        score += BonusPerMove[PIECE - 1] * safe_squares + BaseScore[PIECE - 1];
 
         // TODO: other terms
         if (PIECE == KNIGHT)
@@ -183,7 +183,7 @@ MixedScore piece(const Board& board, Bitboard occupancy, EvalData& data)
     // General placement terms
     b = board.get_pieces<TURN, PIECE>();
     // Behind enemy lines?
-    score += BehindEnemyLines * NominalMoves * (b & ~data.pawns[~TURN].span).count();
+    score += BehindEnemyLines[PIECE-1] * (b & ~data.pawns[~TURN].span).count();
 
     // Set-wise terms
     if (PIECE == KNIGHT)
@@ -226,6 +226,12 @@ MixedScore pieces(const Board& board, EvalData& data)
 {
     MixedScore result(0, 0);
     Bitboard occupancy = board.get_pieces<WHITE>() | board.get_pieces<BLACK>();
+
+    constexpr Bitboard Ranks23[] = { Bitboards::rank_2 | Bitboards::rank_3,
+                                     Bitboards::rank_7 | Bitboards::rank_6 };
+    for (Turn t : { WHITE, BLACK })
+        data.mobility_area[t] = ~(  data.attacks[~t].get<PAWN>()
+                                  | (board.get_pieces(t, PAWN) & Ranks23[t]));
 
     result += piece<KNIGHT, WHITE>(board, occupancy, data)
             - piece<KNIGHT, BLACK>(board, occupancy, data);
