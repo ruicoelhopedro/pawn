@@ -342,6 +342,7 @@ void Thread::search()
     int best_move_changes = 0;
     Move last_best_move = MOVE_NULL;
     int iter_since_best_move_change = 0;
+    Score average_score = 0;
 
     // Clear data
     m_nodes_searched.store(0);
@@ -401,6 +402,10 @@ void Thread::search()
         else
             iter_since_best_move_change++;
 
+        // Update best score and its average
+        Score best_score = m_multiPV.front().score;
+        average_score = (best_score + 9 * average_score) / 10;
+
         // Additional task for main thread: check if we need to stop
         if (main_thread)
         {
@@ -411,6 +416,9 @@ void Thread::search()
                 !limits.infinite)
             {
                 double optimum = time.optimum();
+
+                // Increase time if the score is falling
+                optimum *= std::clamp(1.0 + (average_score - best_score) / 100.0, 1.0, 1.75);
 
                 // Adjust time based on the stability of the best move
                 double stability = std::clamp(1.0 - iter_since_best_move_change / (2.0 * iDepth), 0.75, 1.0);
