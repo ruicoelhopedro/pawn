@@ -429,7 +429,7 @@ void Thread::search()
                 double remaining = optimum - time.elapsed();
 
                 // Do we expect not to have time for one more iteration?
-                if (remaining > 0 && remaining < timer_depth.elapsed() * 1.5)
+                if (remaining < timer_depth.elapsed())
                     break;
             }
 
