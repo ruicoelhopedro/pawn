@@ -159,7 +159,7 @@ Move MoveOrder::next_move()
                 if (move != m_hash_move)
                 {
                     // At this stage only return good captures
-                    if (m_position.board().see(move) >= 0)
+                    if (m_position.board().see(move, std::max(-250, -50 * (m_depth - 1))) >= 0)
                         return move;
 
                     // Move bad captures to be tried later
