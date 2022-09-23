@@ -4,6 +4,7 @@
 #include "Hash.hpp"
 #include "MoveOrder.hpp"
 #include "Search.hpp"
+#include "Evaluation.hpp"
 #include <atomic>
 #include <memory>
 #include <thread>
@@ -42,11 +43,13 @@ class Thread
 protected:
     friend class Search::SearchData;
     friend class ThreadPool;
+    friend Score Evaluation::evaluation(const Board& board, EvalData& data, Thread& thread);
     Depth m_seldepth;
     Search::PvContainer m_pv;
     Histories m_histories;
     std::atomic_uint64_t m_nodes_searched;
     std::vector<Search::MultiPVData> m_multiPV;
+    HashTable<Evaluation::MaterialEntry> m_material_table;
 
 public:
     Thread(int id, ThreadPool& pool);
@@ -70,6 +73,20 @@ public:
     ThreadPool& pool() const;
     const Search::Limits& limits() const;
     const Search::SearchTime& time() const;
+
+    template<bool OUTPUT>
+    Score evaluate(const Position& pos)
+    {
+        const Board& board = pos.board();
+        Evaluation::EvalData data(board);
+
+        Score score = Evaluation::evaluation(board, data, *this);
+
+        if (OUTPUT)
+            Evaluation::eval_table(board, data, score);
+
+        return score;
+    }
 };
 
 
@@ -121,6 +138,8 @@ public:
     void clear();
 
     Thread* get_best_thread() const;
+
+    inline Thread& front() { return *(m_threads.front()); }
 };
 
 

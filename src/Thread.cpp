@@ -22,7 +22,8 @@ Thread::Thread(int id, ThreadPool& pool)
       m_pool(pool),
       m_status(ThreadStatus::STARTING),
       m_nodes_searched(0),
-      m_multiPV(UCI::Options::MultiPV)
+      m_multiPV(UCI::Options::MultiPV),
+      m_material_table(16192, false)
 {
     m_thread = std::thread(&Thread::thread_loop, this);
 
@@ -58,6 +59,7 @@ void Thread::wait()
 void Thread::clear()
 {
     m_histories.clear();
+    m_material_table.clear();
 }
 
 

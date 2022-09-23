@@ -145,8 +145,8 @@ public:
         : HashTable(0)
     {}
 
-    HashTable(std::size_t size_mb)
-        : m_table(size_from_mb(size_mb)),
+    HashTable(std::size_t size, bool size_in_mb = true)
+        : m_table(size_in_mb ? size_from_mb(size) : size),
           m_full(0),
           m_age(0)
     {}

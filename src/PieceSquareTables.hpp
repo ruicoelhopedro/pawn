@@ -103,6 +103,16 @@ constexpr S psq_table_pawns[6][8] =
 };
 
 
+constexpr S imbalance_terms[][NUM_PIECE_TYPES] =
+{   // Pawn       Knight     Bishop    Rook         Queen
+     { S( 0,  0)                                            }, // Pawn
+     { S(14, 10), S(-5, -6)                                 }, // Knight
+     { S( 6,  7), S( 1,  2), S( 0, 0)                       }, // Bishop
+     { S( 0,  0), S( 7,  4), S( 9, 8), S(-12, -11)          }, // Rook
+     { S( 0,  0), S( 9,  9), S(10, 7), S(-11, -13), S(0, 0) }  // Queen
+};
+
+
 constexpr MixedScore piece_square(PieceType piece, Square square, Turn turn)
 {
     // Correct piece position for table lookup

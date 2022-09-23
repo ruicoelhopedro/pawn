@@ -61,6 +61,7 @@ Board::Board()
 
 Board::Board(std::string fen)
     : m_hash(0),
+      m_material_hash(Zobrist::get_initial_material_hash()),
       m_psq(0, 0),
       m_phase(Phases::Total)
 {
@@ -68,6 +69,7 @@ Board::Board(std::string fen)
 
     // Default initialisation for board pieces
     std::memset(m_board_pieces, PIECE_NONE, sizeof(m_board_pieces));
+    std::memset(m_piece_count, 0, sizeof(m_piece_count));
 
     // Read position
     Square square = SQUARE_A8;
@@ -340,19 +342,29 @@ bool Board::is_valid() const
 
     // Material and phase evaluation
     uint8_t phase = Phases::Total;
-    auto eval = MixedScore(0, 0);
+    MixedScore material(0, 0);
+    MixedScore psq(0, 0);
+    Hash material_hash = 0;
     for (PieceType piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
         for (Turn turn : { WHITE, BLACK })
         {
             Bitboard bb = get_pieces(turn, piece);
-            eval += piece_value[piece] * bb.count() * turn_to_color(turn);
+            if (bb.count() != m_piece_count[piece][turn])
+                return false;
+            material += piece_value[piece] * bb.count() * turn_to_color(turn);
             phase -= bb.count() * Phases::Pieces[piece];
+            material_hash ^= Zobrist::get_piece_turn_square(piece, turn, bb.count());
             while (bb)
-                eval += piece_square(piece, bb.bitscan_forward_reset(), turn) * turn_to_color(turn);
+                psq += piece_square(piece, bb.bitscan_forward_reset(), turn) * turn_to_color(turn);
         }
+    MixedScore total_material = m_material[WHITE] - m_material[BLACK];
     if (phase != m_phase)
         return false;
-    if (eval.middlegame() != m_psq.middlegame() || eval.endgame() != m_psq.endgame())
+    if (material.middlegame() != total_material.middlegame() || material.endgame() != total_material.endgame())
+        return false;
+    if (psq.middlegame() != m_psq.middlegame() || psq.endgame() != m_psq.endgame())
+        return false;
+    if (material_hash != m_material_hash)
         return false;
 
     return true;
@@ -439,6 +451,12 @@ bool Board::operator==(const Board& other) const
 Hash Board::hash() const
 {
     return m_hash;
+}
+
+
+Hash Board::material_hash() const
+{
+    return m_material_hash;
 }
 
 

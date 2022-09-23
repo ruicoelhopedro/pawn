@@ -3,6 +3,7 @@
 #include "Position.hpp"
 #include "Evaluation.hpp"
 #include "PieceSquareTables.hpp"
+#include "Thread.hpp"
 #include <cassert>
 #include <stdlib.h>
 
@@ -22,15 +23,48 @@ EvalData::EvalData(const Board& board)
 }
 
 
+void MaterialEntry::store(Age age, Hash hash, const Board& board)
+{
+    // Store hash
+    m_hash = board.material_hash();
+
+    // Compute the imbalance terms
+    m_imbalance = MixedScore(0, 0);
+    for (PieceType p1 : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
+        for (int p2 = PAWN; p2 <= p1; p2++)
+            m_imbalance += imbalance_terms[p1][p2]
+                         * (board.get_pieces(WHITE, p1).count() * board.get_pieces(WHITE, PieceType(p2)).count()
+                          - board.get_pieces(BLACK, p1).count() * board.get_pieces(BLACK, PieceType(p2)).count());
+}
+
+
+MaterialEntry* probe_material(const Board& board, HashTable<MaterialEntry>& table)
+{
+    // Probe the table and return the entry if we get a hit
+    MaterialEntry* entry;
+    if (table.query(board.material_hash(), &entry))
+        return entry;
+
+    // We did not get a hit, recompute all terms and store them in the table
+    table.store(board.material_hash(), board);
+
+    // The entry points to the same entry that we have just written
+    return entry;
+}
+
+
 MixedScore material(Board board, EvalData& eval)
 {
-    eval.fields[WHITE].material = MixedScore(0, 0);
-    eval.fields[BLACK].material = MixedScore(0, 0);
-
-    for (auto piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
+    for (Turn t : { WHITE, BLACK })
     {
-        eval.fields[WHITE].material += piece_value[piece] * board.get_pieces(WHITE, piece).count();
-        eval.fields[BLACK].material += piece_value[piece] * board.get_pieces(BLACK, piece).count();
+        eval.fields[t].material = MixedScore(0, 0);
+        for (auto piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
+        {
+            eval.fields[t].material += piece_value[piece] * board.get_pieces(t, piece).count();
+            for (int p2 = PAWN; p2 <= piece; p2++)
+                eval.fields[t].imbalance += imbalance_terms[piece][p2] * board.get_pieces(t, piece).count()
+                                                                       * board.get_pieces(t, PieceType(p2)).count();
+        }
     }
     return eval.fields[WHITE].material - eval.fields[BLACK].material;
 }
@@ -443,9 +477,13 @@ Score scale(const Board& board, EvalData& data, MixedScore mixed)
 }
 
 
-Score evaluation(const Board& board, EvalData& data)
+Score evaluation(const Board& board, EvalData& data, Thread& thread)
 {
     MixedScore mixed_result(0, 0);
+
+    // Probe the material hash table
+    MaterialEntry* me = probe_material(board, thread.m_material_table);
+    mixed_result += me->imbalance();
 
     // Material and PSQT: incrementally updated in the position
     mixed_result += board.material() + board.psq();
@@ -497,6 +535,7 @@ void eval_table(const Board& board, EvalData& data, Score score)
     for (Turn t : { WHITE, BLACK })
     {
         total[t] = data.fields[t].material + data.fields[t].placement
+                 + data.fields[t].imbalance
                  + data.fields[t].space    + data.fields[t].threats
                  + data.fields[t].passed   + data.fields[t].scale;
         for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
@@ -510,6 +549,7 @@ void eval_table(const Board& board, EvalData& data, Score score)
     std::cout << " Term          |   MG     EG   |   MG     EG   |   MG     EG   "                                        << std::endl;
     std::cout << "---------------------------------------------------------------"                                        << std::endl;
     std::cout << " Material      | " << Term< true>(data.fields[WHITE].material,       data.fields[BLACK].material)       << std::endl;
+    std::cout << " Imbalance     | " << Term< true>(data.fields[WHITE].imbalance,      data.fields[BLACK].imbalance)      << std::endl;
     std::cout << " Placement     | " << Term< true>(data.fields[WHITE].placement,      data.fields[BLACK].placement)      << std::endl;
     std::cout << " Pawns         | " << Term<false>(data.fields[WHITE].pieces[PAWN],   data.fields[BLACK].pieces[PAWN])   << std::endl;
     std::cout << " Knights       | " << Term<false>(data.fields[WHITE].pieces[KNIGHT], data.fields[BLACK].pieces[KNIGHT]) << std::endl;

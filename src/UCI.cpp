@@ -147,7 +147,7 @@ namespace UCI
             else if (token == "board")
                 std::cout << pool->position().board() << std::endl;
             else if (token == "eval")
-                evaluate<true>(pool->position());
+                pool->front().evaluate<true>(pool->position());
             else if (token == "bench")
                 bench(stream);
             else if (token == "test")
