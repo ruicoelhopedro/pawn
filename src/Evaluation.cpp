@@ -96,7 +96,7 @@ MixedScore pawns(const Board& board, EvalData& data)
     constexpr MixedScore IsolatedPenalty(-3, -15);
     constexpr MixedScore BackwardPenalty(-9, -22);
     constexpr MixedScore IslandPenalty(-3, -12);
-    constexpr MixedScore NonPushedCentralPenalty(-35, -50);
+    constexpr MixedScore Connected(3, 25);
 
     // Some helpers
     constexpr Direction Up = 8;
@@ -128,6 +128,10 @@ MixedScore pawns(const Board& board, EvalData& data)
     Bitboard backward[] = { pawns[WHITE] & (~wps.span.shift<-Up>() & bps.attacks).shift<-Up>(),
                             pawns[BLACK] & (~bps.span.shift< Up>() & wps.attacks).shift< Up>() };
 
+    // Connected pawns
+    Bitboard connected[] = { pawns[WHITE] & wps.attacks,
+                             pawns[BLACK] & bps.attacks };
+
     // Build pawn structure scores
     for (auto turn : { WHITE, BLACK })
     {
@@ -135,6 +139,7 @@ MixedScore pawns(const Board& board, EvalData& data)
         data.fields[turn].pieces[PAWN] = DoubledPenalty  * doubled[turn].count()
                                        + IsolatedPenalty * isolated[turn].count()
                                        + BackwardPenalty * backward[turn].count()
+                                       + Connected       * connected[turn].count()
                                        + IslandPenalty   * Bitboards::file_count(data.pawns[turn].open_files);
         
         // Update attack tables
