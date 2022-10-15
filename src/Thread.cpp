@@ -23,7 +23,8 @@ Thread::Thread(int id, ThreadPool& pool)
       m_status(ThreadStatus::STARTING),
       m_nodes_searched(0),
       m_multiPV(UCI::Options::MultiPV),
-      m_material_table(16192, false)
+      m_material_table(16192, false),
+      m_data_gen(false)
 {
     m_thread = std::thread(&Thread::thread_loop, this);
 
@@ -92,7 +93,7 @@ void Thread::output_pvs()
 
 
 int Thread::id() const { return m_id; }
-bool Thread::is_main() const { return m_id == 0; }
+bool Thread::is_main() const { return m_id == 0 && !m_data_gen; }
 ThreadPool& Thread::pool() const { return m_pool; }
 const Search::SearchTime& Thread::time() const { return m_pool.m_time; }
 const Search::Limits& Thread::limits() const { return m_pool.m_limits; }
@@ -274,8 +275,17 @@ Thread* ThreadPool::get_best_thread() const
 }
 
 
+bool Thread::data_gen() const
+{
+    return m_data_gen;
+}
+
+
 bool Thread::timeout() const
 {
+    if (m_data_gen)
+        return false;
+
     // Aborted search
     if (m_pool.status().load(std::memory_order_relaxed) != ThreadStatus::SEARCHING)
         return true;
@@ -476,3 +486,79 @@ void Thread::search()
     }
 }
 
+
+GamePosition Thread::simple_search(Position& pos, const Search::Limits& limits)
+{
+    // For depth 0, return the quiescence score
+    if (limits.depth == 0)
+    {
+        Search::SearchData data(*this);
+        Score qscore = Search::quiescence<Search::PV>(pos, -SCORE_INFINITE, SCORE_INFINITE, data);
+        return GamePosition(pos.board(), qscore * turn_to_color(pos.get_turn()), MOVE_NULL);
+    }
+
+    // Generate root moves
+    Move moves[NUM_MAX_MOVES];
+    m_root_moves = MoveList(moves);
+    pos.board().generate_moves(m_root_moves, MoveGenType::LEGAL);
+
+    // Check for aborted search if game has ended
+    if (m_root_moves.length() == 0 || pos.is_draw(false))
+        return GamePosition(pos.board(),
+                            pos.in_check() ? -SCORE_MATE * turn_to_color(pos.get_turn())
+                                           : SCORE_DRAW,
+                            MOVE_NULL);
+
+    // Clear data
+    Search::MultiPVData pv;
+    m_nodes_searched.store(0);
+
+    // Iterative deepening with aspiration search in data generation mode
+    m_data_gen = true;
+    for (int iDepth = 1; iDepth < NUM_MAX_DEPTH && iDepth <= limits.depth; iDepth++)
+    {
+        Search::SearchData data(*this);
+        aspiration_search(pos, pv, iDepth, data);
+    }
+    m_data_gen = false;
+
+    return GamePosition(pos.board(), pv.score * turn_to_color(pos.get_turn()), *pv.pv);
+}
+
+
+
+GameResult Thread::play_game(std::string fen, Depth depth, Score adjudication)
+{
+    Position pos(fen);
+    Search::Limits limits;
+    limits.depth = depth;
+
+    m_data_gen = true;
+
+    GameResult result;
+    result.game.reserve(100);
+
+    // Game loop
+    pos.set_init_ply();
+    GamePosition state = simple_search(pos, limits);
+    while (state.bestmove != MOVE_NULL && abs(state.score) < adjudication)
+    {
+        // Store this node
+        result.game.push_back(state);
+
+        // Prepare next iteration
+        pos.make_move(state.bestmove);
+        pos.set_init_ply();
+        state = simple_search(pos, limits);
+    }
+
+    // Set winner
+    result.result = state.score > 0 ? WHITE_COLOR
+                  : state.score < 0 ? BLACK_COLOR
+                  : NO_COLOR;
+
+
+    m_data_gen = false;
+
+    return result;
+}

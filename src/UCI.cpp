@@ -5,6 +5,9 @@
 #include "Types.hpp"
 #include "UCI.hpp"
 #include "Thread.hpp"
+#include "data_gen/data_gen.hpp"
+#include "data_gen/psqt.hpp"
+#include "data_gen/fen_score.hpp"
 #include <array>
 #include <algorithm>
 #include <cctype>
@@ -150,6 +153,12 @@ namespace UCI
                 pool->front().evaluate<true>(pool->position());
             else if (token == "bench")
                 bench(stream);
+            else if (token == "score_fens")
+                FEN_Scores::score_fens(stream);
+            else if (token == "evaluate_fens")
+                FEN_Scores::evaluate_fens(stream);
+            else if (token == "gen_data_psqt")
+                PSQT_DataGen::gen_data_psqt(stream);
             else if (token == "test")
             {
                 int t1 = Tests::perft_tests();

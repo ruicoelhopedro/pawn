@@ -493,6 +493,22 @@ public:
     }
 
 
+    inline Piece piece(Square square) const
+    {
+        return m_board_pieces[square];
+    }
+
+
+    inline Square ep_square() const
+    {
+        return m_enpassant_square;
+    }
+
+    inline bool castle_rights(Turn turn, CastleSide side) const
+    {
+        return m_castling_rights[side][turn];
+    }
+
     bool is_valid() const;
 
 
@@ -727,3 +743,15 @@ public:
 
 
 std::ostream& operator<<(std::ostream& out, const Board& board);
+
+
+PieceType fen_piece(char c);
+
+
+char fen_piece(Piece pc);
+
+
+CastleSide fen_castle_side(char c);
+
+
+char fen_castle_side(CastleSide side, Turn turn);

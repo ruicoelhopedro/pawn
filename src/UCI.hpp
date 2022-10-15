@@ -104,6 +104,8 @@ namespace UCI
     void isready(Stream& stream);
 
     void bench(Stream& stream);
+    void gen_data_psqt(Stream& stream);
+    void gen_data(Stream& stream);
 
     Move move_from_uci(Position& position, std::string move_str);
 }

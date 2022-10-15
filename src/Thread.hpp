@@ -5,6 +5,7 @@
 #include "MoveOrder.hpp"
 #include "Search.hpp"
 #include "Evaluation.hpp"
+#include "data_gen/data_gen.hpp"
 #include <atomic>
 #include <memory>
 #include <thread>
@@ -50,6 +51,7 @@ protected:
     std::atomic_uint64_t m_nodes_searched;
     std::vector<Search::MultiPVData> m_multiPV;
     HashTable<Evaluation::MaterialEntry> m_material_table;
+    bool m_data_gen;
 
 public:
     Thread(int id, ThreadPool& pool);
@@ -68,6 +70,12 @@ public:
 
     void clear();
 
+    bool data_gen() const;
+
+    GamePosition simple_search(Position& pos, const Search::Limits& limits);
+
+    GameResult play_game(std::string fen, Depth depth, Score adjudication);
+
     int id() const;
     bool is_main() const;
     ThreadPool& pool() const;
@@ -78,6 +86,19 @@ public:
     Score evaluate(const Position& pos)
     {
         const Board& board = pos.board();
+        Evaluation::EvalData data(board);
+
+        Score score = Evaluation::evaluation(board, data, *this);
+
+        if (OUTPUT)
+            Evaluation::eval_table(board, data, score);
+
+        return score;
+    }
+
+    template<bool OUTPUT>
+    Score evaluate(const Board& board)
+    {
         Evaluation::EvalData data(board);
 
         Score score = Evaluation::evaluation(board, data, *this);
