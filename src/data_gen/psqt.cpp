@@ -174,4 +174,48 @@ namespace PSQT_DataGen
         }
         std::cout << std::endl;
     }
+
+
+    void games_to_psq_data(std::istringstream& stream)
+    {
+        // Parameters
+        std::string input_file_path;
+
+        // Parameter reading
+        assert((stream >> input_file_path) && "Input file path required!");
+
+        // Open files
+        std::ifstream ifile(input_file_path);
+        assert(ifile.is_open() && "Failed to open input file!");
+
+        // Build output file format
+        FileFormat output(0, "");
+
+        // Read entire file
+        BinaryGame game;
+        while(BinaryGame::read(ifile, game))
+        {
+            // Find winner
+            Color result = Color(game.nodes.back().score);
+    
+             // Write each position, score and move
+            Board board(game.starting_pos);
+            for (BinaryNode node : game.nodes)
+                if (node.move != MOVE_NULL)
+                    {
+                        // Write to files if the position verifies
+                        // i) Not in check
+                        // ii) Best move not a capture
+                        // iii) Best move not a promotion
+                        if (!board.checkers() &&
+                            !node.move.is_capture() &&
+                            !node.move.is_promotion())
+                            FeatureSample(board, node.score, result).write(output);
+
+                        // Make the move
+                        assert(board.legal(node.move) && "Illegal move!");
+                        board = board.make_move(node.move);
+                    }
+        }
+    }
 }

@@ -66,4 +66,7 @@ namespace PSQT_DataGen
 
 
     void gen_data_psqt(std::istringstream& stream);
+
+
+    void games_to_psq_data(std::istringstream& stream);
 }

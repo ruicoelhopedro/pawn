@@ -2,6 +2,7 @@
 #include "Types.hpp"
 #include "PieceSquareTables.hpp"
 #include "Zobrist.hpp"
+#include "data_gen/data_gen.hpp"
 #include <cassert>
 #include <sstream>
 #include <string>
@@ -112,6 +113,55 @@ Board::Board(std::string fen)
     while ((++c) < fen.cend() && !isspace(*c))
         m_full_move_clock = m_full_move_clock * 10 + (*c - '0');
     m_full_move_clock = std::max(m_full_move_clock, 1);
+
+    // Update remaining hash: turn and ep square
+    if (m_turn == Turn::BLACK)
+        m_hash ^= Zobrist::get_black_move();
+    if (m_enpassant_square != SQUARE_NULL)
+        m_hash ^= Zobrist::get_ep_file(file(m_enpassant_square));
+
+    update_checkers();
+}
+
+
+Board::Board(const BinaryBoard& bb)
+    : m_hash(0),
+      m_material_hash(Zobrist::get_initial_material_hash()),
+      m_psq(0, 0),
+      m_phase(Phases::Total)
+{
+    // Default initialisation for board pieces
+    std::memset(m_castling_rights, 0, sizeof(m_castling_rights));
+    std::memset(m_board_pieces, PIECE_NONE, sizeof(m_board_pieces));
+    std::memset(m_piece_count, 0, sizeof(m_piece_count));
+
+    // Position
+    for (int rank = 7; rank >= 0; rank--)
+    {
+        for (int file = 0; file < 8; file++)
+        {
+            Piece pc = bb.get_piece_at(make_square(rank, file));
+            if (pc != Piece::NO_PIECE)
+                set_piece(get_piece_type(pc), get_turn(pc), make_square(rank, file));
+        }
+    }
+
+    // Side to move
+    m_turn = bb.get_turn();
+
+    // Castling rights
+    uint8_t rights = bb.get_castle_rights();
+    if (rights & 0b1)    set_castling<true>(KINGSIDE,  WHITE);
+    if (rights & 0b10)   set_castling<true>(QUEENSIDE, WHITE);
+    if (rights & 0b100)  set_castling<true>(KINGSIDE,  BLACK);
+    if (rights & 0b1000) set_castling<true>(QUEENSIDE, BLACK);
+
+    // Ep square
+    m_enpassant_square = bb.get_ep_square();
+
+    // Half- and full-move clocks
+    m_half_move_clock = bb.get_half_move();
+    m_full_move_clock = 1;
 
     // Update remaining hash: turn and ep square
     if (m_turn == Turn::BLACK)

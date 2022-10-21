@@ -8,6 +8,7 @@
 #include "data_gen/data_gen.hpp"
 #include "data_gen/psqt.hpp"
 #include "data_gen/fen_score.hpp"
+#include "data_gen/game_player.hpp"
 #include <array>
 #include <algorithm>
 #include <cctype>
@@ -159,6 +160,12 @@ namespace UCI
                 FEN_Scores::evaluate_fens(stream);
             else if (token == "gen_data_psqt")
                 PSQT_DataGen::gen_data_psqt(stream);
+            else if (token == "play_games")
+                GamePlayer::play_games(stream);
+            else if (token == "games_to_epd")
+                GamePlayer::games_to_epd(stream);
+            else if (token == "games_to_psq_data")
+                PSQT_DataGen::games_to_psq_data(stream);
             else if (token == "test")
             {
                 int t1 = Tests::perft_tests();

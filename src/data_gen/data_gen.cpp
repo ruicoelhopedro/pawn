@@ -34,9 +34,10 @@ Turn BinaryBoard::get_turn() const
 }
 
 
-Square BinaryBoard::get_ep_square(Turn t) const
+Square BinaryBoard::get_ep_square() const
 {
-    return make_square(t == WHITE ? 2 : 5, (other >> 1) & 0b1111);
+    uint8_t mask = (other >> 1) & 0b1111;
+    return (mask & 0x8) ? SQUARE_NULL : make_square((get_turn() == WHITE) ? 5 : 2, mask);
 }
 
 
@@ -68,13 +69,13 @@ std::string BinaryBoard::fen() const
             else
             {
                 if (space)
-                    result += space;
+                    result += std::to_string(space);
                 result += fen_piece(pc);
                 space = 0;
             }
         }
         if (space)
-            result += space;
+            result += std::to_string(space);
         result += (rank > 0 ? '/' : ' ');
     }
 
@@ -96,13 +97,56 @@ std::string BinaryBoard::fen() const
         result += "- ";
 
     // Ep square
-    Square ep_square = get_ep_square(turn);
+    Square ep_square = get_ep_square();
     result += (ep_square == SQUARE_NULL ? "-" : get_square(ep_square)) + ' ';
 
     // Half- and full-move clocks
     result += std::to_string(int(get_half_move())) + " 1";
 
     return result;
+}
+
+
+bool BinaryGame::read(std::ifstream& stream, BinaryGame& result)
+{
+    result = BinaryGame();
+    result.started = true;
+    // Read starting position
+    if (!stream.read(reinterpret_cast<char*>(&result.starting_pos), sizeof(BinaryBoard)))
+        return false;
+    // Read each game node
+    BinaryNode node;
+    while(stream.read(reinterpret_cast<char*>(&node), sizeof(BinaryNode)) && node.move != MOVE_NULL)
+        result.nodes.push_back(node);
+    // Final sanity check
+    if (node.move == MOVE_NULL)
+    {
+        result.nodes.push_back(node);
+        return true;
+    }
+
+    // If the game did not terminate normally, do not return it
+    return false;
+}
+
+
+void BinaryGame::write(std::ofstream& stream)
+{
+    // Do nothing if we have not yet started recording the game
+    if (!started)
+        return;
+
+    // Write initial position
+    stream.write(reinterpret_cast<const char*>(&starting_pos), sizeof(BinaryBoard));
+    // Loop over moves
+    for (BinaryNode node : nodes)
+        stream.write(reinterpret_cast<const char*>(&node), sizeof(BinaryNode));
+    // Write game termination and infer result from last score
+    BinaryNode& last = nodes.back();
+    BinaryNode term(MOVE_NULL, last.score > 0 ? WHITE_COLOR : last.score < 0 ? BLACK_COLOR : NO_COLOR);
+    stream.write(reinterpret_cast<const char*>(&term), sizeof(BinaryNode));
+    // Flush the output file
+    stream.flush();
 }
 
 

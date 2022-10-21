@@ -174,6 +174,8 @@ public:
 
     // IO operators
     friend std::ostream& operator<<(std::ostream& out, const MoveList& list);
+
+    Move operator[](std::size_t pos) { return *(m_moves + pos); }
 };
 
 

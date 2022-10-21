@@ -297,4 +297,6 @@ public:
         z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
         return z ^ (z >> 31);
     }
+
+    inline uint64_t next(uint64_t n) { return next() % n; }
 };

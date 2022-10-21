@@ -15,6 +15,8 @@ enum class MoveGenType
     CAPTURES
 };
 
+class BinaryBoard;
+
 class Board
 {
     // Required fields
@@ -469,6 +471,9 @@ public:
     Board(std::string fen);
 
 
+    Board(const BinaryBoard& bb);
+
+
     friend std::ostream& operator<<(std::ostream& out, const Board& board);
 
 
@@ -739,6 +744,9 @@ public:
 
 
     Move last_move() const;
+
+
+    inline int game_ply() const { return m_boards.size(); }
 };
 
 
