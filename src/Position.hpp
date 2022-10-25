@@ -26,11 +26,12 @@ class Board
     int m_full_move_clock;
 
     // Updated fields
+    Square m_king_sq[NUM_COLORS];
     Hash m_hash;
     Hash m_material_hash;
     Bitboard m_checkers;
     MixedScore m_material[NUM_COLORS];
-    MixedScore m_psq;
+    Score m_psq[NUM_COLORS];
     uint8_t m_phase;
     Piece m_board_pieces[NUM_SQUARES];
     uint8_t m_piece_count[NUM_PIECE_TYPES][NUM_COLORS];
@@ -262,7 +263,8 @@ protected:
         m_pieces[piece][turn].set(square);
         m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
         m_board_pieces[square] = get_piece(piece, turn);
-        m_psq += piece_square(piece, square, turn) * turn_to_color(turn);
+        m_psq[WHITE] += piece_square(piece, square, turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
+        m_psq[BLACK] += piece_square(piece, square, turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
         m_material[turn] += piece_value[piece];
         m_phase -= Phases::Pieces[piece];
         m_piece_count[piece][turn]++;
@@ -276,7 +278,8 @@ protected:
         m_pieces[piece][turn].reset(square);
         m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
         m_board_pieces[square] = NO_PIECE;
-        m_psq -= piece_square(piece, square, turn) * turn_to_color(turn);
+        m_psq[WHITE] -= piece_square(piece, square, turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
+        m_psq[BLACK] -= piece_square(piece, square, turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
         m_material[turn] -= piece_value[piece];
         m_phase += Phases::Pieces[piece];
         m_piece_count[piece][turn]--;
@@ -293,7 +296,10 @@ protected:
         m_hash ^= Zobrist::get_piece_turn_square(piece, turn, to);
         m_board_pieces[from] = NO_PIECE;
         m_board_pieces[to] = get_piece(piece, turn);
-        m_psq += (piece_square(piece, to, turn) - piece_square(piece, from, turn)) * turn_to_color(turn);
+        m_psq[WHITE] -= piece_square(piece, from, turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
+        m_psq[BLACK] -= piece_square(piece, from, turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
+        m_psq[WHITE] += piece_square(piece, to,   turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
+        m_psq[BLACK] += piece_square(piece, to,   turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
     }
 
 
@@ -461,6 +467,8 @@ protected:
         else
             return legal<BLACK, PIECE_TYPE>(move, occupancy);
     }
+
+    void regen_psqt(Turn turn);
 
 public:
     Board();
@@ -630,7 +638,7 @@ public:
     MixedScore material(Turn turn) const;
 
 
-    MixedScore psq() const;
+    Score psq() const;
 
 
     uint8_t phase() const;

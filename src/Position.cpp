@@ -62,7 +62,6 @@ Board::Board()
 Board::Board(std::string fen)
     : m_hash(0),
       m_material_hash(Zobrist::get_initial_material_hash()),
-      m_psq(0, 0),
       m_phase(Phases::Total)
 {
     auto c = fen.cbegin();
@@ -70,6 +69,8 @@ Board::Board(std::string fen)
     // Default initialisation for board pieces
     std::memset(m_board_pieces, PIECE_NONE, sizeof(m_board_pieces));
     std::memset(m_piece_count, 0, sizeof(m_piece_count));
+    std::memset(m_psq, 0, sizeof(m_psq));
+    std::memset(m_king_sq, 0, sizeof(m_king_sq));
 
     // Read position
     Square square = SQUARE_A8;
@@ -120,6 +121,11 @@ Board::Board(std::string fen)
         m_hash ^= Zobrist::get_ep_file(file(m_enpassant_square));
 
     update_checkers();
+
+    m_king_sq[WHITE] = m_pieces[KING][WHITE].bitscan_forward();
+    m_king_sq[BLACK] = m_pieces[KING][BLACK].bitscan_forward();
+    regen_psqt(WHITE);
+    regen_psqt(BLACK);
 }
 
 
@@ -213,6 +219,24 @@ void Board::update_checkers()
 }
 
 
+void Board::regen_psqt(Turn turn)
+{
+    m_psq[turn] = 0;
+    for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
+    {
+        for (Turn t : { WHITE, BLACK })
+        {
+            Bitboard b = get_pieces(t, p);
+            while (b)
+            {
+                Square s = b.bitscan_forward_reset();
+                m_psq[turn] += piece_square(p, s, t, m_king_sq[turn], turn) * turn_to_color(t);
+            }
+        }
+    }
+}
+
+
 void Board::generate_moves(MoveList& list, MoveGenType type) const
 {
     if (m_turn == WHITE)
@@ -294,6 +318,13 @@ Board Board::make_move(Move move) const
         result.move_piece(piece, m_turn, move.from(), move.to());
     }
 
+    // After a king move, update PSQ tables
+    if (piece == KING)
+    {
+        result.m_king_sq[m_turn] = result.m_pieces[KING][m_turn].bitscan_forward();
+        result.regen_psqt(m_turn);
+    }
+
     // Swap turns
     result.m_turn = ~m_turn;
     result.m_hash ^= Zobrist::get_black_move();
@@ -343,7 +374,7 @@ bool Board::is_valid() const
     // Material and phase evaluation
     uint8_t phase = Phases::Total;
     MixedScore material(0, 0);
-    MixedScore psq(0, 0);
+    Score psq_sides[2] = { Score(0), Score(0) };
     Hash material_hash = 0;
     for (PieceType piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
         for (Turn turn : { WHITE, BLACK })
@@ -355,14 +386,18 @@ bool Board::is_valid() const
             phase -= bb.count() * Phases::Pieces[piece];
             material_hash ^= Zobrist::get_piece_turn_square(piece, turn, bb.count());
             while (bb)
-                psq += piece_square(piece, bb.bitscan_forward_reset(), turn) * turn_to_color(turn);
+            {
+                Square s = bb.bitscan_forward_reset();
+                psq_sides[WHITE] += piece_square(piece, s, turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
+                psq_sides[BLACK] += piece_square(piece, s, turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
+            }
         }
     MixedScore total_material = m_material[WHITE] - m_material[BLACK];
     if (phase != m_phase)
         return false;
     if (material.middlegame() != total_material.middlegame() || material.endgame() != total_material.endgame())
         return false;
-    if (psq.middlegame() != m_psq.middlegame() || psq.endgame() != m_psq.endgame())
+    if (psq_sides[WHITE] != m_psq[WHITE] || psq_sides[BLACK] != m_psq[BLACK])
         return false;
     if (material_hash != m_material_hash)
         return false;
@@ -527,9 +562,9 @@ MixedScore Board::material(Turn turn) const
 }
 
 
-MixedScore Board::psq() const
+Score Board::psq() const
 {
-    return m_psq;
+    return m_psq[WHITE] + m_psq[BLACK];
 }
 
 

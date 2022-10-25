@@ -1,6 +1,8 @@
 #pragma once
 #include "Types.hpp"
 
+#define PSQT_Default_File "psqt-769d9df255ea.dat"
+
 using S = MixedScore;
 
 constexpr S   PawnValue(  125,   200);
@@ -121,4 +123,30 @@ constexpr MixedScore piece_square(PieceType piece, Square square, Turn turn)
         return psq_table_pawns[sq_rank - 1][file(square)];
     else
         return psq_table[piece - 1][sq_rank][horizontal_distance(square)] / 2;
+}
+
+namespace PSQT
+{
+
+    class PSQT
+    {
+        static constexpr std::size_t NUM_FEATURES = 20480;
+        int16_t m_weights[NUM_FEATURES];
+
+    public:
+        PSQT(std::string file);
+        Score get(PieceType piece, Square square, Turn turn, Square king_sq, Turn king_turn) const;
+    };
+
+    extern PSQT* psqt_data;
+
+    void init();
+
+    void load(std::string file);
+}
+
+
+inline Score piece_square(PieceType piece, Square square, Turn turn, Square king_sq, Turn king_turn)
+{
+    return PSQT::psqt_data->get(piece, square, turn, king_sq, king_turn);
 }

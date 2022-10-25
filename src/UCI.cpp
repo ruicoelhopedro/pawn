@@ -25,6 +25,7 @@ namespace UCI
         bool Ponder;
         int Threads;
         int MoveOverhead;
+        std::string PSQT_File;
     }
 
 
@@ -104,6 +105,7 @@ namespace UCI
                                                    [](int v) { pool->resize(v); }));
         OptionsMap.emplace("Move Overhead", Option(&Options::MoveOverhead, 0, 0, 5000));
         OptionsMap.emplace("Ponder",        Option(&Options::Ponder, false));
+        OptionsMap.emplace("PSQT_File",     Option(&Options::PSQT_File, PSQT_Default_File, PSQT::load));
     }
 
 
