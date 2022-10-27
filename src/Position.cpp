@@ -69,7 +69,6 @@ Board::Board(std::string fen)
     // Default initialisation for board pieces
     std::memset(m_board_pieces, PIECE_NONE, sizeof(m_board_pieces));
     std::memset(m_piece_count, 0, sizeof(m_piece_count));
-    std::memset(m_psq, 0, sizeof(m_psq));
     std::memset(m_king_sq, 0, sizeof(m_king_sq));
 
     // Read position
@@ -221,7 +220,7 @@ void Board::update_checkers()
 
 void Board::regen_psqt(Turn turn)
 {
-    m_psq[turn] = 0;
+    m_psq[turn] = MixedScore(0, 0);
     for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
     {
         for (Turn t : { WHITE, BLACK })
@@ -374,7 +373,7 @@ bool Board::is_valid() const
     // Material and phase evaluation
     uint8_t phase = Phases::Total;
     MixedScore material(0, 0);
-    Score psq_sides[2] = { Score(0), Score(0) };
+    MixedScore psq_sides[2] = { MixedScore(0, 0), MixedScore(0, 0) };
     Hash material_hash = 0;
     for (PieceType piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
         for (Turn turn : { WHITE, BLACK })
@@ -397,7 +396,9 @@ bool Board::is_valid() const
         return false;
     if (material.middlegame() != total_material.middlegame() || material.endgame() != total_material.endgame())
         return false;
-    if (psq_sides[WHITE] != m_psq[WHITE] || psq_sides[BLACK] != m_psq[BLACK])
+    if (psq_sides[WHITE].middlegame() != m_psq[WHITE].middlegame() || psq_sides[WHITE].endgame() != m_psq[WHITE].endgame())
+        return false;
+    if (psq_sides[BLACK].middlegame() != m_psq[BLACK].middlegame() || psq_sides[BLACK].endgame() != m_psq[BLACK].endgame())
         return false;
     if (material_hash != m_material_hash)
         return false;
@@ -562,7 +563,7 @@ MixedScore Board::material(Turn turn) const
 }
 
 
-Score Board::psq() const
+MixedScore Board::psq() const
 {
     return m_psq[WHITE] + m_psq[BLACK];
 }

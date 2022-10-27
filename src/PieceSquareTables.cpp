@@ -17,11 +17,11 @@ namespace PSQT
     }
 
 
-    Score PSQT::get(PieceType piece, Square square, Turn turn, Square king_sq, Turn king_turn) const
+    MixedScore PSQT::get(PieceType piece, Square square, Turn turn, Square king_sq, Turn king_turn) const
     {
         // No PSQ data for the king
         if (piece == KING)
-            return 0;
+            return MixedScore(0, 0);
 
         // Vertical mirror for black
         if (turn == BLACK)

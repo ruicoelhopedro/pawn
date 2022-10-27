@@ -179,6 +179,18 @@ public:
 };
 
 
+class CompactMixedScore
+{
+    int16_t mg;
+    int16_t eg;
+
+public:
+    CompactMixedScore() = default;
+    inline CompactMixedScore(Score mg, Score eg) : mg(mg), eg(eg) {}
+    inline operator MixedScore() const { return MixedScore(mg, eg); }
+};
+
+
 constexpr uint64_t uint64(int i) { return static_cast<uint64_t>(i); }
 
 
