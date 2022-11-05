@@ -27,4 +27,5 @@ int main(int argc, char** argv)
     UCI::main_loop(ss.str());
 
     pool->kill_threads();
+    PSQT::clean();
 }
