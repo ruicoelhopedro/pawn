@@ -74,15 +74,21 @@ MixedScore piece_square_value(Board board, EvalData& eval)
 {
     eval.fields[WHITE].placement = MixedScore(0, 0);
     eval.fields[BLACK].placement = MixedScore(0, 0);
-    Bitboard bb;
 
-    for (auto piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
+    Square king_sq[] = { board.get_pieces<WHITE, KING>().bitscan_forward(),
+                         board.get_pieces<BLACK, KING>().bitscan_forward() };
+
+    for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
     {
-        for (auto turn : { WHITE, BLACK })
+        for (Turn t : { WHITE, BLACK })
         {
-            bb = board.get_pieces(turn, piece);
-            while (bb)
-                eval.fields[turn].placement += piece_square(piece, bb.bitscan_forward_reset(), turn);
+            Bitboard b = board.get_pieces(t, p);
+            while (b)
+            {
+                Square s = b.bitscan_forward_reset();
+                eval.fields[t].placement += piece_square(p, s, t, king_sq[WHITE], WHITE)
+                                          + piece_square(p, s, t, king_sq[BLACK], BLACK);
+            }
         }
     }
 
@@ -490,8 +496,8 @@ Score evaluation(const Board& board, EvalData& data, Thread& thread)
     MaterialEntry* me = probe_material(board, thread.m_material_table);
     mixed_result += me->imbalance();
 
-    // Material and PSQT: incrementally updated in the position
-    mixed_result += board.material() + board.psq();
+    // Material incrementally updated in the position
+    mixed_result += board.material();
 
     // Pawn structure
     mixed_result += pawns(board, data);
@@ -512,7 +518,7 @@ Score evaluation(const Board& board, EvalData& data, Thread& thread)
     mixed_result += passed<WHITE>(board, data) - passed<BLACK>(board, data);
 
     // Tapered eval
-    Score result = scale(board, data, mixed_result);
+    Score result = scale(board, data, mixed_result) + board.psq();
 
     // We don't return exact draw scores -> add one unit to the moving side
     if (result == SCORE_DRAW)

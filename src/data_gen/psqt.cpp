@@ -61,7 +61,7 @@ namespace PSQT_DataGen
 
         // Compute eval difference
         Score static_eval = pool->front().evaluate<false>(board);
-        Score psq = board.psq().tapered(board.phase());
+        Score psq = board.psq();
         eval = eval_input - (static_eval - psq);
 
         // Store winner
