@@ -9,6 +9,7 @@
 #include "data_gen/psqt.hpp"
 #include "data_gen/fen_score.hpp"
 #include "data_gen/game_player.hpp"
+#include "data_gen/texel.hpp"
 #include <array>
 #include <algorithm>
 #include <cctype>
@@ -168,6 +169,10 @@ namespace UCI
                 GamePlayer::games_to_epd(stream);
             else if (token == "games_to_psq_data")
                 PSQT_DataGen::games_to_psq_data(stream);
+            else if (token == "score_texel")
+                Texel::score_texel(stream);
+            else if (token == "score_eval_error")
+                Texel::score_eval_error(stream);
             else if (token == "test")
             {
                 int t1 = Tests::perft_tests();
