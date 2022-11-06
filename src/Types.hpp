@@ -33,6 +33,7 @@ enum Turn : int8_t
 enum Color : int8_t
 {
     WHITE_COLOR = 1,
+    NO_COLOR = 0,
     BLACK_COLOR = -1
 };
 
@@ -256,7 +257,13 @@ inline constexpr Square horizontal_distance(Square square)
 
 inline constexpr Square vertical_mirror(Square square)
 {
-    return file(square) + (7 - rank(square));
+    return make_square(7 - rank(square), file(square));
+}
+
+
+inline constexpr Square horizontal_mirror(Square square)
+{
+    return make_square(rank(square), 7 - file(square));
 }
 
 template<Turn TURN>
