@@ -87,6 +87,7 @@ namespace UCI
         extern int Threads;
         extern int MoveOverhead;
         extern std::string PSQT_File;
+        extern bool ShallowDepthPruning;
     }
 
 

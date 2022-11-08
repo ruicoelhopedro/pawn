@@ -31,6 +31,7 @@ namespace UCI
         int Threads;
         int MoveOverhead;
         std::string PSQT_File;
+        bool ShallowDepthPruning;
     }
 
 
@@ -111,6 +112,7 @@ namespace UCI
         OptionsMap.emplace("Move Overhead", Option(&Options::MoveOverhead, 0, 0, 5000));
         OptionsMap.emplace("Ponder",        Option(&Options::Ponder, false));
         OptionsMap.emplace("PSQT_File",     Option(&Options::PSQT_File, "", PSQT::load));
+        OptionsMap.emplace("ShallowDepthPruning", Option(&Options::ShallowDepthPruning, true));
     }
 
 

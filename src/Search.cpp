@@ -471,7 +471,7 @@ namespace Search
             // Shallow depth pruning
             int move_score = move.is_capture() ? 0 : orderer.quiet_score(move);
             if (!RootSearch && position.board().non_pawn_material(Turn) && !InCheck && best_score > -SCORE_MATE_FOUND &&
-                !data.thread().data_gen())
+                UCI::Options::ShallowDepthPruning)
             {
                 if (move.is_capture() || move.is_promotion())
                 {

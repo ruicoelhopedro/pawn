@@ -23,6 +23,7 @@ namespace GamePlayer
         uint random_probability = 25;
         int store_min_ply = 15;
         int seed = 0;
+        bool shallow_depth_pruning = false;
 
         // Read passed parameters
         std::string token;
@@ -49,6 +50,8 @@ namespace GamePlayer
                 stream >> store_min_ply;
             else if (token == "seed")
                 stream >> seed;
+            else if (token == "shallow_depth_pruning")
+                shallow_depth_pruning = true;
             else
             {
                 std::cout << "Unknown option " << token << std::endl;
@@ -81,6 +84,10 @@ namespace GamePlayer
         Search::Limits limits;
         limits.depth = depth;
         Thread& thread = pool->front();
+
+        // Store and reset shallow depth pruning
+        bool sdp = UCI::Options::ShallowDepthPruning;
+        UCI::Options::ShallowDepthPruning = shallow_depth_pruning;
 
         // Loop over each FEN
         for (std::size_t i_fen = 0; i_fen < fens.size(); i_fen++)
@@ -156,6 +163,9 @@ namespace GamePlayer
             }
         }
         std::cout << std::endl;
+
+        // Restore shallow depth pruning
+        UCI::Options::ShallowDepthPruning = sdp;
     }
 
 

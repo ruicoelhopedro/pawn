@@ -96,6 +96,10 @@ namespace FEN_Scores
         Search::Limits limits;
         limits.depth = depth;
 
+        // Disable shallow depth pruning
+        bool sdp = UCI::Options::ShallowDepthPruning;
+        UCI::Options::ShallowDepthPruning = false;
+
         // Loop over book
         for (auto fen : fens)
         {
@@ -114,6 +118,9 @@ namespace FEN_Scores
             std::visit([pos, fen, m, s] (auto& output) { output.write(pos, fen, m, s); },
                        output_var);
         }
+
+        // Restore shallow depth pruning
+        UCI::Options::ShallowDepthPruning = sdp;
     }
 
 
