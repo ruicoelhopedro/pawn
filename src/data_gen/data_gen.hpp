@@ -46,7 +46,7 @@ public:
 struct BinaryNode
 {
     Move move;
-    Score score;
+    int16_t score;
 
     BinaryNode() = default;
 
