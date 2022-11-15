@@ -39,6 +39,11 @@ namespace PSQT_DataGen
         Bitboard pieces[] = { board.get_pieces<WHITE>(),
                             board.get_pieces<BLACK>() };
 
+        // Compute midgame and endgame phases
+        constexpr int scale = 64;
+        int phase_mg = MixedScore(scale, 0).tapered(board.phase());
+        int phase_eg = scale - phase_mg;
+
         // Populate features
         count = 0;
         for (Square s = 0; s < NUM_SQUARES; s++)
@@ -48,13 +53,17 @@ namespace PSQT_DataGen
             {
                 if (pieces[WHITE].test(s))
                 {
-                    push(Mapper::map(WHITE, piece, s, king[WHITE]), WHITE_COLOR);
-                    push(Mapper::map(BLACK, piece, s, king[BLACK]), WHITE_COLOR);
+                    push(Mapper::map(MG, WHITE, piece, s, king[WHITE]), WHITE_COLOR * phase_mg);
+                    push(Mapper::map(MG, BLACK, piece, s, king[BLACK]), WHITE_COLOR * phase_mg);
+                    push(Mapper::map(EG, WHITE, piece, s, king[WHITE]), WHITE_COLOR * phase_eg);
+                    push(Mapper::map(EG, BLACK, piece, s, king[BLACK]), WHITE_COLOR * phase_eg);
                 }
                 else
                 {
-                    push(Mapper::map(WHITE, piece, vertical_mirror(s), vertical_mirror(king[BLACK])), BLACK_COLOR);
-                    push(Mapper::map(BLACK, piece, vertical_mirror(s), vertical_mirror(king[WHITE])), BLACK_COLOR);
+                    push(Mapper::map(MG, WHITE, piece, vertical_mirror(s), vertical_mirror(king[BLACK])), BLACK_COLOR * phase_mg);
+                    push(Mapper::map(MG, BLACK, piece, vertical_mirror(s), vertical_mirror(king[WHITE])), BLACK_COLOR * phase_mg);
+                    push(Mapper::map(EG, WHITE, piece, vertical_mirror(s), vertical_mirror(king[BLACK])), BLACK_COLOR * phase_eg);
+                    push(Mapper::map(EG, BLACK, piece, vertical_mirror(s), vertical_mirror(king[WHITE])), BLACK_COLOR * phase_eg);
                 }
             }
         }
@@ -79,7 +88,7 @@ namespace PSQT_DataGen
     }
 
 
-    void FeatureSample::push(Feature feature, Color pc)
+    void FeatureSample::push(Feature feature, PieceColor pc)
     {
         features[count] = feature;
         color[count] = pc;
@@ -88,7 +97,7 @@ namespace PSQT_DataGen
 
 
 
-    std::size_t Mapper::map(Turn turn, PieceType piece, Square square, Square king_sq)
+    std::size_t Mapper::map(Phase phase, Turn turn, PieceType piece, Square square, Square king_sq)
     {
         // Mirror if king on the files E to H
         if (file(king_sq) >= 4)
@@ -99,30 +108,13 @@ namespace PSQT_DataGen
 
         int king_index = 4 * rank(king_sq) + file(king_sq);
 
-        int index = square
-                + piece      *  FEATURE_DIMS[0]
-                + king_index * (FEATURE_DIMS[0] * FEATURE_DIMS[1])
-                + turn       * (FEATURE_DIMS[0] * FEATURE_DIMS[1] * FEATURE_DIMS[2]);
+        int index = phase
+                  + square     *  FEATURE_DIMS[0]
+                  + piece      * (FEATURE_DIMS[0] * FEATURE_DIMS[1])
+                  + king_index * (FEATURE_DIMS[0] * FEATURE_DIMS[1] * FEATURE_DIMS[2])
+                  + turn       * (FEATURE_DIMS[0] * FEATURE_DIMS[1] * FEATURE_DIMS[2] * FEATURE_DIMS[3]);
 
         return index;
-    }
-
-
-    Turn Mapper::turn(std::size_t index)
-    {
-        return Turn(index / (FEATURE_DIMS[0] * FEATURE_DIMS[1] * FEATURE_DIMS[2]));
-    }
-    Square Mapper::king_sq(std::size_t index)
-    {
-        return Square((index / (FEATURE_DIMS[0] * FEATURE_DIMS[1])) % FEATURE_DIMS[2]);
-    }
-    PieceType Mapper::piece(std::size_t index)
-    {
-        return PieceType((index / FEATURE_DIMS[0]) % FEATURE_DIMS[1]);
-    }
-    Square Mapper::square(std::size_t index)
-    {
-        return Square(index % FEATURE_DIMS[0]);
     }
 
 

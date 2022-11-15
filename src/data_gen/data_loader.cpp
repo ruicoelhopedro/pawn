@@ -127,7 +127,7 @@ extern "C"
     }
 
 
-    Size get_sparse_psq_data(const char* file_name, const Size* selection, Size n_selected, Size* idx, unsigned short* cols, char* colors, short* evals, char* results)
+    Size get_sparse_psq_data(const char* file_name, const Size* selection, Size n_selected, Size* idx, unsigned int* cols, char* colors, short* evals, char* results)
     {
         // Open files
         std::string fname_str(file_name);

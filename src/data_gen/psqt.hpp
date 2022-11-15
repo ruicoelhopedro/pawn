@@ -27,14 +27,16 @@ namespace PSQT_DataGen
 
     struct FeatureSample
     {
-        using Feature = uint16_t;
+        static constexpr std::size_t NUM_MAX_FEATURES = 128;
+
+        using Feature = uint32_t;
         using FeatureCount = uint8_t;
         using Eval = int16_t;
         using Result = int8_t;
         using PieceColor = int8_t;
 
-        Feature features[NUM_SQUARES];
-        PieceColor color[NUM_SQUARES];
+        Feature features[NUM_MAX_FEATURES];
+        PieceColor color[NUM_MAX_FEATURES];
         FeatureCount count;
         Eval eval;
         Result result;
@@ -44,23 +46,23 @@ namespace PSQT_DataGen
         void write(FileFormat& file);
 
     private:
-        void push(Feature feature, Color pc);
+        void push(Feature feature, PieceColor pc);
     };
 
 
+    enum Phase
+    {
+        MG = 0,
+        EG = 1
+    };
 
     class Mapper
     {
     public:
-        static constexpr std::size_t FEATURE_DIMS[] = { NUM_SQUARES, NUM_PIECE_TYPES - 1, NUM_SQUARES / 2, NUM_COLORS };
-        static constexpr std::size_t N_FEATURES = FEATURE_DIMS[0] * FEATURE_DIMS[1] * FEATURE_DIMS[2] * FEATURE_DIMS[3];
+        static constexpr std::size_t FEATURE_DIMS[] = { 2, NUM_SQUARES, NUM_PIECE_TYPES - 1, NUM_SQUARES / 2, NUM_COLORS };
+        static constexpr std::size_t N_FEATURES = FEATURE_DIMS[0] * FEATURE_DIMS[1] * FEATURE_DIMS[2] * FEATURE_DIMS[3] * FEATURE_DIMS[4];
 
-        static std::size_t map(Turn turn, PieceType piece, Square square, Square king_sq);
-
-        static Turn turn(std::size_t index);
-        static PieceType piece(std::size_t index);
-        static Square square(std::size_t index);
-        static Square king_sq(std::size_t index);
+        static std::size_t map(Phase phase, Turn turn, PieceType piece, Square square, Square king_sq);
     };
 
 
