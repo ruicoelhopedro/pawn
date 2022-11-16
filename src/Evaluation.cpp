@@ -496,8 +496,8 @@ Score evaluation(const Board& board, EvalData& data, Thread& thread)
     MaterialEntry* me = probe_material(board, thread.m_material_table);
     mixed_result += me->imbalance();
 
-    // Material incrementally updated in the position
-    mixed_result += board.material();
+    // Material and PSQT incrementally updated in the position
+    mixed_result += board.material() + board.psq();
 
     // Pawn structure
     mixed_result += pawns(board, data);
@@ -518,7 +518,7 @@ Score evaluation(const Board& board, EvalData& data, Thread& thread)
     mixed_result += passed<WHITE>(board, data) - passed<BLACK>(board, data);
 
     // Tapered eval
-    Score result = scale(board, data, mixed_result) + board.psq();
+    Score result = scale(board, data, mixed_result);
 
     // We don't return exact draw scores -> add one unit to the moving side
     if (result == SCORE_DRAW)

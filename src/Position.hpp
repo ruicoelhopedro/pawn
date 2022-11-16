@@ -31,7 +31,7 @@ class Board
     Hash m_material_hash;
     Bitboard m_checkers;
     MixedScore m_material[NUM_COLORS];
-    Score m_psq[NUM_COLORS];
+    MixedScore m_psq[NUM_COLORS];
     uint8_t m_phase;
     Piece m_board_pieces[NUM_SQUARES];
     uint8_t m_piece_count[NUM_PIECE_TYPES][NUM_COLORS];
@@ -638,7 +638,7 @@ public:
     MixedScore material(Turn turn) const;
 
 
-    Score psq() const;
+    MixedScore psq() const;
 
 
     uint8_t phase() const;
