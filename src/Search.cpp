@@ -486,6 +486,9 @@ namespace Search
                     if (move_score < -100 * (depth - 1) - 50 * int(depth) * depth * depth)
                         continue;
 
+                    if (!InCheck && depth < 12 && data.static_eval + 100 + 150 * depth + move_score / 75 < alpha)
+                        continue;
+
                     if (depth < 10 && position.board().see(move, -10 * (depth + (int)depth * depth)) < 0)
                         continue;
                 }
