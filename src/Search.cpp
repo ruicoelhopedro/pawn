@@ -325,7 +325,7 @@ namespace Search
         }
 
         // Timeout?
-        if (depth > 1 && data.thread().timeout())
+        if (depth > 3 && data.thread().timeout())
             return SCORE_NONE;
 
         // Mate distance pruning: don't bother searching if we are deeper than the shortest mate up to this point
@@ -583,10 +583,6 @@ namespace Search
 
             // Unmake the move
             position.unmake_move();
-
-            // Timeout?
-            if (depth > 2 && data.thread().timeout())
-                return SCORE_NONE;
 
             // Update histories after passed LMR
             if (didLMR && do_full_search)
