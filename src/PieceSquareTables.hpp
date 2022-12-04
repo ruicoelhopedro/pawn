@@ -2,7 +2,7 @@
 #include "incbin/incbin.h"
 #include "Types.hpp"
 
-#define PSQT_Default_File "psqt-d4c6ca5d39dd.dat"
+#define PSQT_Default_File "psqt-fff4c5e9f033.dat"
 
 using S = MixedScore;
 
@@ -53,7 +53,20 @@ constexpr S imbalance_terms[][NUM_PIECE_TYPES] =
 
 namespace PSQT
 {
-    using FeatureType = int16_t;
+    class CompactMixedScore
+    {
+        int16_t mg;
+        int16_t eg;
+    public:
+        CompactMixedScore() = default;
+
+        inline operator MixedScore() const
+        {
+            return MixedScore(mg, eg);
+        }
+    };
+
+    using FeatureType = CompactMixedScore;
     static constexpr std::size_t NUM_FEATURES = 20480;
 
     extern const FeatureType* psqt_data;
@@ -66,4 +79,4 @@ namespace PSQT
 }
 
 
-Score piece_square(PieceType piece, Square square, Turn turn, Square king_sq, Turn king_turn);
+MixedScore piece_square(PieceType piece, Square square, Turn turn, Square king_sq, Turn king_turn);

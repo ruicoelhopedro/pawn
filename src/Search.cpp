@@ -325,7 +325,7 @@ namespace Search
         }
 
         // Timeout?
-        if (depth > 1 && data.thread().timeout())
+        if (depth > 3 && data.thread().timeout())
             return SCORE_NONE;
 
         // Mate distance pruning: don't bother searching if we are deeper than the shortest mate up to this point
@@ -416,7 +416,8 @@ namespace Search
         // Null move pruning
         if (!PvNode && !InCheck && !HasExcludedMove &&
             static_eval >= beta &&
-            data.static_eval >= beta - 10 * depth - 20 * improving &&
+            static_eval >= data.static_eval &&
+            data.static_eval >= beta - 20 * depth - 40 * improving + 100 &&
             data.last_move() != MOVE_NULL &&
             position.board().non_pawn_material(Turn))
         {
@@ -484,6 +485,9 @@ namespace Search
                         continue;
 
                     if (move_score < -100 * (depth - 1) - 50 * int(depth) * depth * depth)
+                        continue;
+
+                    if (!InCheck && depth < 12 && data.static_eval + 100 + 150 * depth + move_score / 75 < alpha)
                         continue;
 
                     if (depth < 10 && position.board().see(move, -10 * (depth + (int)depth * depth)) < 0)
@@ -580,10 +584,6 @@ namespace Search
 
             // Unmake the move
             position.unmake_move();
-
-            // Timeout?
-            if (depth > 2 && data.thread().timeout())
-                return SCORE_NONE;
 
             // Update histories after passed LMR
             if (didLMR && do_full_search)

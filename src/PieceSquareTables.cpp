@@ -57,11 +57,11 @@ namespace PSQT
 }
 
 
-Score piece_square(PieceType piece, Square square, Turn turn, Square king_sq, Turn king_turn)
+MixedScore piece_square(PieceType piece, Square square, Turn turn, Square king_sq, Turn king_turn)
 {
     // No PSQ data for the king
     if (piece == KING)
-        return 0;
+        return MixedScore(0, 0);
 
     // Vertical mirror for black
     if (turn == BLACK)
