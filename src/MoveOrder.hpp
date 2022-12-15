@@ -11,7 +11,6 @@ enum class MoveStage
     CAPTURES_INIT,
     CAPTURES,
     CAPTURES_END,
-    COUNTERMOVES,
     KILLERS,
     QUIET_INIT,
     QUIET,
@@ -32,7 +31,6 @@ class Histories
     Move m_killers[NUM_KILLERS][NUM_MAX_DEPTH];
     int m_butterfly[NUM_COLORS][NUM_SQUARES][NUM_SQUARES];
     int m_continuation[NUM_SQUARES][NUM_SQUARES][NUM_PIECE_TYPES][NUM_SQUARES];
-    Move m_countermoves[NUM_SQUARES][NUM_SQUARES];
 
 public:
     Histories();
@@ -45,7 +43,6 @@ public:
     bool is_killer(Move move, Depth ply) const;
     int butterfly_score(Move move, Turn turn) const;
     int continuation_score(Move move, PieceType piece, Move prev_move) const;
-    Move countermove(Move move) const;
     Move get_killer(int index, Depth ply) const;
 };
 
@@ -74,7 +71,6 @@ class MoveOrder
     bool m_quiescence;
     MoveList m_moves;
     MoveStage m_stage;
-    Move m_countermove;
     Move m_killer;
     Move* m_curr;
     MoveList m_captures;

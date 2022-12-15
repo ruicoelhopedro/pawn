@@ -23,10 +23,6 @@ void Histories::clear()
     for (int i = 0; i < NUM_KILLERS; i++)
         for (int j = 0; j < NUM_MAX_DEPTH; j++)
             m_killers[i][j] = MOVE_NULL;
-
-    for (int i = 0; i < NUM_SQUARES; i++)
-        for (int j = 0; j < NUM_SQUARES; j++)
-            m_countermoves[i][j] = MOVE_NULL;
             
     for (int i = 0; i < NUM_SQUARES; i++)
         for (int j = 0; j < NUM_SQUARES; j++)
@@ -46,7 +42,6 @@ void Histories::add_bonus(Move move, Turn turn, PieceType piece, Move prev_move,
 void Histories::bestmove(Move move, Move prev_move, Turn turn, Depth depth, Depth ply, PieceType piece)
 {
     add_bonus(move, turn, piece, prev_move, hist_bonus(depth));
-    m_countermoves[prev_move.from()][prev_move.to()] = move;
 
     // Exit if killer already in the list
     if (is_killer(move, ply))
@@ -84,16 +79,10 @@ Move Histories::get_killer(int index, Depth ply) const
 }
 
 
-Move Histories::countermove(Move move) const
-{
-    return m_countermoves[move.from()][move.to()];
-}
-
-
 MoveOrder::MoveOrder(Position& pos, Depth ply, Depth depth, Move hash_move, const Histories& histories, bool quiescence)
     : m_position(pos), m_ply(ply), m_depth(depth), m_hash_move(hash_move), m_histories(histories),
       m_prev_move(pos.last_move()), m_quiescence(quiescence), m_stage(MoveStage::HASH),
-      m_countermove(MOVE_NULL), m_killer(MOVE_NULL)
+      m_killer(MOVE_NULL)
 {
 }
 
@@ -174,17 +163,6 @@ Move MoveOrder::next_move()
                 return MOVE_NULL;
             ++m_stage;
         }
-        else if (m_stage == MoveStage::COUNTERMOVES)
-        {
-            ++m_stage;
-            Move candidate = m_histories.countermove(m_prev_move);
-            if (candidate != m_hash_move &&
-                m_position.board().legal(candidate))
-            {
-                m_countermove = candidate;
-                return m_countermove;
-            }
-        }
         else if (m_stage == MoveStage::KILLERS)
         {
             ++m_stage;
@@ -193,7 +171,6 @@ Move MoveOrder::next_move()
             {
                 Move candidate = m_histories.get_killer(i, m_ply);
                 if (candidate != m_hash_move &&
-                    candidate != m_countermove &&
                     m_position.board().legal(candidate))
                 {
                     m_killer = candidate;
@@ -212,7 +189,7 @@ Move MoveOrder::next_move()
         else if (m_stage == MoveStage::QUIET)
         {
             while (next(move, m_moves.end()))
-                if (move != m_hash_move && move != m_killer && move != m_countermove)
+                if (move != m_hash_move && move != m_killer)
                     return move;
             ++m_stage;
         }
