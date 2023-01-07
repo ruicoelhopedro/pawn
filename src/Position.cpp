@@ -81,7 +81,7 @@ Board::Board(std::string fen)
         else if (*c == '/')
             square -= 16;
         else
-            set_piece(fen_piece(*c), isupper(*c) ? WHITE : BLACK, square++);
+            set_piece<true>(fen_piece(*c), isupper(*c) ? WHITE : BLACK, square++);
 
         c++;
     }
@@ -246,36 +246,49 @@ void Board::generate_moves(MoveList& list, MoveGenType type) const
 }
 
 
-Board Board::make_move(Move move) const
+MoveInfo Board::make_move(Move move)
 {
-    Board result = *this;
     const Direction up = (m_turn == WHITE) ? 8 : -8;
     const PieceType piece = get_piece_at(move.from());
 
+    // Store move info
+    MoveInfo mi;
+    mi.move = move;
+    mi.captured = PIECE_NONE;
+    mi.ep_square = m_enpassant_square;
+    mi.half_move_clock = m_half_move_clock;
+    std::memcpy(mi.castling_rights, m_castling_rights, sizeof(m_castling_rights));
+    mi.hash = m_hash;
+    std::memcpy(mi.psq, m_psq, sizeof(m_psq));
+
     // Increment clocks
-    result.m_full_move_clock += m_turn;
+    m_full_move_clock += m_turn;
     if (piece == PAWN || move.is_capture())
-        result.m_half_move_clock = 0;
+        m_half_move_clock = 0;
     else
-        result.m_half_move_clock++;
+        m_half_move_clock++;
+
+    // Reset previous en-passant hash
+    if (m_enpassant_square != SQUARE_NULL)
+        m_hash ^= Zobrist::get_ep_file(file(m_enpassant_square));
 
     // Initial empty ep square
-    result.m_enpassant_square = SQUARE_NULL;
+    m_enpassant_square = SQUARE_NULL;
 
     // Update castling rights after this move
     if (piece == KING)
     {
         // Unset all castling rights after a king move
         for (auto side : { KINGSIDE, QUEENSIDE })
-            result.set_castling<false>(side, m_turn);
+            set_castling<false>(side, m_turn);
     }
     else if (piece == ROOK)
     {
         // Unset castling rights for a certain side if a rook moves
         if (move.from() == (m_turn == WHITE ? SQUARE_H1 : SQUARE_H8))
-            result.set_castling<false>(KINGSIDE, m_turn);
+            set_castling<false>(KINGSIDE, m_turn);
         if (move.from() == (m_turn == WHITE ? SQUARE_A1 : SQUARE_A8))
-            result.set_castling<false>(QUEENSIDE, m_turn);
+            set_castling<false>(QUEENSIDE, m_turn);
     }
 
     // Per move type action
@@ -285,58 +298,145 @@ Board Board::make_move(Move move) const
         Square target = move.is_ep_capture() ? move.to() - up : move.to();
 
         // Remove captured piece
-        result.pop_piece(get_piece_at(target), ~m_turn, target);
+        PieceType captured = get_piece_at(target);
+        pop_piece<true>(captured, ~m_turn, target);
+        mi.captured = captured;
 
         // Castling: check if any rook has been captured
         if (move.to() == (m_turn == WHITE ? SQUARE_H8 : SQUARE_H1))
-            result.set_castling<false>(KINGSIDE, ~m_turn);
+            set_castling<false>(KINGSIDE, ~m_turn);
         if (move.to() == (m_turn == WHITE ? SQUARE_A8 : SQUARE_A1))
-            result.set_castling<false>(QUEENSIDE, ~m_turn);
+            set_castling<false>(QUEENSIDE, ~m_turn);
     }
     else if (move.is_double_pawn_push())
     {
         // Update ep square
-        result.m_enpassant_square = move.to() - up;
-        result.m_hash ^= Zobrist::get_ep_file(file(move.to()));
+        m_enpassant_square = move.to() - up;
+        m_hash ^= Zobrist::get_ep_file(file(move.to()));
     }
     else if (move.is_castle())
     {
         // Move the rook to the new square
         Square iS = move.to() + (move.to() > move.from() ? +1 : -2);
         Square iE = move.to() + (move.to() > move.from() ? -1 : +1);
-        result.move_piece(ROOK, m_turn, iS, iE);
+        move_piece<true>(ROOK, m_turn, iS, iE);
     }
 
     // Set piece on target square
     if (move.is_promotion())
     {
-        result.pop_piece(piece, m_turn, move.from());
-        result.set_piece(move.promo_piece(), m_turn, move.to());
+        pop_piece<true>(piece, m_turn, move.from());
+        set_piece<true>(move.promo_piece(), m_turn, move.to());
     }
     else
     {
-        result.move_piece(piece, m_turn, move.from(), move.to());
+        move_piece<true>(piece, m_turn, move.from(), move.to());
     }
 
     // After a king move, update PSQ tables
     if (piece == KING)
     {
-        result.m_king_sq[m_turn] = result.m_pieces[KING][m_turn].bitscan_forward();
-        result.regen_psqt(m_turn);
+        m_king_sq[m_turn] = m_pieces[KING][m_turn].bitscan_forward();
+        regen_psqt(m_turn);
     }
 
     // Swap turns
-    result.m_turn = ~m_turn;
-    result.m_hash ^= Zobrist::get_black_move();
-
-    // Reset previous en-passant hash
-    if (m_enpassant_square != SQUARE_NULL)
-        result.m_hash ^= Zobrist::get_ep_file(file(m_enpassant_square));
+    m_turn = ~m_turn;
+    m_hash ^= Zobrist::get_black_move();
 
     // Update checkers
-    result.update_checkers();
+    update_checkers();
 
-    return result;
+    return mi;
+}
+
+
+MoveInfo Board::make_null_move()
+{
+    // Store move info
+    MoveInfo mi;
+    mi.move = MOVE_NULL;
+    mi.captured = PIECE_NONE;
+    mi.ep_square = m_enpassant_square;
+    mi.half_move_clock = m_half_move_clock;
+    std::memcpy(mi.castling_rights, m_castling_rights, sizeof(m_castling_rights));
+    mi.hash = m_hash;
+    std::memcpy(mi.psq, m_psq, sizeof(m_psq));
+
+    // En-passant
+    if (m_enpassant_square != SQUARE_NULL)
+        m_hash ^= Zobrist::get_ep_file(file(m_enpassant_square));
+    m_enpassant_square = SQUARE_NULL;
+
+    // Swap turns
+    m_turn = ~m_turn;
+    m_hash ^= Zobrist::get_black_move();
+
+    return mi;
+}
+
+
+void Board::unmake_move(const MoveInfo& mi)
+{
+    // Restore board state
+    m_enpassant_square = mi.ep_square;
+    m_half_move_clock = mi.half_move_clock;
+    std::memcpy(m_castling_rights, mi.castling_rights, sizeof(m_castling_rights));
+    m_hash = mi.hash;
+    std::memcpy(m_psq, mi.psq, sizeof(m_psq));
+
+    // Swap turns
+    m_turn = ~m_turn;
+    const Direction up = (m_turn == WHITE) ? 8 : -8;
+
+    // Restore moved piece
+    PieceType piece = get_piece_at(mi.move.to());
+    if (mi.move.is_promotion())
+    {
+        pop_piece<false>(mi.move.promo_piece(), m_turn, mi.move.to());
+        set_piece<false>(PAWN, m_turn, mi.move.from());
+    }
+    else
+    {
+        move_piece<false>(piece, m_turn, mi.move.to(), mi.move.from());
+    }
+
+    // Special case: castling
+    if (mi.move.is_castle())
+    {
+        // Move the rook to the new square
+        Square iS = mi.move.to() + (mi.move.to() > mi.move.from() ? +1 : -2);
+        Square iE = mi.move.to() + (mi.move.to() > mi.move.from() ? -1 : +1);
+        move_piece<false>(ROOK, m_turn, iE, iS);
+    }
+
+    // Restore captured piece, if any
+    if (mi.move.is_capture())
+    {
+        Square target = mi.move.is_ep_capture() ? mi.move.to() - up : mi.move.to();
+        set_piece<false>(mi.captured, ~m_turn, target);
+    }
+
+    // After a king move, update king square
+    if (piece == KING)
+        m_king_sq[m_turn] = m_pieces[KING][m_turn].bitscan_forward();
+
+    // Update checkers
+    update_checkers();
+}
+
+
+void Board::unmake_null_move(const MoveInfo& mi)
+{
+    // Restore board state
+    m_enpassant_square = mi.ep_square;
+    m_half_move_clock = mi.half_move_clock;
+    std::memcpy(m_castling_rights, mi.castling_rights, sizeof(m_castling_rights));
+    m_hash = mi.hash;
+    std::memcpy(m_psq, mi.psq, sizeof(m_psq));
+
+    // Swap turns
+    m_turn = ~m_turn;
 }
 
 
@@ -405,22 +505,6 @@ bool Board::is_valid() const
         return false;
 
     return true;
-}
-
-
-Board Board::make_null_move()
-{
-    Board result = *this;
-
-    // En-passant
-    result.m_enpassant_square = SQUARE_NULL;
-    if (m_enpassant_square != SQUARE_NULL)
-        result.m_hash ^= Zobrist::get_ep_file(file(m_enpassant_square));
-
-    // Swap turns
-    result.m_turn = ~m_turn;
-    result.m_hash ^= Zobrist::get_black_move();
-    return result;
 }
 
 
@@ -662,47 +746,45 @@ Bitboard Board::sliders() const
 
 
 Position::Position()
-    : m_boards(1), m_stack(NUM_MAX_DEPTH), m_pos(0), m_extensions(0), m_moves(0), m_reduced(false)
+    : m_stack(NUM_MAX_DEPTH), m_ply(0)
 {}
 
 
 Position::Position(std::string fen)
     : Position()
 {
-    m_boards[0] = Board(fen);
+    m_board = Board(fen);
 }
 
 
-bool Position::is_draw(bool unique) const
+bool Position::is_draw(bool two_fold) const
 {
     // Fifty move rule
     if (board().half_move_clock() >= 100)
         return true;
 
-    // Repetitions
-    int cur_pos = (int)m_boards.size() - 1;
+    // Repetitions: we only need to consider the game history up to the move reseting the
+    // halfmove clock, but limited to the number of plies we have
+    int cur_pos = m_info.size();
     int n_moves = std::min(cur_pos + 1, board().half_move_clock());
     int min_pos = cur_pos - n_moves + 1;
     if (n_moves >= 8)
     {
-        int pos1 = cur_pos - 4;
-        while (pos1 >= min_pos)
-        {
-            if (board().hash() == m_boards[pos1].hash())
+        // Search for the first possible repetition. We use the position hashes for
+        // comparing positions
+        for (int pos1 = cur_pos - 4; pos1 >= min_pos; pos1 -= 2)
+            if (board().hash() == m_info[pos1].hash)
             {
-                if (unique)
+                // Two-fold repetition detected
+                if (two_fold)
                     return true;
-                int pos2 = pos1 - 4;
-                while (pos2 >= min_pos)
-                {
-                    if (board().hash() == m_boards[pos2].hash())
-                        return true;
-                    pos2 -= 2;
-                }
 
+                // If we are looking for three-fold repetitions, keep searching for a second
+                // repetition and return in that case
+                for (int pos2 = pos1 - 4; pos2 >= min_pos; pos2 -= 2)
+                    if (board().hash() == m_info[pos2].hash)
+                        return true;
             }
-            pos1 -= 2;
-        }
     }
 
     return false;
@@ -729,59 +811,49 @@ MoveList Position::generate_moves(MoveGenType type)
 }
 
 
-void Position::make_move(Move move, bool extension)
+void Position::make_move(Move move)
 {
+    m_info.push_back(m_board.make_move(move));
+    ++m_ply;
     ++m_stack;
-    ++m_pos;
-    m_boards.push_back(board().make_move(move));
-    m_moves.push_back(MoveInfo{ move, extension });
-
-    if (extension)
-        m_extensions++;
 }
 
 
 void Position::unmake_move()
 {
-    m_boards.pop_back();
+    m_board.unmake_move(m_info.back());
+    m_info.pop_back();
+    --m_ply;
     --m_stack;
-    --m_pos;
-
-    auto info = m_moves.back();
-    if (info.extended)
-        m_extensions--;
-
-    m_moves.pop_back();
 }
 
 
 void Position::make_null_move()
 {
+    m_info.push_back(m_board.make_null_move());
+    ++m_ply;
     ++m_stack;
-    ++m_pos;
-    m_boards.push_back(board().make_null_move());
-    m_moves.push_back(MoveInfo{ MOVE_NULL, false });
 }
 
 
 void Position::unmake_null_move()
 {
-    m_boards.pop_back();
+    m_board.unmake_null_move(m_info.back());
+    m_info.pop_back();
+    --m_ply;
     --m_stack;
-    --m_pos;
-    m_moves.pop_back();
 }
 
 
 Board& Position::board()
 {
-    return m_boards.back();
+    return m_board;
 }
 
 
 const Board& Position::board() const
 {
-    return m_boards.back();
+    return m_board;
 }
 
 
@@ -797,34 +869,22 @@ MoveList Position::move_list() const
 }
 
 
-int Position::num_extensions() const
-{
-    return m_extensions;
-}
-
-
 void Position::set_init_ply()
 {
-    m_pos = 0;
+    m_ply = 0;
     m_stack.reset_pos();
 }
 
 
 Depth Position::ply() const
 {
-    return m_pos;
-}
-
-
-bool Position::reduced() const
-{
-    return m_reduced;
+    return m_ply;
 }
 
 
 Move Position::last_move() const
 {
-    return m_moves.size() > 0 ? m_moves.back().move : MOVE_NULL;
+    return m_ply > 0 ? m_info.back().move : MOVE_NULL;
 }
 
 

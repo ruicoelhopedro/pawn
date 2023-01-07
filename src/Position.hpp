@@ -6,6 +6,7 @@
 #include "Zobrist.hpp"
 #include "PieceSquareTables.hpp"
 #include <algorithm>
+#include <array>
 #include <string>
 
 enum class MoveGenType
@@ -14,6 +15,22 @@ enum class MoveGenType
     QUIETS,
     CAPTURES
 };
+
+
+struct MoveInfo
+{
+    // Required fields to reverse the board state
+    Move move;
+    PieceType captured;
+    Square ep_square;
+    uint8_t half_move_clock;
+    bool castling_rights[NUM_CASTLE_SIDES][NUM_COLORS];
+
+    // Updated fields that are reset
+    Hash hash;
+    MixedScore psq[NUM_COLORS];
+};
+
 
 class Board
 {
@@ -258,48 +275,63 @@ protected:
     void update_checkers();
 
 
-    inline void set_piece(PieceType piece, Turn turn, Square square)
+    template<bool UPDATE>
+    void set_piece(PieceType piece, Turn turn, Square square)
     {
         m_pieces[piece][turn].set(square);
-        m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
         m_board_pieces[square] = get_piece(piece, turn);
-        m_psq[WHITE] += piece_square(piece, square, turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
-        m_psq[BLACK] += piece_square(piece, square, turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
         m_material[turn] += piece_value[piece];
         m_phase -= Phases::Pieces[piece];
         m_piece_count[piece][turn]++;
         m_material_hash ^= Zobrist::get_piece_turn_square(piece, turn, m_piece_count[piece][turn])
                          ^ Zobrist::get_piece_turn_square(piece, turn, m_piece_count[piece][turn] - 1);
+
+        if (UPDATE)
+        {
+            m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
+            m_psq[WHITE] += piece_square(piece, square, turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
+            m_psq[BLACK] += piece_square(piece, square, turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
+        }
     }
 
 
-    inline void pop_piece(PieceType piece, Turn turn, Square square)
+    template<bool UPDATE>
+    void pop_piece(PieceType piece, Turn turn, Square square)
     {
         m_pieces[piece][turn].reset(square);
-        m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
         m_board_pieces[square] = NO_PIECE;
-        m_psq[WHITE] -= piece_square(piece, square, turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
-        m_psq[BLACK] -= piece_square(piece, square, turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
-        m_material[turn] -= piece_value[piece];
         m_phase += Phases::Pieces[piece];
         m_piece_count[piece][turn]--;
+        m_material[turn] -= piece_value[piece];
         m_material_hash ^= Zobrist::get_piece_turn_square(piece, turn, m_piece_count[piece][turn])
                          ^ Zobrist::get_piece_turn_square(piece, turn, m_piece_count[piece][turn] + 1);
+
+        if (UPDATE)
+        {
+            m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
+            m_psq[WHITE] -= piece_square(piece, square, turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
+            m_psq[BLACK] -= piece_square(piece, square, turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
+        }
     }
 
 
-    inline void move_piece(PieceType piece, Turn turn, Square from, Square to)
+    template<bool UPDATE>
+    void move_piece(PieceType piece, Turn turn, Square from, Square to)
     {
         m_pieces[piece][turn].reset(from);
         m_pieces[piece][turn].set(to);
-        m_hash ^= Zobrist::get_piece_turn_square(piece, turn, from);
-        m_hash ^= Zobrist::get_piece_turn_square(piece, turn, to);
         m_board_pieces[from] = NO_PIECE;
         m_board_pieces[to] = get_piece(piece, turn);
-        m_psq[WHITE] -= piece_square(piece, from, turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
-        m_psq[BLACK] -= piece_square(piece, from, turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
-        m_psq[WHITE] += piece_square(piece, to,   turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
-        m_psq[BLACK] += piece_square(piece, to,   turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
+
+        if (UPDATE)
+        {
+            m_hash ^= Zobrist::get_piece_turn_square(piece, turn, from);
+            m_hash ^= Zobrist::get_piece_turn_square(piece, turn, to);
+            m_psq[WHITE] -= piece_square(piece, from, turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
+            m_psq[BLACK] -= piece_square(piece, from, turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
+            m_psq[WHITE] += piece_square(piece, to,   turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
+            m_psq[BLACK] += piece_square(piece, to,   turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
+        }
     }
 
 
@@ -483,10 +515,16 @@ public:
     std::string to_fen() const;
 
 
-    Board make_move(Move move) const;
+    MoveInfo make_move(Move move);
 
 
-    Board make_null_move();
+    void unmake_move(const MoveInfo& mi);
+
+
+    MoveInfo make_null_move();
+
+
+    void unmake_null_move(const MoveInfo& mi);
 
 
     int half_move_clock() const;
@@ -657,23 +695,13 @@ public:
 };
 
 
-struct MoveInfo
-{
-    Move move;
-    bool extended;
-    bool reduced;
-};
-
-
 
 class Position
 {
-    std::vector<Board> m_boards;
+    Board m_board;
     MoveStack m_stack;
-    int m_pos;
-    int m_extensions;
-    std::vector<MoveInfo> m_moves;
-    bool m_reduced;
+    std::vector<MoveInfo> m_info;
+    int m_ply;
 
 public:
     Position();
@@ -682,7 +710,7 @@ public:
     Position(std::string fen);
 
 
-    bool is_draw(bool unique) const;
+    bool is_draw(bool two_fold) const;
 
 
     bool in_check() const;
@@ -694,7 +722,7 @@ public:
     MoveList generate_moves(MoveGenType type);
 
 
-    void make_move(Move move, bool extension = false);
+    void make_move(Move move);
 
 
     void unmake_move();
@@ -718,16 +746,10 @@ public:
     MoveList move_list() const;
 
 
-    int num_extensions() const;
-
-
     void set_init_ply();
 
 
     Depth ply() const;
-
-
-    bool reduced() const;
 
 
     Move last_move() const;
