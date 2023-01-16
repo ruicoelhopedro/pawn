@@ -9,7 +9,11 @@ SRC_FILES = $(shell find $(SRC_DIR) -name *.cpp)
 OBJ_FILES = $(SRC_FILES:%.cpp=$(BUILD_DIR)/%.o)
 DEP_FILES = $(OBJ_FILES:.o=.d)
 
-$(BUILD_DIR)/$(BIN_NAME) : $(OBJ_FILES)
+PSQT_SRC_FILE = "src/PieceSquareTables.cpp"
+PSQT_HEADER_FILE = "src/PieceSquareTables.hpp"
+PSQT_FILE = $(subst ",,$(word 3, $(shell grep PSQT_Default_File $(PSQT_HEADER_FILE))))
+
+$(BUILD_DIR)/$(BIN_NAME) : $(OBJ_FILES) $(PSQT_FILE)
 	$(CXX) $(OBJ_FILES) -o $@ $(LDFLAGS)
 
 -include $(DEP_FILES)
