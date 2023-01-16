@@ -2,7 +2,7 @@
 #include "incbin/incbin.h"
 #include "Types.hpp"
 
-#define PSQT_Default_File "psqt-fff4c5e9f033.dat"
+#define PSQT_Default_File "psqt-f2d79778502a.nn"
 
 using S = MixedScore;
 
@@ -53,23 +53,51 @@ constexpr S imbalance_terms[][NUM_PIECE_TYPES] =
 
 namespace PSQT
 {
-    class CompactMixedScore
-    {
-        int16_t mg;
-        int16_t eg;
-    public:
-        CompactMixedScore() = default;
 
-        inline operator MixedScore() const
-        {
-            return MixedScore(mg, eg);
-        }
+    using Weight = int16_t;
+    constexpr int SCALE_FACTOR = 1024;
+    constexpr std::size_t NUM_FEATURES = 20480;
+    constexpr std::size_t NUM_ACCUMULATORS = 8;
+    
+    enum Phase
+    {
+        MG = 0,
+        EG = 1,
+        NUM_PHASES
     };
 
-    using FeatureType = CompactMixedScore;
-    static constexpr std::size_t NUM_FEATURES = 20480;
+    struct Net
+    {
+        Weight m_psqt[NUM_PHASES][NUM_FEATURES];
+        Weight m_sparse_layer[NUM_ACCUMULATORS][NUM_FEATURES];
+        Weight m_bias[NUM_ACCUMULATORS];
+        Weight m_dense[NUM_PHASES][NUM_ACCUMULATORS];
+    };
 
-    extern const FeatureType* psqt_data;
+    class Accumulator
+    {
+        int m_net[NUM_ACCUMULATORS];
+        int m_psqt[NUM_PHASES];
+
+        int index(PieceType p, Square s, Square ks, Turn pt, Turn kt);
+
+    public:
+        Accumulator();
+
+        void clear();
+
+        void push(PieceType p, Square s, Square ks, Turn pt, Turn kt);
+
+        void pop(PieceType p, Square s, Square ks, Turn pt, Turn kt);
+
+        MixedScore eval() const;
+
+        bool operator==(const Accumulator& other) const;
+
+        bool operator!=(const Accumulator& other) const;
+    };
+
+    extern const Net* psqt_net;
 
     void init();
 
@@ -77,6 +105,3 @@ namespace PSQT
 
     void clean();
 }
-
-
-MixedScore piece_square(PieceType piece, Square square, Turn turn, Square king_sq, Turn king_turn);
