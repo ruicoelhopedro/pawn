@@ -2,7 +2,7 @@
 #include "incbin/incbin.h"
 #include "Types.hpp"
 
-#define PSQT_Default_File "psqt-ade6a14a31cf.nn"
+#define PSQT_Default_File "psqt-b5d7734b42d9.nn"
 
 using S = MixedScore;
 
@@ -68,8 +68,8 @@ namespace PSQT
 
     struct Net
     {
-        Weight m_psqt[NUM_PHASES][NUM_FEATURES];
-        Weight m_sparse_layer[NUM_ACCUMULATORS][NUM_FEATURES];
+        Weight m_psqt[NUM_FEATURES][NUM_PHASES];
+        Weight m_sparse_layer[NUM_FEATURES][NUM_ACCUMULATORS];
         Weight m_bias[NUM_ACCUMULATORS];
         Weight m_dense[NUM_PHASES][NUM_ACCUMULATORS];
     };

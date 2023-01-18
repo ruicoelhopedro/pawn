@@ -104,9 +104,9 @@ namespace PSQT
 
         int idx = index(p, s, ks, pt, kt);
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
-            m_net[i] += psqt_net->m_sparse_layer[i][idx];
-        m_psqt[MG] += psqt_net->m_psqt[MG][idx];
-        m_psqt[EG] += psqt_net->m_psqt[EG][idx];
+            m_net[i] += psqt_net->m_sparse_layer[idx][i];
+        m_psqt[MG] += psqt_net->m_psqt[idx][MG];
+        m_psqt[EG] += psqt_net->m_psqt[idx][EG];
     }
 
 
@@ -117,9 +117,9 @@ namespace PSQT
 
         int idx = index(p, s, ks, pt, kt);
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
-            m_net[i] -= psqt_net->m_sparse_layer[i][idx];
-        m_psqt[MG] -= psqt_net->m_psqt[MG][idx];
-        m_psqt[EG] -= psqt_net->m_psqt[EG][idx];
+            m_net[i] -= psqt_net->m_sparse_layer[idx][i];
+        m_psqt[MG] -= psqt_net->m_psqt[idx][MG];
+        m_psqt[EG] -= psqt_net->m_psqt[idx][EG];
     }
 
 
