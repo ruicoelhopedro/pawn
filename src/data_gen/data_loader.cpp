@@ -185,12 +185,14 @@ extern "C"
 
 
 
-    Size get_positional_data(const char* file_name, const Size* selection, Size n_selected, Size* w_idx, Size* b_idx, unsigned short* w_cols, unsigned short* b_cols, short* evals, char* phases)
+    Size get_positional_data(const char* file_name, const Size* selection, Size n_selected, Size seed, Size prob, Size* w_idx, Size* b_idx, unsigned short* w_cols, unsigned short* b_cols, short* evals, short* scores, char* results, char* phases)
     {
         // Open files
         std::string fname_str(file_name);
         std::ifstream ifile(fname_str, std::ios::binary);
         assert(ifile.is_open() && "Failed to open input file!");
+
+        PseudoRandom prng(seed);
 
         w_idx[0] = 0;
         b_idx[0] = 0;
@@ -221,6 +223,9 @@ extern "C"
             // Read the game at the specified index
             ifile.seekg(selection[i]);
             BinaryGame::read(ifile, game);
+
+            // Find winner
+            Color result = Color(game.nodes.back().score);
     
              // Write each position, score and move
             Board board(game.starting_pos);
@@ -233,7 +238,8 @@ extern "C"
                         // iii) Best move not a promotion
                         if (!board.checkers() &&
                             !node.move.is_capture() &&
-                            !node.move.is_promotion())
+                            !node.move.is_promotion() &&
+                            prng.next(prob) < 1)
                         {
                             // Update features
                             w_idx[count+1] = w_idx[count];
@@ -263,8 +269,10 @@ extern "C"
                             }
 
                             // Store eval and phase
-                            evals[count] = node.score - pool->front().evaluate<false>(board) + board.psq().tapered(board.phase());
+                            evals[count] = pool->front().evaluate<false>(board) - board.psq().tapered(board.phase());
+                            scores[count] = node.score;
                             phases[count] = MixedScore(64, 0).tapered(board.phase());
+                            results[count] = result;
                             count++;
                         }
 
