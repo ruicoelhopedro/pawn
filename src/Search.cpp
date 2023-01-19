@@ -584,6 +584,10 @@ namespace Search
             // Unmake the move
             position.unmake_move();
 
+            // After a timeout, the search results cannot be trusted
+            if (RootSearch && data.thread().timeout())
+                return best_score;
+
             // Update histories after passed LMR
             if (didLMR && do_full_search)
             {
