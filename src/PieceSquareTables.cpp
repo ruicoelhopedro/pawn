@@ -37,7 +37,7 @@ namespace PSQT
                 std::abort();
             }
 
-            psqt_net = new Net[NUM_FEATURES];
+            psqt_net = new Net;
     
             if(!input.read(const_cast<char*>(reinterpret_cast<const char*>(psqt_net)), sizeof(Net)))
             {
@@ -51,7 +51,7 @@ namespace PSQT
     void clean()
     {
         if (psqt_net != gEmbeddedPSQTData)
-            delete[] psqt_net;
+            delete psqt_net;
         psqt_net = nullptr;
     }
 
