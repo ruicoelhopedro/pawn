@@ -72,26 +72,8 @@ MixedScore material(Board board, EvalData& eval)
 
 MixedScore piece_square_value(Board board, EvalData& eval)
 {
-    eval.fields[WHITE].placement = MixedScore(0, 0);
-    eval.fields[BLACK].placement = MixedScore(0, 0);
-
-    Square king_sq[] = { board.get_pieces<WHITE, KING>().bitscan_forward(),
-                         board.get_pieces<BLACK, KING>().bitscan_forward() };
-
-    for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
-    {
-        for (Turn t : { WHITE, BLACK })
-        {
-            Bitboard b = board.get_pieces(t, p);
-            while (b)
-            {
-                Square s = b.bitscan_forward_reset();
-                eval.fields[t].placement += piece_square(p, s, t, king_sq[WHITE], WHITE)
-                                          + piece_square(p, s, t, king_sq[BLACK], BLACK);
-            }
-        }
-    }
-
+    eval.fields[WHITE].placement = board.psq(WHITE);
+    eval.fields[BLACK].placement = board.psq(BLACK);
     return eval.fields[WHITE].placement - eval.fields[BLACK].placement;
 }
 

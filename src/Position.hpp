@@ -33,7 +33,7 @@ class Board
     Hash m_material_hash;
     Bitboard m_checkers;
     MixedScore m_material[NUM_COLORS];
-    MixedScore m_psq[NUM_COLORS];
+    PSQT::Accumulator m_psq[NUM_COLORS];
     uint8_t m_phase;
     Piece m_board_pieces[NUM_SQUARES];
     uint8_t m_piece_count[NUM_PIECE_TYPES][NUM_COLORS];
@@ -265,8 +265,8 @@ protected:
         m_pieces[piece][turn].set(square);
         m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
         m_board_pieces[square] = get_piece(piece, turn);
-        m_psq[WHITE] += piece_square(piece, square, turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
-        m_psq[BLACK] += piece_square(piece, square, turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
+        m_psq[WHITE].push(piece, square, m_king_sq[WHITE], turn, WHITE);
+        m_psq[BLACK].push(piece, square, m_king_sq[BLACK], turn, BLACK);
         m_material[turn] += piece_value[piece];
         m_phase -= Phases::Pieces[piece];
         m_piece_count[piece][turn]++;
@@ -280,8 +280,8 @@ protected:
         m_pieces[piece][turn].reset(square);
         m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
         m_board_pieces[square] = NO_PIECE;
-        m_psq[WHITE] -= piece_square(piece, square, turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
-        m_psq[BLACK] -= piece_square(piece, square, turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
+        m_psq[WHITE].pop(piece, square, m_king_sq[WHITE], turn, WHITE);
+        m_psq[BLACK].pop(piece, square, m_king_sq[BLACK], turn, BLACK);
         m_material[turn] -= piece_value[piece];
         m_phase += Phases::Pieces[piece];
         m_piece_count[piece][turn]--;
@@ -298,10 +298,10 @@ protected:
         m_hash ^= Zobrist::get_piece_turn_square(piece, turn, to);
         m_board_pieces[from] = NO_PIECE;
         m_board_pieces[to] = get_piece(piece, turn);
-        m_psq[WHITE] -= piece_square(piece, from, turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
-        m_psq[BLACK] -= piece_square(piece, from, turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
-        m_psq[WHITE] += piece_square(piece, to,   turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
-        m_psq[BLACK] += piece_square(piece, to,   turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
+        m_psq[WHITE].pop(piece, from, m_king_sq[WHITE], turn, WHITE);
+        m_psq[BLACK].pop(piece, from, m_king_sq[BLACK], turn, BLACK);
+        m_psq[WHITE].push(piece,  to, m_king_sq[WHITE], turn, WHITE);
+        m_psq[BLACK].push(piece,  to, m_king_sq[BLACK], turn, BLACK);
     }
 
 
@@ -660,6 +660,9 @@ public:
 
 
     MixedScore psq() const;
+
+
+    MixedScore psq(Turn t) const;
 
 
     uint8_t phase() const;

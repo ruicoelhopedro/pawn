@@ -134,8 +134,8 @@ namespace Phases
     constexpr int Pieces[NUM_PIECE_TYPES] = { Pawn, Knight, Bishop, Rook, Queen, King };
     constexpr int Total = 16 * Pawn + 4 * Knight + 4 * Bishop + 4 * Rook + 2 * Queen + 2 * King;
 
-    constexpr int MgLimit = 22;
-    constexpr int EgLimit = 4;
+    constexpr int MgLimit = 4;
+    constexpr int EgLimit = 19;
 }
 
 
@@ -153,7 +153,7 @@ public:
 
     inline constexpr Score tapered(int phase_entry) const
     {
-        int phase = std::clamp(256 * (phase_entry - Phases::EgLimit) / (Phases::MgLimit - Phases::EgLimit), 0, 256);
+        int phase = std::clamp(256 * (phase_entry - Phases::MgLimit) / (Phases::EgLimit - Phases::MgLimit), 0, 256);
         return ((mg * (256 - phase)) + (eg * phase)) / 256;
     }
 

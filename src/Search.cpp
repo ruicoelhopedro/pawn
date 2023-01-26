@@ -535,7 +535,7 @@ namespace Search
             position.make_move(move);
 
             // Check extensions
-            if (InCheck && depth < 4)
+            if (!extension && position.in_check() && abs(static_eval) > 75)
                 extension = 1;
 
             // Update depth and search data
@@ -556,7 +556,7 @@ namespace Search
                               - (move_score + 15000) / 30000;
 
                 // Reduced depth search
-                Depth new_depth = reduce(depth, 1 + std::max(0, reduction));
+                Depth new_depth = reduce(curr_depth, 1 + std::max(0, reduction));
                 score = -negamax<NON_PV>(position, new_depth, -alpha - 1, -alpha, curr_data);
 
                 // Only carry a full search if this reduced move fails high
@@ -584,6 +584,10 @@ namespace Search
 
             // Unmake the move
             position.unmake_move();
+
+            // After a timeout, the search results cannot be trusted
+            if (RootSearch && data.thread().timeout())
+                return best_score;
 
             // Update histories after passed LMR
             if (didLMR && do_full_search)

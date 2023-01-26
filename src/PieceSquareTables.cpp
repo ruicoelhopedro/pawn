@@ -6,42 +6,42 @@
 
 namespace PSQT
 {
-    const FeatureType* psqt_data;
+    const Net* psqt_net;
 
 
-    INCBIN(FeatureType, EmbeddedPSQT, PSQT_Default_File);
+    INCBIN(Net, EmbeddedPSQT, PSQT_Default_File);
 
 
     void init()
     {
-        psqt_data = nullptr;
+        psqt_net = nullptr;
         load(PSQT_Default_File);
     }
 
     
     void load(std::string file)
     {
-        if (psqt_data)
+        if (psqt_net)
             clean();
 
         if (file == "" || file == PSQT_Default_File)
         {
-            psqt_data = gEmbeddedPSQTData;
+            psqt_net = gEmbeddedPSQTData;
         }
         else
         {
             std::ifstream input(file, std::ios_base::binary);
             if (!input.is_open())
             {
-                std::cerr << "Failed to open PSQ input file!" << std::endl;
+                std::cerr << "Failed to open PSQ net input file!" << std::endl;
                 std::abort();
             }
 
-            psqt_data = new FeatureType[NUM_FEATURES];
+            psqt_net = new Net;
     
-            if(!input.read(const_cast<char*>(reinterpret_cast<const char*>(psqt_data)), NUM_FEATURES * sizeof(FeatureType)))
+            if(!input.read(const_cast<char*>(reinterpret_cast<const char*>(psqt_net)), sizeof(Net)))
             {
-                std::cerr << "Failed to read PSQ data!" << std::endl;
+                std::cerr << "Failed to read PSQ net!" << std::endl;
                 std::abort();
             }    
         }
@@ -50,42 +50,118 @@ namespace PSQT
 
     void clean()
     {
-        if (psqt_data != gEmbeddedPSQTData)
-            delete[] psqt_data;
-        psqt_data = nullptr;
+        if (psqt_net != gEmbeddedPSQTData)
+            delete psqt_net;
+        psqt_net = nullptr;
     }
-}
 
+    
 
-MixedScore piece_square(PieceType piece, Square square, Turn turn, Square king_sq, Turn king_turn)
-{
-    // No PSQ data for the king
-    if (piece == KING)
-        return MixedScore(0, 0);
-
-    // Vertical mirror for black
-    if (turn == BLACK)
+    int Accumulator::index(PieceType p, Square s, Square ks, Turn pt, Turn kt)
     {
-        king_turn = ~king_turn;
-        square = vertical_mirror(square);
-        king_sq = vertical_mirror(king_sq);
+        // Vertical mirror for black kings
+        if (kt == BLACK)
+        {
+            pt = ~pt;
+            s = vertical_mirror(s);
+            ks = vertical_mirror(ks);
+        }
+
+        // Horiziontal mirror if king on the files E to H
+        if (file(ks) >= 4)
+        {
+            s = horizontal_mirror(s);
+            ks = horizontal_mirror(ks);
+        }
+
+        // Compute corrected king index (since we are mirrored there are only 4 files)
+        int ki = 4 * rank(ks) + file(ks);
+
+        // Compute index
+        return s
+             + p  *  NUM_SQUARES
+             + ki * (NUM_SQUARES * (NUM_PIECE_TYPES - 1))
+             + pt * (NUM_SQUARES * (NUM_PIECE_TYPES - 1) * NUM_SQUARES / 2);
     }
 
-    // Horiziontal mirror if king on the files E to H
-    if (file(king_sq) >= 4)
+
+    Accumulator::Accumulator() { clear(); }
+
+
+    void Accumulator::clear()
     {
-        square = horizontal_mirror(square);
-        king_sq = horizontal_mirror(king_sq);
+        for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
+            m_net[i] = psqt_net->m_bias[i];
+        m_psqt[MG] = 0;
+        m_psqt[EG] = 0;
     }
 
-    // Compute corrected king index (since we are mirrored there are only 4 files)
-    int king_index = 4 * rank(king_sq) + file(king_sq);
 
-    // Compute PSQ table index
-    int index = square
-                + piece      *  NUM_SQUARES
-                + king_index * (NUM_SQUARES * (NUM_PIECE_TYPES - 1))
-                + king_turn  * (NUM_SQUARES * (NUM_PIECE_TYPES - 1) * NUM_SQUARES / 2);
+    void Accumulator::push(PieceType p, Square s, Square ks, Turn pt, Turn kt)
+    {
+        if (p == KING)
+            return;
 
-    return PSQT::psqt_data[index];
+        int idx = index(p, s, ks, pt, kt);
+        for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
+            m_net[i] += psqt_net->m_sparse_layer[idx][i];
+        m_psqt[MG] += psqt_net->m_psqt[idx][MG];
+        m_psqt[EG] += psqt_net->m_psqt[idx][EG];
+    }
+
+
+    void Accumulator::pop(PieceType p, Square s, Square ks, Turn pt, Turn kt)
+    {
+        if (p == KING)
+            return;
+
+        int idx = index(p, s, ks, pt, kt);
+        for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
+            m_net[i] -= psqt_net->m_sparse_layer[idx][i];
+        m_psqt[MG] -= psqt_net->m_psqt[idx][MG];
+        m_psqt[EG] -= psqt_net->m_psqt[idx][EG];
+    }
+
+
+    MixedScore Accumulator::eval() const
+    {
+        // Clipped ReLU on the accumulators
+        int accumulator[NUM_ACCUMULATORS];
+        for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
+            accumulator[i] = std::clamp(m_net[i], 0, SCALE_FACTOR);
+
+        // Net output
+        int output[2] = { 0, 0 };
+        for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
+        {
+            output[MG] += psqt_net->m_dense[MG][i] * accumulator[i];
+            output[EG] += psqt_net->m_dense[EG][i] * accumulator[i];
+        }
+
+        // Build and return final score
+        int mg = (m_psqt[MG] + output[MG] / SCALE_FACTOR) ;
+        int eg = (m_psqt[EG] + output[EG] / SCALE_FACTOR) ;
+        return MixedScore(mg, eg);
+    }
+    
+
+    bool Accumulator::operator==(const Accumulator& other) const
+    {
+        for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
+            if (m_net[i] != other.m_net[i])
+                return false;
+        if (m_psqt[MG] != other.m_psqt[MG] || m_psqt[EG] != other.m_psqt[EG])
+            return false;
+        return true;
+    }
+
+    bool Accumulator::operator!=(const Accumulator& other) const
+    {
+        for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
+            if (m_net[i] != other.m_net[i])
+                return true;
+        if (m_psqt[MG] != other.m_psqt[MG] || m_psqt[EG] != other.m_psqt[EG])
+            return true;
+        return false;
+    }
 }

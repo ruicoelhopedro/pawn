@@ -70,7 +70,6 @@ Board::Board(std::string fen)
     // Default initialisation for board pieces
     std::memset(m_board_pieces, PIECE_NONE, sizeof(m_board_pieces));
     std::memset(m_piece_count, 0, sizeof(m_piece_count));
-    std::memset(m_psq, 0, sizeof(m_psq));
     std::memset(m_king_sq, 0, sizeof(m_king_sq));
 
     // Read position
@@ -272,17 +271,14 @@ void Board::update_checkers()
 
 void Board::regen_psqt(Turn turn)
 {
-    m_psq[turn] = MixedScore(0, 0);
+    m_psq[turn].clear();
     for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
     {
         for (Turn t : { WHITE, BLACK })
         {
             Bitboard b = get_pieces(t, p);
             while (b)
-            {
-                Square s = b.bitscan_forward_reset();
-                m_psq[turn] += piece_square(p, s, t, m_king_sq[turn], turn) * turn_to_color(t);
-            }
+                m_psq[turn].push(p, b.bitscan_forward_reset(), m_king_sq[turn], t, turn);
         }
     }
 }
@@ -425,7 +421,7 @@ bool Board::is_valid() const
     // Material and phase evaluation
     uint8_t phase = Phases::Total;
     MixedScore material(0, 0);
-    MixedScore psq_sides[2] = { MixedScore(0, 0), MixedScore(0, 0) };
+    PSQT::Accumulator acc[2];
     Hash material_hash = 0;
     for (PieceType piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
         for (Turn turn : { WHITE, BLACK })
@@ -439,8 +435,8 @@ bool Board::is_valid() const
             while (bb)
             {
                 Square s = bb.bitscan_forward_reset();
-                psq_sides[WHITE] += piece_square(piece, s, turn, m_king_sq[WHITE], WHITE) * turn_to_color(turn);
-                psq_sides[BLACK] += piece_square(piece, s, turn, m_king_sq[BLACK], BLACK) * turn_to_color(turn);
+                acc[WHITE].push(piece, s, m_king_sq[WHITE], turn, WHITE);
+                acc[BLACK].push(piece, s, m_king_sq[BLACK], turn, BLACK);
             }
         }
     MixedScore total_material = m_material[WHITE] - m_material[BLACK];
@@ -448,9 +444,7 @@ bool Board::is_valid() const
         return false;
     if (material.middlegame() != total_material.middlegame() || material.endgame() != total_material.endgame())
         return false;
-    if (psq_sides[WHITE].middlegame() != m_psq[WHITE].middlegame() || psq_sides[BLACK].middlegame() != m_psq[BLACK].middlegame())
-        return false;
-    if (psq_sides[WHITE].endgame() != m_psq[WHITE].endgame() || psq_sides[BLACK].endgame() != m_psq[BLACK].endgame())
+    if (acc[WHITE] != m_psq[WHITE] || acc[BLACK] != m_psq[BLACK])
         return false;
     if (material_hash != m_material_hash)
         return false;
@@ -617,7 +611,13 @@ MixedScore Board::material(Turn turn) const
 
 MixedScore Board::psq() const
 {
-    return m_psq[WHITE] + m_psq[BLACK];
+    return m_psq[WHITE].eval() - m_psq[BLACK].eval();
+}
+
+
+MixedScore Board::psq(Turn t) const
+{
+    return m_psq[t].eval();
 }
 
 
