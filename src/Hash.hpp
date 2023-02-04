@@ -103,7 +103,7 @@ public:
     {
         bool replace = type == EntryType::EXACT
                     || age != this->age()
-                    || depth > m_depth - (hash == this->hash() ? 0 : 3);
+                    || depth > m_depth - 4;
         if (replace)
         {
             m_hash = hash ^ data_hash(depth, score, gen_type(age, type), static_eval);
