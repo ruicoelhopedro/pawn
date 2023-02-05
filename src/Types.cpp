@@ -1,4 +1,5 @@
 #include "Types.hpp"
+#include <array>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -11,3 +12,5 @@ std::string get_square(Square square)
     char name[2] = { files[file(square)], ranks[rank(square)] };
     return std::string(name, 2);
 }
+
+std::array<Debug::Entry, Debug::NUM_DEBUG_SLOTS> Debug::debug_slots;
