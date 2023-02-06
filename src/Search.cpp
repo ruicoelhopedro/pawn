@@ -371,7 +371,7 @@ namespace Search
                  (tt_type == EntryType::LOWER_BOUND && tt_score >= beta)))
             {
                 // Update histories for quiet TT moves
-                if (tt_move != MOVE_NULL && !tt_move.is_capture() && tt_score >= beta)
+                if (tt_move != MOVE_NULL && !tt_move.is_capture() && tt_score >= beta && position.board().legal(tt_move))
                     data.histories.bestmove(tt_move, data.last_move(), Turn, depth, Ply, position.board().get_piece_at(tt_move.from()));
 
                 // Do not cutoff when we are approaching the 50 move rule
