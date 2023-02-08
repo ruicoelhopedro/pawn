@@ -316,6 +316,7 @@ namespace Search
         const bool InCheck = position.in_check();
         const Turn Turn = position.get_turn();
         const Depth Ply = data.ply();
+        CurrentHistory history = data.histories.get(position);
 
         if (PvNode)
         {
@@ -372,7 +373,7 @@ namespace Search
             {
                 // Update histories for quiet TT moves
                 if (tt_move != MOVE_NULL && !tt_move.is_capture() && tt_score >= beta && position.board().legal(tt_move))
-                    data.histories.bestmove(tt_move, data.last_move(), Turn, depth, Ply, position.board().get_piece_at(tt_move.from()));
+                    history.bestmove(tt_move, position.board().get_piece_at(tt_move.from()), depth);
 
                 // Do not cutoff when we are approaching the 50 move rule
                 if (position.board().half_move_clock() < 90)
@@ -444,7 +445,7 @@ namespace Search
         Move quiet_list[NUM_MAX_MOVES];
         MoveList quiets_searched(quiet_list);
         Move hash_move = (data.in_pv() && data.pv_move() != MOVE_NULL) ? data.pv_move() : tt_move;
-        MoveOrder orderer = MoveOrder(position, Ply, depth, hash_move, data.histories);
+        MoveOrder orderer = MoveOrder(position, depth, hash_move, history);
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;
@@ -592,7 +593,7 @@ namespace Search
             if (didLMR && do_full_search)
             {
                 int bonus = score > best_score ? depth : -depth;
-                data.histories.add_bonus(move, Turn, piece, data.last_move(), bonus);
+                history.add_bonus(move, piece, bonus);
             }
 
             // New best move
@@ -630,12 +631,12 @@ namespace Search
         if (best_move != MOVE_NULL && !best_move.is_capture())
         {
             // Update stats for bestmove
-            data.histories.bestmove(best_move, data.last_move(), Turn, depth, Ply, position.board().get_piece_at(best_move.from()));
+            history.bestmove(best_move, position.board().get_piece_at(best_move.from()), depth);
 
             // Penalty for any non-best quiet
             for (auto move : quiets_searched)
                 if (move != best_move)
-                    data.histories.add_bonus(move, Turn, position.board().get_piece_at(move.from()), data.last_move(), -hist_bonus(depth));
+                    history.add_bonus(move, position.board().get_piece_at(move.from()), -hist_bonus(depth));
         }
 
         // Check for game end
@@ -747,7 +748,8 @@ namespace Search
         Move move;
         int n_moves = 0;
         Move best_move = MOVE_NULL;
-        MoveOrder orderer = MoveOrder(position, Ply, 0, tt_move, data.histories, true);
+        CurrentHistory history = data.histories.get(position);
+        MoveOrder orderer = MoveOrder(position, 0, tt_move, history, true);
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;

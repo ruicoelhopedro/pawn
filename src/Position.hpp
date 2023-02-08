@@ -733,7 +733,7 @@ public:
     bool reduced() const;
 
 
-    Move last_move() const;
+    Move last_move(std::size_t offset = 0) const;
 };
 
 

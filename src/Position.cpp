@@ -822,9 +822,9 @@ bool Position::reduced() const
 }
 
 
-Move Position::last_move() const
+Move Position::last_move(std::size_t offset) const
 {
-    return m_moves.size() > 0 ? m_moves.back().move : MOVE_NULL;
+    return m_moves.size() > offset ? m_moves[m_moves.size() - offset - 1].move : MOVE_NULL;
 }
 
 

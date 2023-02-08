@@ -3,6 +3,8 @@
 #include "Position.hpp"
 #include "Move.hpp"
 #include "Hash.hpp"
+#include <array>
+#include <cstring>
 
 
 enum class MoveStage
@@ -24,27 +26,13 @@ constexpr MoveStage operator++(MoveStage& current);
 
 constexpr int NUM_KILLERS = 3;
 constexpr int NUM_LOW_PLY = 5;
+constexpr int NUM_CONTINUATION = 3;
 
 
-class Histories
+constexpr int hist_bonus(Depth d)
 {
-    Move m_killers[NUM_KILLERS][NUM_MAX_DEPTH];
-    int m_butterfly[NUM_COLORS][NUM_SQUARES][NUM_SQUARES];
-    int m_continuation[NUM_SQUARES][NUM_SQUARES][NUM_PIECE_TYPES][NUM_SQUARES];
-
-public:
-    Histories();
-
-    void clear();
-
-    void add_bonus(Move move, Turn turn, PieceType piece, Move prev_move, int bonus);
-    void bestmove(Move move, Move prev_move, Turn turn, Depth depth, Depth ply, PieceType piece);
-
-    bool is_killer(Move move, Depth ply) const;
-    int butterfly_score(Move move, Turn turn) const;
-    int continuation_score(Move move, PieceType piece, Move prev_move) const;
-    Move get_killer(int index, Depth ply) const;
-};
+    return std::min(2000, 5 * (d + 10) * d);
+}
 
 
 template<int MAX>
@@ -54,27 +42,78 @@ void saturate_add(int& entry, int bonus)
 }
 
 
-constexpr int hist_bonus(Depth d)
+template<int CAP>
+class PieceToHistoryStats
 {
-    return std::min(2000, 5 * (d + 10) * d);
-}
+    int m_data[NUM_PIECE_TYPES][NUM_SQUARES];
 
+public:
+    PieceToHistoryStats() { clear(); }
+    void clear() { std::memset(m_data, 0, sizeof(m_data)); }
+    int get(PieceType p, Square s) const { return m_data[p][s]; }
+    void add(PieceType p, Square s, int bonus) { saturate_add<CAP>(m_data[p][s], bonus); }
+};
+
+
+template<int CAP>
+class ButterflyHistoryStats
+{
+    int m_data[NUM_SQUARES][NUM_SQUARES];
+
+public:
+    ButterflyHistoryStats() { clear(); }
+    void clear() { std::memset(m_data, 0, sizeof(m_data)); }
+    int get(Square from, Square to) const { return m_data[from][to]; }
+    void add(Square from, Square to, int bonus) { saturate_add<CAP>(m_data[from][to], bonus); }
+};
+
+
+using ButterflyHistory = ButterflyHistoryStats<15000>;
+using PieceToHistory = PieceToHistoryStats<30000>;
+
+
+struct CurrentHistory
+{
+    Move* killers;
+    PieceToHistory* continuation[NUM_CONTINUATION];
+    ButterflyHistory* main_history;
+
+    void add_bonus(Move move, PieceType piece, int bonus);
+    void bestmove(Move move, PieceType piece, Depth depth);
+    bool is_killer(Move move) const;
+};
+
+
+class Histories
+{
+    PieceToHistory m_continuation[NUM_SQUARES][NUM_SQUARES];
+    ButterflyHistory m_main[NUM_COLORS];
+    Move m_killers[NUM_MAX_DEPTH][NUM_KILLERS];
+
+public:
+    Histories();
+    void clear();
+
+    CurrentHistory get(const Position& pos);
+};
+
+
+constexpr int asd = sizeof(MoveStage);
 
 class MoveOrder
 {
-    Position& m_position;
-    Depth m_ply;
-    Depth m_depth;
-    Move m_hash_move;
-    const Histories& m_histories;
-    Move m_prev_move;
-    bool m_quiescence;
     MoveList m_moves;
-    MoveStage m_stage;
-    Move m_killer;
-    Move* m_curr;
     MoveList m_captures;
+    Position& m_position;
+    const CurrentHistory& m_history;
+    Move* m_curr;
     Move* m_bad_captures;
+    MoveStage m_stage;
+    Move m_hash_move;
+    Move m_killer;
+    Depth m_depth;
+    bool m_quiescence;
+
 
     bool hash_move(Move& move);
 
@@ -82,7 +121,7 @@ class MoveOrder
     template<bool CAPTURES>
     int move_score(Move move) const
     {
-        if (CAPTURES)
+        if constexpr (CAPTURES)
             return capture_score(move);
         else
             return quiet_score(move);
@@ -130,7 +169,7 @@ class MoveOrder
 
 
 public:
-    MoveOrder(Position& pos, Depth ply, Depth depth, Move hash_move, const Histories& histories, bool quiescence = false);
+    MoveOrder(Position& pos, Depth depth, Move hash_move, const CurrentHistory& history, bool quiescence = false);
 
     Move next_move();
 
