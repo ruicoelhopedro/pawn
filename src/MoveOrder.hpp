@@ -98,8 +98,6 @@ public:
 };
 
 
-constexpr int asd = sizeof(MoveStage);
-
 class MoveOrder
 {
     MoveList m_moves;
