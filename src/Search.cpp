@@ -268,7 +268,7 @@ namespace Search
             copy_pv(pv.pv, data.prev_pv());
 
             // Do the search
-            score = negamax<ROOT>(position, depth, alpha, beta, data);
+            score = negamax<ROOT>(position, depth, alpha, beta, data, false);
 
             // Check for timeout: search results cannot be trusted
             if (thread.timeout())
@@ -307,7 +307,7 @@ namespace Search
 
 
     template<SearchType ST>
-    Score negamax(Position& position, Depth depth, Score alpha, Score beta, SearchData& data)
+    Score negamax(Position& position, Depth depth, Score alpha, Score beta, SearchData& data, bool cut_node)
     {
         // Node data
         constexpr bool PvNode = ST != NON_PV;
@@ -426,7 +426,7 @@ namespace Search
             Depth new_depth = reduce(depth, 1 + reduction);
             SearchData curr_data = data.next(MOVE_NULL);
             position.make_null_move();
-            Score null = -negamax<NON_PV>(position, new_depth, -beta, -beta + 1, curr_data);
+            Score null = -negamax<NON_PV>(position, new_depth, -beta, -beta + 1, curr_data, !cut_node);
             position.unmake_null_move();
             if (null >= beta)
                 return null < SCORE_MATE_FOUND ? null : beta;
@@ -512,7 +512,7 @@ namespace Search
 
                 // Search with the move excluded
                 data.excluded_move = move;
-                Score score = negamax<NON_PV>(position, singularDepth, singularBeta - 1, singularBeta, data);
+                Score score = negamax<NON_PV>(position, singularDepth, singularBeta - 1, singularBeta, data, cut_node);
                 data.excluded_move = MOVE_NULL;
 
                 if (score < singularBeta)
@@ -546,18 +546,20 @@ namespace Search
             bool do_full_search = !(PvNode && n_moves == 1);
             bool didLMR = false;
             if (depth > 4 &&
-                n_moves > 1 + 2 * PvNode &&
+                n_moves > 1 + 2 * RootSearch &&
                 (!PvNode || !captureOrPromotion) &&
                 data.thread().id() % 3 < 2)
             {
                 didLMR = true;
-                int reduction = ilog2(n_moves)
+                int reduction = ilog2(n_moves) / 2
                               - (captureOrPromotion || PvNode)
-                              - (move_score + 15000) / 30000;
+                              - (move_score + 15000) / 30000
+                              + 2 * cut_node
+                              + 2;
 
                 // Reduced depth search
                 Depth new_depth = reduce(curr_depth, 1 + std::max(0, reduction));
-                score = -negamax<NON_PV>(position, new_depth, -alpha - 1, -alpha, curr_data);
+                score = -negamax<NON_PV>(position, new_depth, -alpha - 1, -alpha, curr_data, true);
 
                 // Only carry a full search if this reduced move fails high
                 do_full_search = score > alpha && reduction > 0;
@@ -565,13 +567,13 @@ namespace Search
 
             // NonPv node search when LMR is skipped or fails high
             if (do_full_search)
-                score = -negamax<NON_PV>(position, curr_depth - 1, -alpha - 1, -alpha, curr_data);
+                score = -negamax<NON_PV>(position, curr_depth - 1, -alpha - 1, -alpha, curr_data, !cut_node);
 
             // PvNode search at the first move in a PV node or when the nonPv search returns
             // a possibly good move
             if (PvNode && (n_moves == 1 || (score > alpha && (RootSearch || score < beta))))
             {
-                score = -negamax<PV>(position, curr_depth - 1, -beta, -alpha, curr_data);
+                score = -negamax<PV>(position, curr_depth - 1, -beta, -alpha, curr_data, false);
 
                 // Return failed aspirated search immediately
                 if (RootSearch && n_moves == 1 && (score <= alpha || score >= beta))

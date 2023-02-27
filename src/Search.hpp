@@ -173,7 +173,7 @@ namespace Search
 
 
     template<SearchType ST>
-    Score negamax(Position& position, Depth depth, Score alpha, Score beta, SearchData& data);
+    Score negamax(Position& position, Depth depth, Score alpha, Score beta, SearchData& data, bool cut_node);
 
 
     template<SearchType ST>
@@ -263,5 +263,5 @@ namespace Search
         return n_nodes;
     }
 
-    constexpr int ilog2(int v) { return 1 + Bitboard(v).bitscan_reverse(); }
+    constexpr int ilog2(int v) { return Bitboard(v).bitscan_reverse(); }
 }
