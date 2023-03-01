@@ -594,7 +594,7 @@ namespace Search
             // Update histories after passed LMR
             if (didLMR && do_full_search)
             {
-                int bonus = score > best_score ? depth : -depth;
+                int bonus = score > best_score ? hist_bonus(depth) : -hist_bonus(depth);
                 history.add_bonus(move, piece, bonus);
             }
 
