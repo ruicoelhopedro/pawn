@@ -422,8 +422,8 @@ namespace Search
             data.last_move() != MOVE_NULL &&
             position.board().non_pawn_material(Turn))
         {
-            int reduction = 3 + std::min(6, (static_eval - beta) / 200);
-            Depth new_depth = reduce(depth, 1 + reduction);
+            int reduction = 4 + std::min(6, (static_eval - beta) / 200);
+            Depth new_depth = std::max(0, depth - reduction);
             SearchData curr_data = data.next(MOVE_NULL);
             position.make_null_move();
             Score null = -negamax<NON_PV>(position, new_depth, -beta, -beta + 1, curr_data, !cut_node);
@@ -545,7 +545,7 @@ namespace Search
             // Late move reductions
             bool do_full_search = !(PvNode && n_moves == 1);
             bool didLMR = false;
-            if (depth > 4 &&
+            if (depth > 2 &&
                 n_moves > 1 + 2 * RootSearch &&
                 (!PvNode || !captureOrPromotion) &&
                 data.thread().id() % 3 < 2)
@@ -558,7 +558,7 @@ namespace Search
                               + 2;
 
                 // Reduced depth search
-                Depth new_depth = reduce(curr_depth, 1 + std::max(0, reduction));
+                Depth new_depth = std::clamp(curr_depth - reduction - 1, 0, curr_depth - 1);
                 score = -negamax<NON_PV>(position, new_depth, -alpha - 1, -alpha, curr_data, true);
 
                 // Only carry a full search if this reduced move fails high

@@ -13,7 +13,7 @@ using Square = int8_t;
 using Hash = uint64_t;
 using Direction = int8_t;
 using Score = int32_t;
-using Depth = uint8_t;
+using Depth = int;
 
 
 constexpr int NUM_COLORS = 2;
@@ -236,12 +236,6 @@ constexpr Score score_from_tt(const Score& score, int ply, int half_move)
                                                      : (score + ply);
     else
         return score;
-}
-
-
-constexpr Depth reduce(const Depth& depth, const Depth& reduction)
-{
-    return (reduction > depth) ? 0 : depth - reduction;
 }
 
 

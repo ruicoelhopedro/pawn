@@ -64,7 +64,7 @@ class TranspositionEntry
     static constexpr uint8_t GEN_DATA_MASK = (1 << GEN_DATA_BITS) - 1;
 
     Hash m_hash;
-    Depth m_depth;
+    uint8_t m_depth;
     uint8_t m_type;
     int16_t m_score;
     Move m_best_move;
