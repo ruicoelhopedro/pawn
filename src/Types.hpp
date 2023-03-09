@@ -3,13 +3,17 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <array>
+#include <iostream>
+#include <atomic>
+#include <cmath>
 
 
 using Square = int8_t;
 using Hash = uint64_t;
 using Direction = int8_t;
 using Score = int32_t;
-using Depth = uint8_t;
+using Depth = int;
 
 
 constexpr int NUM_COLORS = 2;
@@ -235,12 +239,6 @@ constexpr Score score_from_tt(const Score& score, int ply, int half_move)
 }
 
 
-constexpr Depth reduce(const Depth& depth, const Depth& reduction)
-{
-    return (reduction > depth) ? 0 : depth - reduction;
-}
-
-
 constexpr int mate_in(const Score& score)
 {
     int distance = (score > 0) ? (SCORE_MATE - score) : (SCORE_MATE + score);
@@ -300,3 +298,84 @@ public:
 
     inline uint64_t next(uint64_t n) { return next() % n; }
 };
+
+
+// Debug tools
+namespace Debug
+{
+    enum Slots
+    {
+        NUM_DEBUG_SLOTS
+    };
+
+
+    constexpr std::array<const char*, NUM_DEBUG_SLOTS> Names
+    {
+    };
+
+
+    constexpr bool Enabled = NUM_DEBUG_SLOTS > 0;
+
+
+    class Entry
+    {
+        std::atomic_int64_t m_hits;
+        std::atomic_int64_t m_sums;
+        std::atomic_int64_t m_sums_squared;
+
+    public:
+        inline Entry() : m_hits(0), m_sums(0), m_sums_squared(0) {}
+        inline void clear()
+        {
+            m_hits.store(0);
+            m_sums.store(0);
+            m_sums_squared.store(0);
+        }
+        inline void hit(int64_t value = 0)
+        {
+            m_hits.fetch_add(1, std::memory_order_relaxed);
+            m_sums.fetch_add(value, std::memory_order_relaxed);
+            m_sums_squared.fetch_add(value * value, std::memory_order_relaxed);
+        }
+        inline int64_t get_hits() const { return m_hits.load(); }
+        inline int64_t get_sums() const { return m_sums.load(); }
+        inline double get_avg() const { return double(m_sums.load()) / m_hits.load(); }
+        inline double get_std() const
+        {
+            double avg = get_avg();
+            return sqrt(double(m_sums_squared.load()) / m_hits.load() - avg * avg);
+        }
+    };
+
+
+    extern std::array<Entry, NUM_DEBUG_SLOTS> debug_slots;
+
+
+    inline void clear_debug_data()
+    {
+        for (auto& slot : debug_slots)
+            slot.clear();
+    }
+
+
+    inline void print_debug_data()
+    {
+        std::cout << "Debug info:" << std::endl;
+        for (std::size_t i = 0; i < NUM_DEBUG_SLOTS; i++)
+            std::cout << " Slot: " << i
+                      << " (" << Names[i] << ")"
+                      << " Hits: " << debug_slots[i].get_hits()
+                      << " Sums: " << debug_slots[i].get_sums()
+                      << " Avg: "  << debug_slots[i].get_avg()
+                      << " Std: "  << debug_slots[i].get_std()
+                      << std::endl;
+    }
+
+
+    template<Slots Slot>
+    void debug_hit(int64_t value = 0)
+    {
+        static_assert(Slot < NUM_DEBUG_SLOTS && Slot >= 0, "Invalid debug slot");
+        debug_slots[Slot].hit(value);
+    }
+}

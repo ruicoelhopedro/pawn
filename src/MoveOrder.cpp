@@ -7,6 +7,39 @@
 #include <iostream>
 
 
+void CurrentHistory::add_bonus(Move move, PieceType piece, int bonus)
+{
+    main_history->add(move.from(), move.to(), bonus);
+    for (std::size_t i = 0; i < NUM_CONTINUATION; i++)
+        continuation[i]->add(piece, move.to(), bonus);
+}
+
+
+void CurrentHistory::bestmove(Move move, PieceType piece, Depth depth)
+{
+    add_bonus(move, piece, hist_bonus(depth));
+
+    // Exit if killer already in the list
+    if (is_killer(move))
+        return;
+
+    // Right-shift killers and add new one
+    for (int i = NUM_KILLERS - 1; i > 0; i--)
+        killers[i] = killers[i - 1];
+    killers[0] = move;
+}
+
+
+bool CurrentHistory::is_killer(Move move) const
+{
+    for (int i = 0; i < NUM_KILLERS; i++)
+        if (killers[i] == move)
+            return true;
+    return false;
+}
+
+
+
 Histories::Histories()
 {
     clear();
@@ -15,74 +48,38 @@ Histories::Histories()
 
 void Histories::clear()
 {
-    for (int i = 0; i < NUM_COLORS; i++)
-        for (int j = 0; j < NUM_SQUARES; j++)
-            for (int k = 0; k < NUM_SQUARES; k++)
-                m_butterfly[i][j][k] = 0;
-
-    for (int i = 0; i < NUM_KILLERS; i++)
-        for (int j = 0; j < NUM_MAX_DEPTH; j++)
-            m_killers[i][j] = MOVE_NULL;
-            
     for (int i = 0; i < NUM_SQUARES; i++)
         for (int j = 0; j < NUM_SQUARES; j++)
-            for (int k = 0; k < NUM_PIECE_TYPES; k++)
-                for (int l = 0; l < NUM_SQUARES; l++)
-                    m_continuation[i][j][k][l] = 0;
+            m_continuation[i][j].clear();
+
+    for (int i = 0; i < NUM_COLORS; i++)
+        m_main[i].clear();
+
+    for (int i = 0; i < NUM_MAX_DEPTH; i++)
+        for (int j = 0; j < NUM_KILLERS; j++)
+            m_killers[i][j] = MOVE_NULL;
 }
 
 
-void Histories::add_bonus(Move move, Turn turn, PieceType piece, Move prev_move, int bonus)
+CurrentHistory Histories::get(const Position& pos)
 {
-    saturate_add<15000>(m_butterfly[turn][move.from()][move.to()], bonus);
-    saturate_add<30000>(m_continuation[prev_move.from()][prev_move.to()][piece][move.to()], bonus);
+    CurrentHistory history;
+    history.killers = m_killers[pos.ply()];
+    history.main_history = &m_main[pos.get_turn()];
+    for (std::size_t i = 0; i < NUM_CONTINUATION; i++)
+    {
+        Move m = pos.last_move(2 * i);
+        history.continuation[i] = &m_continuation[m.from()][m.to()];
+    }
+    return history;
 }
 
 
-void Histories::bestmove(Move move, Move prev_move, Turn turn, Depth depth, Depth ply, PieceType piece)
-{
-    add_bonus(move, turn, piece, prev_move, hist_bonus(depth));
 
-    // Exit if killer already in the list
-    if (is_killer(move, ply))
-        return;
-
-    // Right-shift killers and add new one
-    for (int i = NUM_KILLERS - 1; i > 0; i--)
-        m_killers[i][ply] = m_killers[i - 1][ply];
-    m_killers[0][ply] = move;
-}
-
-
-bool Histories::is_killer(Move move, Depth ply) const
-{
-    for (int i = 0; i < NUM_KILLERS; i++)
-        if (m_killers[i][ply] == move)
-            return true;
-    return false;
-}
-
-
-int Histories::butterfly_score(Move move, Turn turn) const
-{
-    return m_butterfly[turn][move.from()][move.to()];
-}
-
-int Histories::continuation_score(Move move, PieceType piece, Move prev_move) const
-{
-    return m_continuation[prev_move.from()][prev_move.to()][piece][move.to()];
-}
-
-Move Histories::get_killer(int index, Depth ply) const
-{
-    return m_killers[index][ply];
-}
-
-
-MoveOrder::MoveOrder(Position& pos, Depth ply, Depth depth, Move hash_move, const Histories& histories, bool quiescence)
-    : m_position(pos), m_ply(ply), m_depth(depth), m_hash_move(hash_move), m_histories(histories),
-      m_prev_move(pos.last_move()), m_quiescence(quiescence), m_stage(MoveStage::HASH),
-      m_killer(MOVE_NULL)
+MoveOrder::MoveOrder(Position& pos, Depth depth, Move hash_move, const CurrentHistory& history, bool quiescence)
+    : m_position(pos), m_history(history), m_stage(MoveStage::HASH),
+      m_hash_move(hash_move), m_killer(MOVE_NULL), m_depth(depth),
+      m_quiescence(quiescence)
 {
 }
 
@@ -113,12 +110,11 @@ int MoveOrder::capture_score(Move move) const
 
 int MoveOrder::quiet_score(Move move) const
 {
-    // Quiets are scored based on:
-    // 1. Butterfly histories
-    // 2. Piece type-destination histories
     PieceType piece = m_position.board().get_piece_at(move.from());
-    return m_histories.butterfly_score(move, m_position.get_turn())
-         + 4 * m_histories.continuation_score(move, piece, m_prev_move);
+    return     m_history.main_history->get(move.from(), move.to())
+         + 2 * m_history.continuation[0]->get(piece, move.to())
+         +     m_history.continuation[1]->get(piece, move.to())
+         +     m_history.continuation[2]->get(piece, move.to());
 }
 
 
@@ -169,7 +165,7 @@ Move MoveOrder::next_move()
             m_killer = MOVE_NULL;
             for (int i = 0; i < NUM_KILLERS; i++)
             {
-                Move candidate = m_histories.get_killer(i, m_ply);
+                Move candidate = m_history.killers[i];
                 if (candidate != m_hash_move &&
                     m_position.board().legal(candidate))
                 {

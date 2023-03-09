@@ -173,7 +173,7 @@ namespace Search
 
 
     template<SearchType ST>
-    Score negamax(Position& position, Depth depth, Score alpha, Score beta, SearchData& data);
+    Score negamax(Position& position, Depth depth, Score alpha, Score beta, SearchData& data, bool cut_node);
 
 
     template<SearchType ST>
@@ -200,7 +200,8 @@ namespace Search
         {
             // Use move orderer (slower but the actual method used during search)
             Move move;
-            MoveOrder orderer = MoveOrder(position, 0, depth, MOVE_NULL, hists);
+            CurrentHistory history = hists.get(position);
+            MoveOrder orderer = MoveOrder(position, depth, MOVE_NULL, history);
             while ((move = orderer.next_move()) != MOVE_NULL)
             {
                 if (LEGALITY && !legality_tests(position, move_list))
@@ -262,5 +263,5 @@ namespace Search
         return n_nodes;
     }
 
-    constexpr int ilog2(int v) { return 1 + Bitboard(v).bitscan_reverse(); }
+    constexpr int ilog2(int v) { return Bitboard(v).bitscan_reverse(); }
 }

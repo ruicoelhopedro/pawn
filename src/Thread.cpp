@@ -159,6 +159,10 @@ void ThreadPool::search(const Search::Timer& timer, const Search::Limits& limits
     // Estimate search time
     update_time(timer, limits);
 
+    // Clear debug data (if any)
+    if constexpr (Debug::Enabled)
+        Debug::clear_debug_data();
+
     // Wake threads
     send_signal(ThreadStatus::SEARCHING);
 }
@@ -483,6 +487,10 @@ void Thread::search()
         if (pondermove != MOVE_NULL)
             std::cout << " ponder " << pondermove;
         std::cout << std::endl;
+
+        // Debug prints
+        if constexpr (Debug::Enabled)
+            Debug::print_debug_data();
     }
 }
 

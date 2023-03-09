@@ -64,7 +64,7 @@ class TranspositionEntry
     static constexpr uint8_t GEN_DATA_MASK = (1 << GEN_DATA_BITS) - 1;
 
     Hash m_hash;
-    Depth m_depth;
+    uint8_t m_depth;
     uint8_t m_type;
     int16_t m_score;
     Move m_best_move;
@@ -103,7 +103,7 @@ public:
     {
         bool replace = type == EntryType::EXACT
                     || age != this->age()
-                    || depth > m_depth - (hash == this->hash() ? 0 : 3);
+                    || depth > m_depth - 4;
         if (replace)
         {
             m_hash = hash ^ data_hash(depth, score, gen_type(age, type), static_eval);

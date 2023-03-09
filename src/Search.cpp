@@ -268,7 +268,7 @@ namespace Search
             copy_pv(pv.pv, data.prev_pv());
 
             // Do the search
-            score = negamax<ROOT>(position, depth, alpha, beta, data);
+            score = negamax<ROOT>(position, depth, alpha, beta, data, false);
 
             // Check for timeout: search results cannot be trusted
             if (thread.timeout())
@@ -307,7 +307,7 @@ namespace Search
 
 
     template<SearchType ST>
-    Score negamax(Position& position, Depth depth, Score alpha, Score beta, SearchData& data)
+    Score negamax(Position& position, Depth depth, Score alpha, Score beta, SearchData& data, bool cut_node)
     {
         // Node data
         constexpr bool PvNode = ST != NON_PV;
@@ -316,6 +316,7 @@ namespace Search
         const bool InCheck = position.in_check();
         const Turn Turn = position.get_turn();
         const Depth Ply = data.ply();
+        CurrentHistory history = data.histories.get(position);
 
         if (PvNode)
         {
@@ -371,8 +372,8 @@ namespace Search
                  (tt_type == EntryType::LOWER_BOUND && tt_score >= beta)))
             {
                 // Update histories for quiet TT moves
-                if (tt_move != MOVE_NULL && !tt_move.is_capture() && tt_score >= beta)
-                    data.histories.bestmove(tt_move, data.last_move(), Turn, depth, Ply, position.board().get_piece_at(tt_move.from()));
+                if (tt_move != MOVE_NULL && !tt_move.is_capture() && tt_score >= beta && position.board().legal(tt_move))
+                    history.bestmove(tt_move, position.board().get_piece_at(tt_move.from()), depth);
 
                 // Do not cutoff when we are approaching the 50 move rule
                 if (position.board().half_move_clock() < 90)
@@ -421,11 +422,11 @@ namespace Search
             data.last_move() != MOVE_NULL &&
             position.board().non_pawn_material(Turn))
         {
-            int reduction = 3 + std::min(6, (static_eval - beta) / 200);
-            Depth new_depth = reduce(depth, 1 + reduction);
+            int reduction = 4 + std::min(6, (static_eval - beta) / 200);
+            Depth new_depth = std::max(0, depth - reduction);
             SearchData curr_data = data.next(MOVE_NULL);
             position.make_null_move();
-            Score null = -negamax<NON_PV>(position, new_depth, -beta, -beta + 1, curr_data);
+            Score null = -negamax<NON_PV>(position, new_depth, -beta, -beta + 1, curr_data, !cut_node);
             position.unmake_null_move();
             if (null >= beta)
                 return null < SCORE_MATE_FOUND ? null : beta;
@@ -444,7 +445,7 @@ namespace Search
         Move quiet_list[NUM_MAX_MOVES];
         MoveList quiets_searched(quiet_list);
         Move hash_move = (data.in_pv() && data.pv_move() != MOVE_NULL) ? data.pv_move() : tt_move;
-        MoveOrder orderer = MoveOrder(position, Ply, depth, hash_move, data.histories);
+        MoveOrder orderer = MoveOrder(position, depth, hash_move, history);
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;
@@ -512,7 +513,7 @@ namespace Search
 
                 // Search with the move excluded
                 data.excluded_move = move;
-                Score score = negamax<NON_PV>(position, singularDepth, singularBeta - 1, singularBeta, data);
+                Score score = negamax<NON_PV>(position, singularDepth, singularBeta - 1, singularBeta, data, cut_node);
                 data.excluded_move = MOVE_NULL;
 
                 if (score < singularBeta)
@@ -545,19 +546,21 @@ namespace Search
             // Late move reductions
             bool do_full_search = !(PvNode && n_moves == 1);
             bool didLMR = false;
-            if (depth > 4 &&
-                n_moves > 1 + 2 * PvNode &&
+            if (depth > 2 &&
+                n_moves > 1 + 2 * RootSearch &&
                 (!PvNode || !captureOrPromotion) &&
                 data.thread().id() % 3 < 2)
             {
                 didLMR = true;
-                int reduction = ilog2(n_moves)
+                int reduction = ilog2(n_moves) / 2
                               - (captureOrPromotion || PvNode)
-                              - (move_score + 15000) / 30000;
+                              - (move_score + 15000) / 30000
+                              + 2 * cut_node
+                              + 2;
 
                 // Reduced depth search
-                Depth new_depth = reduce(curr_depth, 1 + std::max(0, reduction));
-                score = -negamax<NON_PV>(position, new_depth, -alpha - 1, -alpha, curr_data);
+                Depth new_depth = std::clamp(curr_depth - reduction - 1, 0, curr_depth - 1);
+                score = -negamax<NON_PV>(position, new_depth, -alpha - 1, -alpha, curr_data, true);
 
                 // Only carry a full search if this reduced move fails high
                 do_full_search = score > alpha && reduction > 0;
@@ -565,13 +568,13 @@ namespace Search
 
             // NonPv node search when LMR is skipped or fails high
             if (do_full_search)
-                score = -negamax<NON_PV>(position, curr_depth - 1, -alpha - 1, -alpha, curr_data);
+                score = -negamax<NON_PV>(position, curr_depth - 1, -alpha - 1, -alpha, curr_data, !cut_node);
 
             // PvNode search at the first move in a PV node or when the nonPv search returns
             // a possibly good move
             if (PvNode && (n_moves == 1 || (score > alpha && (RootSearch || score < beta))))
             {
-                score = -negamax<PV>(position, curr_depth - 1, -beta, -alpha, curr_data);
+                score = -negamax<PV>(position, curr_depth - 1, -beta, -alpha, curr_data, false);
 
                 // Return failed aspirated search immediately
                 if (RootSearch && n_moves == 1 && (score <= alpha || score >= beta))
@@ -592,8 +595,8 @@ namespace Search
             // Update histories after passed LMR
             if (didLMR && do_full_search)
             {
-                int bonus = score > best_score ? depth : -depth;
-                data.histories.add_bonus(move, Turn, piece, data.last_move(), bonus);
+                int bonus = score > best_score ? hist_bonus(depth) : -hist_bonus(depth);
+                history.add_bonus(move, piece, bonus);
             }
 
             // New best move
@@ -631,12 +634,12 @@ namespace Search
         if (best_move != MOVE_NULL && !best_move.is_capture())
         {
             // Update stats for bestmove
-            data.histories.bestmove(best_move, data.last_move(), Turn, depth, Ply, position.board().get_piece_at(best_move.from()));
+            history.bestmove(best_move, position.board().get_piece_at(best_move.from()), depth);
 
             // Penalty for any non-best quiet
             for (auto move : quiets_searched)
                 if (move != best_move)
-                    data.histories.add_bonus(move, Turn, position.board().get_piece_at(move.from()), data.last_move(), -hist_bonus(depth));
+                    history.add_bonus(move, position.board().get_piece_at(move.from()), -hist_bonus(depth));
         }
 
         // Check for game end
@@ -748,7 +751,8 @@ namespace Search
         Move move;
         int n_moves = 0;
         Move best_move = MOVE_NULL;
-        MoveOrder orderer = MoveOrder(position, Ply, 0, tt_move, data.histories, true);
+        CurrentHistory history = data.histories.get(position);
+        MoveOrder orderer = MoveOrder(position, 0, tt_move, history, true);
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
             n_moves++;
