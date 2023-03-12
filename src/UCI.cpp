@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cctype>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 
@@ -269,8 +270,8 @@ namespace UCI
         // Check if perft search
         if (perft_depth > 0)
         {
-            Histories hists;
-            int64_t nodes = Search::perft<true>(pool->position(), perft_depth, hists);
+            std::unique_ptr<Histories> hists;
+            int64_t nodes = Search::perft<true>(pool->position(), perft_depth, *hists);
             std::cout << "\nNodes searched: " << nodes << std::endl;
             return;
         }
