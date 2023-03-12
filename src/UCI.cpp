@@ -15,6 +15,9 @@
 
 namespace UCI
 {
+    constexpr std::string_view VERSION = "pawn 1.0";
+
+
     std::map<std::string, Option, OptionNameCompare> OptionsMap;
 
 
@@ -188,7 +191,7 @@ namespace UCI
 
     void uci(Stream& stream)
     {
-        std::cout << "id name pawn" << std::endl;
+        std::cout << "id name " << VERSION << std::endl;
         std::cout << "id author ruicoelhopedro" << std::endl;
 
         // Send options
