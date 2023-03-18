@@ -110,6 +110,10 @@ namespace UCI
         OptionsMap.emplace("Move Overhead", Option(&Options::MoveOverhead, 0, 0, 5000));
         OptionsMap.emplace("Ponder",        Option(&Options::Ponder, false));
         OptionsMap.emplace("PSQT_File",     Option(&Options::PSQT_File, "", PSQT::load));
+
+        for (auto& var : Tune::vars)
+            OptionsMap.emplace("Tune_" + var.name,
+                               Option(&var.value, var.value, var.lbound, var.ubound));
     }
 
 

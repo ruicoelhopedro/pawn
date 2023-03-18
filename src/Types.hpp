@@ -377,3 +377,37 @@ namespace Debug
         debug_slots[Slot].hit(value);
     }
 }
+
+
+// Tuning tools
+namespace Tune
+{
+    struct Variable
+    {
+        std::string name;
+        int value;
+        int lbound;
+        int ubound;
+    };
+
+
+    enum Slots
+    {
+        NUM_TUNE_SLOTS,
+    };
+
+
+    constexpr bool Enabled = NUM_TUNE_SLOTS > 0;
+
+
+    extern std::array<Variable, NUM_TUNE_SLOTS> vars;
+
+
+    inline void init()
+    {
+    }
+
+
+    template<Slots SLOT>
+    int get() { return vars[SLOT].value; }
+}

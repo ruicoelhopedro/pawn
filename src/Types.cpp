@@ -17,3 +17,8 @@ namespace Debug
 {
     std::array<Entry, NUM_DEBUG_SLOTS> debug_slots;
 }
+
+namespace Tune
+{
+    std::array<Variable, NUM_TUNE_SLOTS> vars;
+}

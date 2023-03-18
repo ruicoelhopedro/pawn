@@ -14,6 +14,7 @@ int main(int argc, char** argv)
     Bitboards::init_bitboards();
     Zobrist::build_rnd_hashes();
     PSQT::init();
+    Tune::init();
     UCI::init_options();
     ttable = HashTable<TranspositionEntry>(16);
     pool = new ThreadPool();
