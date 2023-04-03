@@ -59,7 +59,7 @@ if __name__ == '__main__':
     parser.add_argument('--games_per_batch', default=1000, type=int)
     parser.add_argument('--depth', default=9, type=int)
     parser.add_argument('--num_threads', default=1, type=int)
-    parser.add_argument('--num_batches', default=1000000, type=int)
+    parser.add_argument('--num_batches', default=10000, type=int)
     parser.add_argument('--init_seed', default=0, type=int)
 
     args = parser.parse_args()

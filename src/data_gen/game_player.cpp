@@ -12,9 +12,9 @@ namespace GamePlayer
     void play_games(std::istringstream& stream)
     {
         // Parameters and their default values
-        int depth = 7;
+        int depth = 9;
         std::size_t runs_per_fen = 1000000;
-        int adjudication = 4000;
+        int adjudication = SCORE_MATE_FOUND;
         std::string book = "";
         std::string output_file = "output.dat";
         int random_min_ply = 0;
