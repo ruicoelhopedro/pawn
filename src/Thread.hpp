@@ -44,7 +44,7 @@ class Thread
 protected:
     friend class Search::SearchData;
     friend class ThreadPool;
-    friend Score Evaluation::evaluation(const Board& board, EvalData& data, Thread& thread);
+    friend Score Evaluation::evaluation(const Board& board, Evaluation::EvalData& data, Thread& thread);
     Depth m_seldepth;
     Search::PvContainer m_pv;
     Histories m_histories;
