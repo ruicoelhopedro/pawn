@@ -7,11 +7,11 @@ ARCH = native
 
 # Compiler flags
 ifeq ($(findstring library, $(MAKECMDGOALS)), library)
-    CXXFLAGS = -Wall -std=c++17 -O3 -march=$(ARCH) -flto -fPIC -Isrc -g
+    CXXFLAGS = -Wall -std=c++17 -O3 -march=$(ARCH) -flto -Isrc -fPIC -g
     LDFLAGS = -pthread -flto -march=$(ARCH) -fPIC -shared
 	BIN_NAME=pawn.so
 else
-	CXXFLAGS = -Wall -std=c++17 -O3 -march=$(ARCH) -flto
+	CXXFLAGS = -Wall -std=c++17 -O3 -march=$(ARCH) -flto -Isrc
 	LDFLAGS = -pthread -flto -march=$(ARCH)
 	BIN_NAME=pawn
 endif
