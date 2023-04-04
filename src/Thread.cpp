@@ -495,14 +495,14 @@ void Thread::search()
 }
 
 
-GamePosition Thread::simple_search(Position& pos, const Search::Limits& limits)
+SearchResult Thread::simple_search(Position& pos, const Search::Limits& limits)
 {
     // For depth 0, return the quiescence score
     if (limits.depth == 0)
     {
         Search::SearchData data(*this);
         Score qscore = Search::quiescence<Search::PV>(pos, -SCORE_INFINITE, SCORE_INFINITE, data);
-        return GamePosition(pos.board(), qscore * turn_to_color(pos.get_turn()), MOVE_NULL);
+        return SearchResult(qscore * turn_to_color(pos.get_turn()), MOVE_NULL);
     }
 
     // Generate root moves
@@ -512,8 +512,7 @@ GamePosition Thread::simple_search(Position& pos, const Search::Limits& limits)
 
     // Check for aborted search if game has ended
     if (m_root_moves.length() == 0 || pos.is_draw(false))
-        return GamePosition(pos.board(),
-                            pos.in_check() ? -SCORE_MATE * turn_to_color(pos.get_turn())
+        return SearchResult(pos.in_check() ? -SCORE_MATE * turn_to_color(pos.get_turn())
                                            : SCORE_DRAW,
                             MOVE_NULL);
 
@@ -530,7 +529,7 @@ GamePosition Thread::simple_search(Position& pos, const Search::Limits& limits)
     }
     m_data_gen = false;
 
-    return GamePosition(pos.board(), pv.score * turn_to_color(pos.get_turn()), *pv.pv);
+    return SearchResult(pv.score * turn_to_color(pos.get_turn()), *pv.pv);
 }
 
 
@@ -548,11 +547,11 @@ GameResult Thread::play_game(std::string fen, Depth depth, Score adjudication)
 
     // Game loop
     pos.set_init_ply();
-    GamePosition state = simple_search(pos, limits);
+    SearchResult state = simple_search(pos, limits);
     while (state.bestmove != MOVE_NULL && abs(state.score) < adjudication)
     {
         // Store this node
-        result.game.push_back(state);
+        result.game.push_back(GamePosition(pos.board(), state.score, state.bestmove));
 
         // Prepare next iteration
         pos.make_move(state.bestmove);

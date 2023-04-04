@@ -107,7 +107,7 @@ namespace GamePlayer
                 int n_random_moves = 0;
 
                 // Game loop
-                GamePosition state = thread.simple_search(pos, limits);
+                SearchResult state = thread.simple_search(pos, limits);
                 while (state.bestmove != MOVE_NULL && abs(state.score) < adjudication)
                 {
                     int ply = pos.game_ply();

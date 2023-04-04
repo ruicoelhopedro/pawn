@@ -108,7 +108,7 @@ namespace FEN_Scores
             
             // Search the position
             Position pos(fen);
-            GamePosition result = pool->front().simple_search(pos, limits);
+            SearchResult result = pool->front().simple_search(pos, limits);
 
             // Parse output
             Move m = result.bestmove;

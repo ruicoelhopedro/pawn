@@ -72,7 +72,7 @@ public:
 
     bool data_gen() const;
 
-    GamePosition simple_search(Position& pos, const Search::Limits& limits);
+    SearchResult simple_search(Position& pos, const Search::Limits& limits);
 
     GameResult play_game(std::string fen, Depth depth, Score adjudication);
 

@@ -17,6 +17,16 @@ struct GamePosition
     {}
 };
 
+struct SearchResult
+{
+    Score score;
+    Move bestmove;
+
+    inline SearchResult(Score s, Move m)
+        : score(s), bestmove(m)
+    {}
+};
+
 
 struct GameResult
 {
