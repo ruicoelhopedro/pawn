@@ -12,4 +12,8 @@ namespace GamePlayer
     void play_games(std::istringstream& stream);
 
     void games_to_epd(std::istringstream& stream);
+
+    void check_games(std::istringstream& stream);
+
+    bool file_valid(std::string filename);
 }

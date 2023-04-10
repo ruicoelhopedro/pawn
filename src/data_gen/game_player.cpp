@@ -201,4 +201,54 @@ namespace GamePlayer
                 }
         }
     }
+
+
+    bool file_valid(std::string filename)
+    {
+        std::ifstream file(filename);
+        if (!file.is_open())
+            return false;
+
+        BinaryGame game;
+        while(BinaryGame::read(file, game))
+        {
+            // Loop over all moves ensuring they are legal
+            Board board(game.starting_pos);
+            for (BinaryNode node : game.nodes)
+            {
+                if (node.move != MOVE_NULL)
+                {
+                    if(!board.legal(node.move))
+                        return false;
+                    board = board.make_move(node.move);
+                }
+                // Ensure the last score is the game outcome (-1, 0 or 1)
+                else if (abs(node.score) > 1)
+                    return false;
+            }
+        }
+
+        // Ensure the file at the end
+        if (!file.eof())
+            return false;
+
+        return true;
+    }
+
+
+    void check_games(std::istringstream& stream)
+    {
+        // Files to parse
+        std::string token;
+        std::vector<std::string> files;
+        while (stream >> token)
+            files.push_back(token);
+        assert(files.size() > 0 && "No input files have been passed!");
+
+        // Parse each file
+        for (auto filename : files)
+            std::cout << (file_valid(filename) ? " [ OK ] " : " [FAIL] ")
+                      << filename
+                      << std::endl;
+    }
 }

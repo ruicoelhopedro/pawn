@@ -173,6 +173,8 @@ namespace UCI
                 GamePlayer::play_games(stream);
             else if (token == "games_to_epd")
                 GamePlayer::games_to_epd(stream);
+            else if (token == "check_data")
+                GamePlayer::check_games(stream);
             else if (token == "games_to_psq_data")
                 PSQT_DataGen::games_to_psq_data(stream);
             else if (token == "score_texel")
