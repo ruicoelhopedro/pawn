@@ -3,7 +3,7 @@ import torch
 import shutil
 import argparse
 import numpy as np
-from model import PositionalNet, SCALE_FACTOR
+from model import NNUE, SCALE_FACTOR
 from hashlib import sha256
 
 

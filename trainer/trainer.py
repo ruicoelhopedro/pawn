@@ -6,15 +6,17 @@ from numpy.ctypeslib import ndpointer
 import torch
 import torch.sparse
 from torch import nn
+from tqdm import tqdm
 from torch.utils.data import Dataset
 from torch.utils.data.sampler import BatchSampler, RandomSampler
-from model import PositionalNet, SCALE_FACTOR, NUM_FEATURES, NUM_MAX_FEATURES
+from model import NNUE, SCALE_FACTOR, NUM_FEATURES, NUM_MAX_FEATURES
 
 
 class BatchedDataLoader:
 
     def __init__(self, dataset, batch_size):
         self.dataset = dataset
+        self.batch_size = batch_size
         self.sampler = BatchSampler(RandomSampler(dataset), batch_size=batch_size, drop_last=False)
 
     def __iter__(self):
@@ -48,21 +50,20 @@ class PawnDataset(Dataset):
                                            ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
                                            ctypes.c_ulonglong]
 
-        self.get_positional_data = self.lib.get_positional_data
-        self.get_positional_data.restype = ctypes.c_ulonglong
-        self.get_positional_data.argtypes = [ctypes.c_char_p,
-                                             ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
-                                             ctypes.c_ulonglong,
-                                             ctypes.c_ulonglong,
-                                             ctypes.c_ulonglong,
-                                             ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
-                                             ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
-                                             ndpointer(ctypes.c_ushort, flags="C_CONTIGUOUS"),
-                                             ndpointer(ctypes.c_ushort, flags="C_CONTIGUOUS"),
-                                             ndpointer(ctypes.c_short, flags="C_CONTIGUOUS"),
-                                             ndpointer(ctypes.c_short, flags="C_CONTIGUOUS"),
-                                             ndpointer(ctypes.c_byte, flags="C_CONTIGUOUS"),
-                                             ndpointer(ctypes.c_byte, flags="C_CONTIGUOUS")]
+        self.get_nnue_data = self.lib.get_nnue_data
+        self.get_nnue_data.restype = ctypes.c_ulonglong
+        self.get_nnue_data.argtypes = [ctypes.c_char_p,
+                                       ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
+                                       ctypes.c_ulonglong,
+                                       ctypes.c_ulonglong,
+                                       ctypes.c_ulonglong,
+                                       ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
+                                       ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
+                                       ndpointer(ctypes.c_ushort, flags="C_CONTIGUOUS"),
+                                       ndpointer(ctypes.c_ushort, flags="C_CONTIGUOUS"),
+                                       ndpointer(ctypes.c_short, flags="C_CONTIGUOUS"),
+                                       ndpointer(ctypes.c_byte, flags="C_CONTIGUOUS"),
+                                       ndpointer(ctypes.c_byte, flags="C_CONTIGUOUS")]
 
         # Load total number of games in the dataset
         print('Counting games...')
@@ -88,16 +89,14 @@ class PawnDataset(Dataset):
         b_idx = np.empty(n_max_pos + 1, dtype=np.ulonglong)
         w_cols = np.empty(n_max_features, dtype=np.uint16)
         b_cols = np.empty(n_max_features, dtype=np.uint16)
-        evals = np.empty(n_max_pos, dtype=np.int16)
         scores = np.empty(n_max_pos, dtype=np.int16)
         results = np.empty(n_max_pos, dtype=np.byte)
         phases = np.empty(n_max_pos, dtype=np.byte)
         # Read the games and get the actual number of positions
         filtered = self.indices[games]
-        n_pos = self.get_positional_data(self.fname, filtered, len(filtered), hash(str(index)), self.prob_skip,
-                                         w_idx, b_idx, w_cols, b_cols, evals, scores, results, phases)
+        n_pos = self.get_nnue_data(self.fname, filtered, len(filtered), hash(str(index)), self.prob_skip,
+                                   w_idx, b_idx, w_cols, b_cols, scores, results, phases)
         # Build reduced arrays
-        evals_array = torch.tensor(evals[0:n_pos], dtype=torch.float32)
         scores_array = torch.tensor(scores[0:n_pos], dtype=torch.float32)
         phases_array = torch.tensor(phases[0:n_pos], dtype=torch.float32) / 64.0
         results_array = (torch.tensor(results[0:n_pos], dtype=torch.float32) + 1) / 2
@@ -108,37 +107,40 @@ class PawnDataset(Dataset):
         b_cols = np.array(b_cols[:w_idx[n_pos]], dtype=np.int_)
         w_matrix = torch.sparse_csr_tensor(w_idx, w_cols, np.ones(w_idx[n_pos]), size=(n_pos, NUM_FEATURES), dtype=torch.float32)
         b_matrix = torch.sparse_csr_tensor(b_idx, b_cols, np.ones(b_idx[n_pos]), size=(n_pos, NUM_FEATURES), dtype=torch.float32)
-        return w_matrix, b_matrix, evals_array, scores_array, results_array, phases_array
+        return w_matrix, b_matrix, scores_array, results_array, phases_array
 
 
 
-def train(dataloader, model, loss_fn, optimiser, device):
+def train(dataloader, model, loss_fn, optimiser, device, epoch):
     send = lambda x: x.to(device)
-    curr = 0
     size = len(dataloader.dataset)
     model.train()
-    for batch, indices in enumerate(dataloader):
-        wf, bf, evals, scores, results, phases = map(send, dataloader.load(indices))
+    n_batches = size // dataloader.batch_size + 1
+    pbar = tqdm(dataloader, desc=f'Epoch {epoch + 1}', total=n_batches, unit='batch')
+    for indices in dataloader:
+        wf, bf, scores, results, phases = map(send, dataloader.load(indices))
 
         # Compute prediction error
         pred = model(wf, bf)
-        loss = loss_fn(pred.squeeze(), evals, scores, results, phases)
+        loss = loss_fn(pred.squeeze(), scores, results, phases)
 
         # Backpropagation
         optimiser.zero_grad()
         loss.backward()
         optimiser.step()
 
-        curr += len(indices)
-        print(f"Batch {batch:<5} loss: {loss.item():>4.3e}  [{curr:>7d}/{size:>7d}] ({100.0 * curr / size:>3.1f}%)")
+        # Update progress
+        pbar.set_postfix_str(f'Loss: {loss.item():>6.4e}')
+        pbar.update()
+    pbar.close()
 
 
 
-def sigmoid_loss(output, evals, scores, results, phases):
-    K = 256
+def sigmoid_loss(output, scores, results, phases):
+    K = 400
     mix = 0.3
     y = output[:, 0] * phases + output[:, 1] * (1 - phases)
-    y_wdl = torch.sigmoid((SCALE_FACTOR * y + evals) / K)
+    y_wdl = torch.sigmoid(SCALE_FACTOR / K * y)
     scores_wdl = (1 - mix) * torch.sigmoid(scores / K) + mix * results
     return torch.mean((y_wdl - scores_wdl)**2)
 
@@ -156,7 +158,7 @@ def main(pawn_path: str, dataset_path: str, output_dir: str, epochs: int, batch_
 
     # Define model
     if load_model is None:
-        model = PositionalNet()
+        model = NNUE()
         model = model.to(device)
     else:
         model = torch.load(load_model, map_location=device)
@@ -168,8 +170,7 @@ def main(pawn_path: str, dataset_path: str, output_dir: str, epochs: int, batch_
     # Training time
     os.makedirs(output_dir, exist_ok=True)
     for epoch in range(epochs):
-        print(f"Epoch {epoch+1}\n-------------------------------")
-        train(dataloader, model, loss_func, optimiser, device)
+        train(dataloader, model, loss_func, optimiser, device, epoch)
         torch.save(model, os.path.join(output_dir, f"model-epoch{epoch}"))
 
     # Save final model

@@ -19,4 +19,5 @@ extern "C"
     Size get_sparse_psq_data(const char* file_name, const Size* selection, Size n_selected, Size* idx, unsigned int* cols, char* colors, short* evals, char* results);
 
     Size get_positional_data(const char* file_name, const Size* selection, Size n_selected, Size seed, Size prob, Size* w_idx, Size* b_idx, unsigned short* w_cols, unsigned short* b_cols, short* evals, short* scores, char* results, char* phases);
+    Size get_nnue_data(const char* file_name, const Size* selection, Size n_selected, Size seed, Size prob, Size* w_idx, Size* b_idx, unsigned short* w_cols, unsigned short* b_cols, short* scores, char* results, char* phases);
 }
