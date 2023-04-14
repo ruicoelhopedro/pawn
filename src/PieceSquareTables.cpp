@@ -15,6 +15,15 @@ namespace PSQT
     void init()
     {
         psqt_net = nullptr;
+        if (sizeof(Net) != gEmbeddedPSQTSize)
+        {
+            std::cerr << "Invalid size of embedded network! Expected "
+                      << sizeof(Net)
+                      << ", found "
+                      << gEmbeddedPSQTSize
+                      << std::endl;
+            std::abort();
+        }
         load(PSQT_Default_File);
     }
 
