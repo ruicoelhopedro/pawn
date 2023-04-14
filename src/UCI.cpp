@@ -16,7 +16,7 @@
 
 namespace UCI
 {
-    constexpr std::string_view VERSION = "pawn 1.0";
+    constexpr std::string_view VERSION = "pawn 1.0-dev";
 
 
     std::map<std::string, Option, OptionNameCompare> OptionsMap;
