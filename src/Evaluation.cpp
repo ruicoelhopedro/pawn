@@ -472,41 +472,9 @@ Score scale(const Board& board, EvalData& data, MixedScore mixed)
 
 Score evaluation(const Board& board, EvalData& data, Thread& thread)
 {
-    MixedScore mixed_result(0, 0);
-
-    // Probe the material hash table
-    MaterialEntry* me = probe_material(board, thread.m_material_table);
-    mixed_result += me->imbalance();
-
-    // Material and PSQT incrementally updated in the position
-    mixed_result += board.material() + board.psq();
-
-    // Pawn structure
-    mixed_result += pawns(board, data);
-
-    // Piece scores
-    mixed_result += pieces(board, data);
-
-    // King safety
-    mixed_result += king_safety<WHITE>(board, data) - king_safety<BLACK>(board, data);
-
-    // Space
-    mixed_result += space<WHITE>(board, data) - space<BLACK>(board, data);
-
-    // Threats
-    mixed_result += threats<WHITE>(board, data) - threats<BLACK>(board, data);
-
-    // Passed pawn scores
-    mixed_result += passed<WHITE>(board, data) - passed<BLACK>(board, data);
-
-    // Tapered eval
-    Score result = scale(board, data, mixed_result);
-
-    // We don't return exact draw scores -> add one unit to the moving side
-    if (result == SCORE_DRAW)
-        result += turn_to_color(board.turn());
-
-    return result;
+    MixedScore mixed_result = board.psq();
+    Score result = mixed_result.tapered(board.phase());
+    return std::clamp(result, -SCORE_MATE_FOUND + 1, SCORE_MATE_FOUND - 1);
 }
 
 

@@ -2,7 +2,7 @@
 #include "incbin/incbin.h"
 #include "Types.hpp"
 
-#define PSQT_Default_File "psqt-eecf521e5b2a.nn"
+#define PSQT_Default_File "psqt-bd7f6c32575a.nn"
 
 using S = MixedScore;
 
@@ -57,7 +57,7 @@ namespace PSQT
     using Weight = int16_t;
     constexpr int SCALE_FACTOR = 1024;
     constexpr std::size_t NUM_FEATURES = 20480;
-    constexpr std::size_t NUM_ACCUMULATORS = 32;
+    constexpr std::size_t NUM_ACCUMULATORS = 64;
     
     enum Phase
     {
