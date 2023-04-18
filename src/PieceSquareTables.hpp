@@ -2,7 +2,7 @@
 #include "incbin/incbin.h"
 #include "Types.hpp"
 
-#define PSQT_Default_File "psqt-bd7f6c32575a.nn"
+#define PSQT_Default_File "psqt-a2b523b3d193.nn"
 
 using S = MixedScore;
 
