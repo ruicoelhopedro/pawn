@@ -92,6 +92,8 @@ namespace PSQT
 
         MixedScore eval() const;
 
+        MixedScore eval_psq() const;
+
         bool operator==(const Accumulator& other) const;
 
         bool operator!=(const Accumulator& other) const;

@@ -152,6 +152,12 @@ namespace PSQT
         int eg = (m_psqt[EG] + output[EG] / SCALE_FACTOR) ;
         return MixedScore(mg, eg);
     }
+
+
+    MixedScore Accumulator::eval_psq() const
+    {
+        return MixedScore(m_psqt[MG], m_psqt[EG]);
+    }
     
 
     bool Accumulator::operator==(const Accumulator& other) const

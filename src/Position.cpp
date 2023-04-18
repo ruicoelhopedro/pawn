@@ -659,6 +659,13 @@ Bitboard Board::sliders() const
 
 
 
+const PSQT::Accumulator& Board::accumulator(Turn t) const
+{
+    return m_psq[t];
+}
+
+
+
 
 
 Position::Position()
