@@ -5,7 +5,7 @@ from utils import map_features
 
 
 NUM_FEATURES = 20480
-NUM_ACCUMULATORS = 64
+NUM_ACCUMULATORS = 128
 
 
 SCALE_FACTOR = 1024
