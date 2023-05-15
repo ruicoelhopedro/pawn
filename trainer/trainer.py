@@ -9,6 +9,7 @@ from torch import nn
 from tqdm import tqdm
 from torch.utils.data import Dataset
 from torch.utils.data.sampler import BatchSampler, RandomSampler
+from sklearn.model_selection import train_test_split
 from model import NNUE, SCALE_FACTOR, NUM_FEATURES, NUM_MAX_FEATURES
 
 
@@ -25,11 +26,17 @@ class BatchedDataLoader:
     def load(self, indices):
         return self.dataset[indices]
 
+    def set_train(self):
+        self.dataset.set_train()
+
+    def set_test(self):
+        self.dataset.set_test()
+
 
 
 class PawnDataset(Dataset):
 
-    def __init__(self, pawn_path: str, dataset_path: str, prob_skip):
+    def __init__(self, pawn_path: str, dataset_path: str, prob_skip, test_size):
         # Load and prepare the library
         self.lib = ctypes.CDLL(pawn_path)
         self.lib.init_pawn()
@@ -76,11 +83,24 @@ class PawnDataset(Dataset):
         self.get_indices(self.fname, self.indices)
         print(f'Found {self.n_games} games with a total of {self.indices[-1]} positions')
 
+        # Train-test split
+        self.train_indices, self.test_indices = train_test_split(np.arange(self.n_games), test_size=test_size)
+        self.train_games = len(self.train_indices)
+        self.test_games = len(self.test_indices)
+        self.train = True
+
+    def set_train(self):
+        self.train = True
+
+    def set_test(self):
+        self.train = False
+
     def __len__(self):
-        return self.n_games
+        return self.train_games if self.train else self.test_games
 
     def __getitem__(self, index):
-        games = np.array(index, dtype=np.ulonglong)
+        mapper = self.train_indices if self.train else self.test_indices
+        games = np.array(mapper[index], dtype=np.ulonglong)
         # Find maximum number of positions we can get from these games
         n_max_pos = self.get_num_positions(self.indices, games, len(games))
         n_max_features = n_max_pos * NUM_MAX_FEATURES
@@ -104,20 +124,21 @@ class PawnDataset(Dataset):
         w_idx = np.array(w_idx[:n_pos+1], dtype=np.int_)
         b_idx = np.array(b_idx[:n_pos+1], dtype=np.int_)
         w_cols = np.array(w_cols[:w_idx[n_pos]], dtype=np.int_)
-        b_cols = np.array(b_cols[:w_idx[n_pos]], dtype=np.int_)
+        b_cols = np.array(b_cols[:b_idx[n_pos]], dtype=np.int_)
         w_matrix = torch.sparse_csr_tensor(w_idx, w_cols, np.ones(w_idx[n_pos]), size=(n_pos, NUM_FEATURES), dtype=torch.float32)
         b_matrix = torch.sparse_csr_tensor(b_idx, b_cols, np.ones(b_idx[n_pos]), size=(n_pos, NUM_FEATURES), dtype=torch.float32)
         return w_matrix, b_matrix, scores_array, results_array, phases_array
 
 
 
-def train(dataloader, model, loss_fn, optimiser, device, epoch):
+def train(dataloader, model, loss_fn, optimiser, device, epoch, output_file):
     send = lambda x: x.to(device)
-    size = len(dataloader.dataset)
     model.train()
+    dataloader.set_train()
+    size = len(dataloader.dataset)
     n_batches = size // dataloader.batch_size + 1
     pbar = tqdm(dataloader, desc=f'Epoch {epoch + 1}', total=n_batches, unit='batch')
-    for indices in dataloader:
+    for batch, indices in enumerate(dataloader):
         wf, bf, scores, results, phases = map(send, dataloader.load(indices))
 
         # Compute prediction error
@@ -130,9 +151,28 @@ def train(dataloader, model, loss_fn, optimiser, device, epoch):
         optimiser.step()
 
         # Update progress
+        output_file.write(f'{epoch}\t{batch}\t{loss.item()}\n')
+        output_file.flush()
         pbar.set_postfix_str(f'Loss: {loss.item():>6.4e}')
         pbar.update()
     pbar.close()
+
+
+def test(dataloader, model, loss_fn, device, epoch, output_file):
+    send = lambda x: x.to(device)
+    test_loss = 0
+    num_batches = 0
+    dataloader.set_test()
+    with torch.no_grad():
+        for indices in dataloader:
+            wf, bf, scores, results, phases = map(send, dataloader.load(indices))
+            pred = model(wf, bf)
+            test_loss += loss_fn(pred.squeeze(), scores, results, phases).item()
+            num_batches += 1
+        test_loss /= num_batches
+    output_file.write(f'{epoch}\t{test_loss}\n')
+    output_file.flush()
+    print(f'Epoch {epoch + 1}: Test loss: {test_loss:>6.4e}')
 
 
 
@@ -146,14 +186,14 @@ def sigmoid_loss(output, scores, results, phases):
 
 
 
-def main(pawn_path: str, dataset_path: str, output_dir: str, epochs: int, batch_size: int, random_skip: int, load_model=None):
+def main(pawn_path: str, dataset_path: str, output_dir: str, epochs: int, batch_size: int, random_skip: int, test_size: float, load_model=None):
     # Get cpu or gpu device for training
     device = "cuda" if torch.cuda.is_available() else "cpu"
     torch.set_num_threads(1)
     print(f"Using {device} device")
 
     # Build dataset and dataloaders
-    dataset = PawnDataset(pawn_path, dataset_path, random_skip)
+    dataset = PawnDataset(pawn_path, dataset_path, random_skip, test_size)
     dataloader = BatchedDataLoader(dataset, batch_size)
 
     # Define model
@@ -169,9 +209,11 @@ def main(pawn_path: str, dataset_path: str, output_dir: str, epochs: int, batch_
 
     # Training time
     os.makedirs(output_dir, exist_ok=True)
-    for epoch in range(epochs):
-        train(dataloader, model, loss_func, optimiser, device, epoch)
-        torch.save(model, os.path.join(output_dir, f"model-epoch{epoch}"))
+    with open('train.hist', 'w') as train_file, open('test.hist', 'w') as test_file:
+        for epoch in range(epochs):
+            train(dataloader, model, loss_func, optimiser, device, epoch, train_file)
+            test(dataloader, model, loss_func, device, epoch, test_file)
+            torch.save(model, os.path.join(output_dir, f"model-epoch{epoch}"))
 
     # Save final model
     torch.save(model, os.path.join(output_dir, "model"))
@@ -186,5 +228,6 @@ if __name__ == '__main__':
     parser.add_argument('--load', type=str, default=None, help='Start from a given model')
     parser.add_argument('--batch_size', type=int, default=16384, help='Number of games per batch')
     parser.add_argument('--random_skip', type=int, default=15, help='On average, skip every x positions')
+    parser.add_argument('--test_size', type=float, default=0.1, help='Test dataset size')
     args = parser.parse_args()
-    main(args.pawn, args.dataset, args.output, args.epochs, args.batch_size, args.random_skip, args.load)
+    main(args.pawn, args.dataset, args.output, args.epochs, args.batch_size, args.random_skip, args.test_size, args.load)
