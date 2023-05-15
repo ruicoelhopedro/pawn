@@ -10,16 +10,9 @@ from hashlib import sha256
 def main(net_file):
     model = torch.load(net_file, map_location='cpu')
 
+    # Export NNUE to temporary file
     tmp_psqt_name = 'psqt.nn'
-
-    params = [a.detach().numpy() for a in model.parameters()]
-    quant_params = [np.array(np.round(SCALE_FACTOR * a), dtype=np.short) for a in params]
-
-    with open(tmp_psqt_name, 'w') as file:
-        for i, a in enumerate(quant_params):
-            # Transpose the two first sparse layers
-            data = a.T if i <= 1 else a
-            data.tofile(file)
+    model.export(tmp_psqt_name)
 
     # Update the hash of the file
     hasher = sha256()

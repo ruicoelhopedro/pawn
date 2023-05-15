@@ -1,5 +1,6 @@
 import chess
 import torch
+import numpy as np
 from torch import nn
 from utils import map_features
 
@@ -34,10 +35,10 @@ class NNUE(nn.Module):
 
     def __init__(self):
         super().__init__()
+        self.crelu = CReLU()
         self.psqt = nn.Linear(NUM_FEATURES, 2, bias=False)
         self.accumulator = nn.Linear(NUM_FEATURES, NUM_ACCUMULATORS)
-        self.stack = nn.Sequential(CReLU(),
-                                   nn.Linear(NUM_ACCUMULATORS, 2, bias=False))
+        self.layer = nn.Linear(NUM_ACCUMULATORS, 2, bias=False)
         # Clear weights and biases for sparse input layer and PSQT
         self.psqt.weight.data.fill_(0.0)
         self.accumulator.weight.data.fill_(0.0)
@@ -49,7 +50,28 @@ class NNUE(nn.Module):
                     self.psqt.weight.data[0, map_features(piece, square, king, True)] = mg / SCALE_FACTOR
                     self.psqt.weight.data[1, map_features(piece, square, king, True)] = eg / SCALE_FACTOR
 
+
     def forward(self, white, black):
         psqt = self.psqt(white) - self.psqt(black)
-        positional = self.stack(self.accumulator(white)) - self.stack(self.accumulator(black))
+        white_acc = self.crelu(self.accumulator(white))
+        black_acc = self.crelu(self.accumulator(black))
+        positional = self.layer(white_acc) - self.layer(black_acc)
         return psqt + positional
+
+
+    @staticmethod
+    def __dump(tensor, dtype, scale, file, transpose=False):
+        weights = tensor.detach().numpy()
+        quant_weights = np.array(np.round(scale * weights), dtype=dtype)
+        if transpose:
+            quant_weights = quant_weights.T
+        quant_weights.tofile(file)
+
+
+    def export(self, filename):
+        # Export each layer to the output NNUE file
+        with open(filename, 'w') as output_file:
+            self.__dump(self.psqt.weight, np.short, SCALE_FACTOR, output_file, transpose=True)
+            self.__dump(self.accumulator.weight, np.short, SCALE_FACTOR, output_file, transpose=True)
+            self.__dump(self.accumulator.bias.data, np.short, SCALE_FACTOR, output_file)
+            self.__dump(self.layer.weight.data, np.short, SCALE_FACTOR, output_file)
