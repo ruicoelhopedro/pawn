@@ -221,15 +221,20 @@ void Board::update_checkers()
 void Board::regen_psqt(Turn turn)
 {
     m_psq[turn].clear();
-    for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
-    {
-        for (Turn t : { WHITE, BLACK })
+    std::size_t num_features = 0;
+    PSQT::Feature features[PSQT::NUM_MAX_ACTIVE_FEATURES];
+
+    // Pack features to be pushed into the accumulator
+    for (Turn t : { WHITE, BLACK })
+        for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
         {
             Bitboard b = get_pieces(t, p);
             while (b)
-                m_psq[turn].push(p, b.bitscan_forward_reset(), m_king_sq[turn], t, turn);
+                features[num_features++] = m_psq[turn].get_feature(p, b.bitscan_forward_reset(), m_king_sq[turn], t, turn);
         }
-    }
+
+    // Regen entire accumulator at once
+    m_psq[turn].push_features(num_features, features);
 }
 
 

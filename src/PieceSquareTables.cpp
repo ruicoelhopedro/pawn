@@ -66,7 +66,7 @@ namespace PSQT
 
     
 
-    int Accumulator::index(PieceType p, Square s, Square ks, Turn pt, Turn kt)
+    Feature Accumulator::get_feature(PieceType p, Square s, Square ks, Turn pt, Turn kt) const
     {
         // Vertical mirror for black kings
         if (kt == BLACK)
@@ -111,7 +111,7 @@ namespace PSQT
         if (p == KING)
             return;
 
-        int idx = index(p, s, ks, pt, kt);
+        Feature idx = get_feature(p, s, ks, pt, kt);
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
             m_net[i] += psqt_net->m_sparse_layer[idx][i];
         m_psqt[MG] += psqt_net->m_psqt[idx][MG];
@@ -124,11 +124,23 @@ namespace PSQT
         if (p == KING)
             return;
 
-        int idx = index(p, s, ks, pt, kt);
+        Feature idx = get_feature(p, s, ks, pt, kt);
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
             m_net[i] -= psqt_net->m_sparse_layer[idx][i];
         m_psqt[MG] -= psqt_net->m_psqt[idx][MG];
         m_psqt[EG] -= psqt_net->m_psqt[idx][EG];
+    }
+
+
+    void Accumulator::push_features(std::size_t num_features, Feature* features)
+    {
+        for (std::size_t i = 0; i < num_features; i++)
+        {
+            for (std::size_t j = 0; j < NUM_ACCUMULATORS; j++)
+                m_net[j] += psqt_net->m_sparse_layer[features[i]][j];
+            m_psqt[MG] += psqt_net->m_psqt[features[i]][MG];
+            m_psqt[EG] += psqt_net->m_psqt[features[i]][EG];
+        }
     }
 
 

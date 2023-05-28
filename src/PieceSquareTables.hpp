@@ -55,9 +55,11 @@ namespace PSQT
 {
 
     using Weight = int16_t;
+    using Feature = int;
     constexpr int SCALE_FACTOR = 1024;
     constexpr std::size_t NUM_FEATURES = 20480;
     constexpr std::size_t NUM_ACCUMULATORS = 128;
+    constexpr std::size_t NUM_MAX_ACTIVE_FEATURES = 30;
     
     enum Phase
     {
@@ -79,16 +81,18 @@ namespace PSQT
         int m_net[NUM_ACCUMULATORS];
         int m_psqt[NUM_PHASES];
 
-        int index(PieceType p, Square s, Square ks, Turn pt, Turn kt);
-
     public:
         Accumulator();
 
         void clear();
 
+        Feature get_feature(PieceType p, Square s, Square ks, Turn pt, Turn kt) const;
+
         void push(PieceType p, Square s, Square ks, Turn pt, Turn kt);
 
         void pop(PieceType p, Square s, Square ks, Turn pt, Turn kt);
+
+        void push_features(std::size_t num_features, Feature* features);
 
         MixedScore eval() const;
 
