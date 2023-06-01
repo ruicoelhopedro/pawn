@@ -6,6 +6,7 @@
 #include <sstream>
 #include <string>
 #include <variant>
+#include "Move.hpp"
 
 
 namespace UCI

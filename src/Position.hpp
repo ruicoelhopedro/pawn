@@ -258,36 +258,6 @@ protected:
     void update_checkers();
 
 
-    inline void set_piece(PieceType piece, Turn turn, Square square)
-    {
-        m_pieces[piece][turn].set(square);
-        m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
-        m_board_pieces[square] = get_piece(piece, turn);
-        m_psq[WHITE].push(piece, square, m_king_sq[WHITE], turn, WHITE);
-        m_psq[BLACK].push(piece, square, m_king_sq[BLACK], turn, BLACK);
-        m_material[turn] += piece_value[piece];
-        m_phase -= Phases::Pieces[piece];
-        m_piece_count[piece][turn]++;
-        m_material_hash ^= Zobrist::get_piece_turn_square(piece, turn, m_piece_count[piece][turn])
-                         ^ Zobrist::get_piece_turn_square(piece, turn, m_piece_count[piece][turn] - 1);
-    }
-
-
-    inline void pop_piece(PieceType piece, Turn turn, Square square)
-    {
-        m_pieces[piece][turn].reset(square);
-        m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
-        m_board_pieces[square] = NO_PIECE;
-        m_psq[WHITE].pop(piece, square, m_king_sq[WHITE], turn, WHITE);
-        m_psq[BLACK].pop(piece, square, m_king_sq[BLACK], turn, BLACK);
-        m_material[turn] -= piece_value[piece];
-        m_phase += Phases::Pieces[piece];
-        m_piece_count[piece][turn]--;
-        m_material_hash ^= Zobrist::get_piece_turn_square(piece, turn, m_piece_count[piece][turn])
-                         ^ Zobrist::get_piece_turn_square(piece, turn, m_piece_count[piece][turn] + 1);
-    }
-
-
     inline void move_piece(PieceType piece, Turn turn, Square from, Square to)
     {
         m_pieces[piece][turn].reset(from);
@@ -495,6 +465,36 @@ public:
     void generate_moves(MoveList& list, MoveGenType type) const;
 
 
+    inline void set_piece(PieceType piece, Turn turn, Square square)
+    {
+        m_pieces[piece][turn].set(square);
+        m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
+        m_board_pieces[square] = get_piece(piece, turn);
+        m_psq[WHITE].push(piece, square, m_king_sq[WHITE], turn, WHITE);
+        m_psq[BLACK].push(piece, square, m_king_sq[BLACK], turn, BLACK);
+        m_material[turn] += piece_value[piece];
+        m_phase -= Phases::Pieces[piece];
+        m_piece_count[piece][turn]++;
+        m_material_hash ^= Zobrist::get_piece_turn_square(piece, turn, m_piece_count[piece][turn])
+                         ^ Zobrist::get_piece_turn_square(piece, turn, m_piece_count[piece][turn] - 1);
+    }
+
+
+    inline void pop_piece(PieceType piece, Turn turn, Square square)
+    {
+        m_pieces[piece][turn].reset(square);
+        m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
+        m_board_pieces[square] = NO_PIECE;
+        m_psq[WHITE].pop(piece, square, m_king_sq[WHITE], turn, WHITE);
+        m_psq[BLACK].pop(piece, square, m_king_sq[BLACK], turn, BLACK);
+        m_material[turn] -= piece_value[piece];
+        m_phase += Phases::Pieces[piece];
+        m_piece_count[piece][turn]--;
+        m_material_hash ^= Zobrist::get_piece_turn_square(piece, turn, m_piece_count[piece][turn])
+                         ^ Zobrist::get_piece_turn_square(piece, turn, m_piece_count[piece][turn] + 1);
+    }
+
+
     inline PieceType get_piece_at(Square square) const
     {
         return get_piece_type(m_board_pieces[square]);
@@ -657,6 +657,9 @@ public:
 
 
     Bitboard sliders() const;
+
+
+    const PSQT::Accumulator& accumulator(Turn t) const;
 };
 
 

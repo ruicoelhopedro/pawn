@@ -53,30 +53,6 @@ MaterialEntry* probe_material(const Board& board, HashTable<MaterialEntry>& tabl
 }
 
 
-MixedScore material(Board board, EvalData& eval)
-{
-    for (Turn t : { WHITE, BLACK })
-    {
-        eval.fields[t].material = MixedScore(0, 0);
-        for (auto piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
-        {
-            eval.fields[t].material += piece_value[piece] * board.get_pieces(t, piece).count();
-            for (int p2 = PAWN; p2 <= piece; p2++)
-                eval.fields[t].imbalance += imbalance_terms[piece][p2] * board.get_pieces(t, piece).count()
-                                                                       * board.get_pieces(t, PieceType(p2)).count();
-        }
-    }
-    return eval.fields[WHITE].material - eval.fields[BLACK].material;
-}
-
-
-MixedScore piece_square_value(Board board, EvalData& eval)
-{
-    eval.fields[WHITE].placement = board.psq(WHITE);
-    eval.fields[BLACK].placement = board.psq(BLACK);
-    return eval.fields[WHITE].placement - eval.fields[BLACK].placement;
-}
-
 MixedScore pawns(const Board& board, EvalData& data)
 {
     // Bonuses and penalties
@@ -472,45 +448,13 @@ Score scale(const Board& board, EvalData& data, MixedScore mixed)
 
 Score evaluation(const Board& board, EvalData& data, Thread& thread)
 {
-    MixedScore mixed_result(0, 0);
-
-    // Probe the material hash table
-    MaterialEntry* me = probe_material(board, thread.m_material_table);
-    mixed_result += me->imbalance();
-
-    // Material and PSQT incrementally updated in the position
-    mixed_result += board.material() + board.psq();
-
-    // Pawn structure
-    mixed_result += pawns(board, data);
-
-    // Piece scores
-    mixed_result += pieces(board, data);
-
-    // King safety
-    mixed_result += king_safety<WHITE>(board, data) - king_safety<BLACK>(board, data);
-
-    // Space
-    mixed_result += space<WHITE>(board, data) - space<BLACK>(board, data);
-
-    // Threats
-    mixed_result += threats<WHITE>(board, data) - threats<BLACK>(board, data);
-
-    // Passed pawn scores
-    mixed_result += passed<WHITE>(board, data) - passed<BLACK>(board, data);
-
-    // Tapered eval
-    Score result = scale(board, data, mixed_result);
-
-    // We don't return exact draw scores -> add one unit to the moving side
-    if (result == SCORE_DRAW)
-        result += turn_to_color(board.turn());
-
-    return result;
+    MixedScore mixed_result = board.psq();
+    Score result = mixed_result.tapered(board.phase());
+    return std::clamp(result, -SCORE_MATE_FOUND + 1, SCORE_MATE_FOUND - 1);
 }
 
 
-void eval_table(const Board& board, EvalData& data, Score score)
+void eval_table(const Board& board, EvalData& data)
 {
     // No eval printing when in check
     if (board.checkers())
@@ -519,46 +463,75 @@ void eval_table(const Board& board, EvalData& data, Score score)
         return;
     }
 
-    // Update material and placement terms
-    material(board, data);
-    piece_square_value(board, data);
+    // Get total and partial NNUE scores
+    MixedScore mixed_nnue = board.psq();
+    auto white_acc = board.accumulator(WHITE);
+    auto black_acc = board.accumulator(BLACK);
+    MixedScore psqt = white_acc.eval_psq() - black_acc.eval_psq();
+    MixedScore positional = mixed_nnue - psqt;
+    Score nnue = mixed_nnue.tapered(board.phase());
 
-    // Compute total scores
-    MixedScore total[2];
-    for (Turn t : { WHITE, BLACK })
+
+    // Print board with NNUE-derived piece values
+    Board b = board;
+    const char* white_piece_map = "PNBRQK  ";
+    const char* black_piece_map = "pnbrqk  ";
+    std::cout << std::endl;
+    std::cout << "NNUE-derived piece values" << std::endl;
+    for (int rank = 7; rank >= 0; rank--)
     {
-        total[t] = data.fields[t].material + data.fields[t].placement
-                 + data.fields[t].imbalance
-                 + data.fields[t].space    + data.fields[t].threats
-                 + data.fields[t].passed   + data.fields[t].scale;
-        for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
-            total[t] += data.fields[t].pieces[p];
-    }
+        std::cout << "+---------+---------+---------+---------+---------+---------+---------+---------+" << std::endl;
 
-    // Print the eval table
-    std::cout << ""                                                                                                       << std::endl;
-    std::cout << "---------------------------------------------------------------"                                        << std::endl;
-    std::cout << "               |     White     |     Black     |     Total     "                                        << std::endl;
-    std::cout << " Term          |   MG     EG   |   MG     EG   |   MG     EG   "                                        << std::endl;
-    std::cout << "---------------------------------------------------------------"                                        << std::endl;
-    std::cout << " Material      | " << Term< true>(data.fields[WHITE].material,       data.fields[BLACK].material)       << std::endl;
-    std::cout << " Imbalance     | " << Term< true>(data.fields[WHITE].imbalance,      data.fields[BLACK].imbalance)      << std::endl;
-    std::cout << " Placement     | " << Term< true>(data.fields[WHITE].placement,      data.fields[BLACK].placement)      << std::endl;
-    std::cout << " Pawns         | " << Term<false>(data.fields[WHITE].pieces[PAWN],   data.fields[BLACK].pieces[PAWN])   << std::endl;
-    std::cout << " Knights       | " << Term<false>(data.fields[WHITE].pieces[KNIGHT], data.fields[BLACK].pieces[KNIGHT]) << std::endl;
-    std::cout << " Bishops       | " << Term<false>(data.fields[WHITE].pieces[BISHOP], data.fields[BLACK].pieces[BISHOP]) << std::endl;
-    std::cout << " Rooks         | " << Term<false>(data.fields[WHITE].pieces[ROOK],   data.fields[BLACK].pieces[ROOK])   << std::endl;
-    std::cout << " Queens        | " << Term<false>(data.fields[WHITE].pieces[QUEEN],  data.fields[BLACK].pieces[QUEEN])  << std::endl;
-    std::cout << " King safety   | " << Term<false>(data.fields[WHITE].pieces[KING],   data.fields[BLACK].pieces[KING])   << std::endl;
-    std::cout << " Space         | " << Term<false>(data.fields[WHITE].space,          data.fields[BLACK].space)          << std::endl;
-    std::cout << " Threats       | " << Term<false>(data.fields[WHITE].threats,        data.fields[BLACK].threats)        << std::endl;
-    std::cout << " Passed pawns  | " << Term<false>(data.fields[WHITE].passed,         data.fields[BLACK].passed)         << std::endl;
-    std::cout << " Scale         | " << Term< true>(data.fields[WHITE].scale,          data.fields[BLACK].scale)          << std::endl;
-    std::cout << "---------------------------------------------------------------"                                        << std::endl;
-    std::cout << " Final         | " << Term< true>(total[WHITE],                      total[BLACK])                      << std::endl;
-    std::cout << "---------------------------------------------------------------"                                        << std::endl;
+        // First pass: write piece types
+        std::cout << "|";
+        for (int file = 0; file < 8; file++)
+        {
+            Square s = make_square(rank, file);
+            PieceType p = board.get_piece_at(s);
+            Turn t = board.get_pieces<WHITE>().test(s) ? WHITE : BLACK;
+            std::cout << "    " << (t == WHITE ? white_piece_map[p]: black_piece_map[p]) << "    |";
+        }
+        std::cout << std::endl;
+
+        // Second pass: write piece values
+        std::cout << "|";
+        for (int file = 0; file < 8; file++)
+        {
+            Square s = make_square(rank, file);
+            PieceType p = board.get_piece_at(s);
+            if (p != PIECE_NONE && p != KING)
+            {
+                // Compute the value of each piece by evaluating the eval difference after removing it
+                Turn t = board.get_pieces<WHITE>().test(s) ? WHITE : BLACK;
+                b.pop_piece(p, t, s);
+                Score value = nnue - b.psq().tapered(board.phase());
+                b.set_piece(p, t, s);
+                std::cout << " "
+                          << std::showpoint << std::noshowpos << std::fixed
+                          << std::setprecision(2) << std::setw(6)
+                          << Term::adjust(value) << "  |";
+            }
+            else
+                std::cout << "         |";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "+---------+---------+---------+---------+---------+---------+---------+---------+" << std::endl;
+
+
+    // Print NNUE table
+    std::cout << ""                                                   << std::endl;
+    std::cout << "NNUE Scores"                                        << std::endl;
+    std::cout << "--------------------------------------"             << std::endl;
+    std::cout << " Term                |    MG      EG  "             << std::endl;
+    std::cout << "--------------------------------------"             << std::endl;
+    std::cout << " Material   (PSQT)   | " << Term(psqt)       << " " << std::endl;
+    std::cout << " Positional (Layers) | " << Term(positional) << " " << std::endl;
+    std::cout << "--------------------------------------"             << std::endl;
+    std::cout << " Final               | " << Term(mixed_nnue) << " " << std::endl;
+    std::cout << "--------------------------------------"             << std::endl;
     std::cout << "Game Phase:       " << int(board.phase()) << std::endl;
-    std::cout << "Final evaluation: " <<  100 * score / PawnValue.endgame() << " cp (White)" << std::endl;
+    std::cout << "Final evaluation: " <<  100 * nnue / PawnValue.endgame() << " cp (White)" << std::endl;
     std::cout << std::endl;
 }
     
