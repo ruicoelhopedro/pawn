@@ -695,19 +695,19 @@ bool Position::is_draw(bool unique) const
     int cur_pos = (int)m_boards.size() - 1;
     int n_moves = std::min(cur_pos + 1, board().half_move_clock());
     int min_pos = cur_pos - n_moves + 1;
-    if (n_moves >= 8)
+    if (n_moves >= (unique ? 4 : 8))
     {
         int pos1 = cur_pos - 4;
         while (pos1 >= min_pos)
         {
-            if (board().hash() == m_boards[pos1].hash())
+            if (board() == m_boards[pos1])
             {
                 if (unique)
                     return true;
                 int pos2 = pos1 - 4;
                 while (pos2 >= min_pos)
                 {
-                    if (board().hash() == m_boards[pos2].hash())
+                    if (board() == m_boards[pos2])
                         return true;
                     pos2 -= 2;
                 }
