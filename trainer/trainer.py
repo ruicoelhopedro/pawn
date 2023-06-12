@@ -9,6 +9,7 @@ from torch import nn
 from tqdm import tqdm
 from torch.utils.data import Dataset
 from torch.utils.data.sampler import BatchSampler, RandomSampler
+from torch.optim.lr_scheduler import StepLR
 from sklearn.model_selection import train_test_split
 from model import NNUE, SCALE_FACTOR, NUM_FEATURES, NUM_MAX_FEATURES
 
@@ -207,14 +208,16 @@ def main(pawn_path: str, dataset_path: str, output_dir: str, epochs: int, batch_
 
     # Loss and optimiser
     loss_func = sigmoid_loss
-    optimiser = torch.optim.Adam(model.parameters(), lr=1e-3)
+    optimiser = torch.optim.Adam(model.parameters(), lr=2e-3)
 
     # Training time
     os.makedirs(output_dir, exist_ok=True)
+    scheduler = StepLR(optimiser, step_size=30, gamma=0.65)
     with open('train.hist', 'w') as train_file, open('test.hist', 'w') as test_file:
         for epoch in range(epochs):
             train(dataloader, model, loss_func, optimiser, device, epoch, train_file)
             test(dataloader, model, loss_func, device, epoch, test_file)
+            scheduler.step()
             torch.save(model, os.path.join(output_dir, f"model-epoch{epoch}"))
 
     # Save final model
