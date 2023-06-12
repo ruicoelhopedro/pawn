@@ -36,25 +36,26 @@ class NNUE(nn.Module):
     def __init__(self):
         super().__init__()
         self.crelu = CReLU()
-        self.psqt = nn.Linear(NUM_FEATURES, 2, bias=False)
-        self.accumulator = nn.Linear(NUM_FEATURES, NUM_ACCUMULATORS)
+        self.psqt = nn.EmbeddingBag(NUM_FEATURES, 2, mode='sum')
+        self.accumulator_emb = nn.EmbeddingBag(NUM_FEATURES, NUM_ACCUMULATORS, mode='sum')
+        self.accumulator_bias = nn.Parameter(torch.zeros(NUM_ACCUMULATORS))
         self.layer = nn.Linear(NUM_ACCUMULATORS, 2, bias=False)
         # Clear weights and biases for sparse input layer and PSQT
         self.psqt.weight.data.fill_(0.0)
-        self.accumulator.weight.data.fill_(0.0)
-        self.accumulator.bias.data.fill_(0.0)
+        self.accumulator_emb.weight.data.fill_(0.0)
+        self.accumulator_bias.data.fill_(0.0)
         # Initialise PSQT weights using material balance
         for square in range(64):
             for king in range(64):
                 for piece, (mg, eg) in PIECE_VALUES.items():
-                    self.psqt.weight.data[0, map_features(piece, square, king, True)] = mg / SCALE_FACTOR
-                    self.psqt.weight.data[1, map_features(piece, square, king, True)] = eg / SCALE_FACTOR
+                    self.psqt.weight.data[map_features(piece, square, king, True), 0] = mg / SCALE_FACTOR
+                    self.psqt.weight.data[map_features(piece, square, king, True), 1] = eg / SCALE_FACTOR
 
 
-    def forward(self, white, black):
-        psqt = self.psqt(white) - self.psqt(black)
-        white_acc = self.crelu(self.accumulator(white))
-        black_acc = self.crelu(self.accumulator(black))
+    def forward(self, w_offset, w_cols, b_offset, b_cols):
+        psqt = self.psqt(w_cols, w_offset) - self.psqt(b_cols, b_offset)
+        white_acc = self.crelu(self.accumulator_emb(w_cols, w_offset) + self.accumulator_bias)
+        black_acc = self.crelu(self.accumulator_emb(b_cols, b_offset) + self.accumulator_bias)
         positional = self.layer(white_acc) - self.layer(black_acc)
         return psqt + positional
 
@@ -71,7 +72,7 @@ class NNUE(nn.Module):
     def export(self, filename):
         # Export each layer to the output NNUE file
         with open(filename, 'w') as output_file:
-            self.__dump(self.psqt.weight, np.short, SCALE_FACTOR, output_file, transpose=True)
-            self.__dump(self.accumulator.weight, np.short, SCALE_FACTOR, output_file, transpose=True)
-            self.__dump(self.accumulator.bias.data, np.short, SCALE_FACTOR, output_file)
+            self.__dump(self.psqt.weight.data, np.short, SCALE_FACTOR, output_file)
+            self.__dump(self.accumulator_emb.weight.data, np.short, SCALE_FACTOR, output_file)
+            self.__dump(self.accumulator_bias.data, np.short, SCALE_FACTOR, output_file)
             self.__dump(self.layer.weight.data, np.short, SCALE_FACTOR, output_file)

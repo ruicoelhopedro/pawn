@@ -29,10 +29,10 @@ def map_matrix(weights):
 
 def plot_heatmap(data_white, data_black, king_sq, piece):
     # Map the data to a matrix
-    w_matrix_mg = map_matrix(data_white[0, :])
-    w_matrix_eg = map_matrix(data_white[1, :])
-    b_matrix_mg = map_matrix(data_black[0, :])
-    b_matrix_eg = map_matrix(data_black[1, :])
+    w_matrix_mg = map_matrix(data_white[:, 0])
+    w_matrix_eg = map_matrix(data_white[:, 1])
+    b_matrix_mg = map_matrix(data_black[:, 0])
+    b_matrix_eg = map_matrix(data_black[:, 1])
     # Create the plot
     fig, axes = plt.subplots(figsize=(8, 8), ncols=2, nrows=2)
     for row in axes:
@@ -72,8 +72,8 @@ def main(net_file, piece, king_sq):
     idx_white = [map_features(piece, square, king_sq, True) for square in range(64)]
     idx_black = [map_features(piece, square, king_sq, False) for square in range(64)]
     # Plot the heatmap
-    weights_white = model.psqt.weight.data[:, idx_white] * SCALE_FACTOR
-    weights_black = model.psqt.weight.data[:, idx_black] * SCALE_FACTOR
+    weights_white = model.psqt.weight.data[idx_white,:] * SCALE_FACTOR
+    weights_black = model.psqt.weight.data[idx_black,:] * SCALE_FACTOR
     plot_heatmap(weights_white, weights_black, king_sq, piece)
 
 

@@ -81,7 +81,11 @@ class PawnDataset(Dataset):
         print('Building indices...')
         self.indices = np.empty(self.n_games + 1, dtype=np.ulonglong)
         self.get_indices(self.fname, self.indices)
-        print(f'Found {self.n_games} games with a total of {self.indices[-1]} positions')
+
+        # Get number of positions
+        games = np.arange(self.n_games, dtype=np.ulonglong)
+        self.n_pos = self.get_num_positions(self.indices, games, len(games))
+        print(f'Found {self.n_games} games with a total of {self.n_pos} positions')
 
         # Train-test split
         self.train_indices, self.test_indices = train_test_split(np.arange(self.n_games), test_size=test_size)
@@ -120,14 +124,12 @@ class PawnDataset(Dataset):
         scores_array = torch.tensor(scores[0:n_pos], dtype=torch.float32)
         phases_array = torch.tensor(phases[0:n_pos], dtype=torch.float32) / 64.0
         results_array = (torch.tensor(results[0:n_pos], dtype=torch.float32) + 1) / 2
-        # Build the sparse matrix
-        w_idx = np.array(w_idx[:n_pos+1], dtype=np.int_)
-        b_idx = np.array(b_idx[:n_pos+1], dtype=np.int_)
-        w_cols = np.array(w_cols[:w_idx[n_pos]], dtype=np.int_)
-        b_cols = np.array(b_cols[:b_idx[n_pos]], dtype=np.int_)
-        w_matrix = torch.sparse_csr_tensor(w_idx, w_cols, np.ones(w_idx[n_pos]), size=(n_pos, NUM_FEATURES), dtype=torch.float32)
-        b_matrix = torch.sparse_csr_tensor(b_idx, b_cols, np.ones(b_idx[n_pos]), size=(n_pos, NUM_FEATURES), dtype=torch.float32)
-        return w_matrix, b_matrix, scores_array, results_array, phases_array
+        # Build the embedding tensors
+        w_cols =   torch.LongTensor(np.array(w_cols[:w_idx[n_pos]], dtype=np.int_))
+        b_cols =   torch.LongTensor(np.array(b_cols[:b_idx[n_pos]], dtype=np.int_))
+        w_offset = torch.LongTensor(np.array(w_idx[:n_pos], dtype=np.int_))
+        b_offset = torch.LongTensor(np.array(b_idx[:n_pos], dtype=np.int_))
+        return w_offset, w_cols, b_offset, b_cols, scores_array, results_array, phases_array
 
 
 
@@ -139,10 +141,10 @@ def train(dataloader, model, loss_fn, optimiser, device, epoch, output_file):
     n_batches = size // dataloader.batch_size + 1
     pbar = tqdm(dataloader, desc=f'Epoch {epoch + 1}', total=n_batches, unit='batch')
     for batch, indices in enumerate(dataloader):
-        wf, bf, scores, results, phases = map(send, dataloader.load(indices))
+        w_offset, w_cols, b_offset, b_cols, scores, results, phases = map(send, dataloader.load(indices))
 
         # Compute prediction error
-        pred = model(wf, bf)
+        pred = model(w_offset, w_cols, b_offset, b_cols)
         loss = loss_fn(pred.squeeze(), scores, results, phases)
 
         # Backpropagation
@@ -165,8 +167,8 @@ def test(dataloader, model, loss_fn, device, epoch, output_file):
     dataloader.set_test()
     with torch.no_grad():
         for indices in dataloader:
-            wf, bf, scores, results, phases = map(send, dataloader.load(indices))
-            pred = model(wf, bf)
+            w_offset, w_cols, b_offset, b_cols, scores, results, phases = map(send, dataloader.load(indices))
+            pred = model(w_offset, w_cols, b_offset, b_cols)
             test_loss += loss_fn(pred.squeeze(), scores, results, phases).item()
             num_batches += 1
         test_loss /= num_batches
