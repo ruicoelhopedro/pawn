@@ -228,7 +228,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='NNUE trainer for pawn')
     parser.add_argument('dataset', help='Dataset file to use for training', type=str)
     parser.add_argument('pawn', help='Shared library of pawn', type=str)
-    parser.add_argument('--epochs', type=int, default=100, help='Number of epochs')
+    parser.add_argument('--epochs', type=int, default=300, help='Number of epochs')
     parser.add_argument('--output', type=str, default='models', help='Output directory')
     parser.add_argument('--load', type=str, default=None, help='Start from a given model')
     parser.add_argument('--batch_size', type=int, default=16384, help='Number of games per batch')
