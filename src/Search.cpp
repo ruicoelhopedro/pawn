@@ -472,7 +472,7 @@ namespace Search
 
             // Shallow depth pruning
             int move_score = move.is_capture() ? 0 : orderer.quiet_score(move);
-            if (!RootSearch && position.board().non_pawn_material(Turn) && !InCheck && best_score > -SCORE_MATE_FOUND)
+            if (!RootSearch && position.board().non_pawn_material(Turn) && best_score > -SCORE_MATE_FOUND)
             {
                 if (move.is_capture() || move.is_promotion())
                 {
@@ -501,7 +501,6 @@ namespace Search
                 tt_hit &&
                 depth > 8 &&
                 !HasExcludedMove &&
-                !InCheck &&
                 move == tt_move &&
                 tt_depth >= depth - 3 &&
                 (tt_type == EntryType::LOWER_BOUND || tt_type == EntryType::EXACT) &&
@@ -535,7 +534,7 @@ namespace Search
             position.make_move(move);
 
             // Check extensions
-            if (!extension && position.in_check() && abs(static_eval) > 75)
+            if (position.in_check() && abs(static_eval) > 75)
                 extension = 1;
 
             // Update depth and search data
