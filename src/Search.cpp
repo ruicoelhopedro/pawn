@@ -271,7 +271,7 @@ namespace Search
             score = negamax<ROOT>(position, depth, alpha, beta, data, false);
 
             // Check for timeout: search results cannot be trusted
-            if (thread.timeout())
+            if (thread.timeout() && depth > 1)
                 return score;
 
             // Store results for this PV line
@@ -466,7 +466,7 @@ namespace Search
             // Output some information during search
             if (RootSearch && data.thread().is_main() &&
                 data.thread().time().elapsed() > 3)
-                std::cout << "info depth " << static_cast<int>(depth)
+                std::cout << "info depth " << depth
                           << " currmove " << move.to_uci()
                           << " currmovenumber " << n_moves << std::endl;
 
@@ -528,9 +528,9 @@ namespace Search
             }
 
             // Make the move
-            Score score;
+            Score score = -SCORE_INFINITE;
             bool captureOrPromotion = move.is_capture() || move.is_promotion();
-            PieceType piece = static_cast<PieceType>(position.board().get_piece_at(move.from()));
+            PieceType piece = position.board().get_piece_at(move.from());
             position.make_move(move);
 
             // Check extensions
@@ -546,8 +546,7 @@ namespace Search
             bool didLMR = false;
             if (depth > 2 &&
                 n_moves > 1 + 2 * RootSearch &&
-                (!PvNode || !captureOrPromotion) &&
-                data.thread().id() % 3 < 2)
+                (!PvNode || !captureOrPromotion))
             {
                 didLMR = true;
                 int reduction = ilog2(n_moves) / 2
@@ -587,7 +586,7 @@ namespace Search
             position.unmake_move();
 
             // After a timeout, the search results cannot be trusted
-            if (RootSearch && data.thread().timeout())
+            if (RootSearch && data.thread().timeout() && depth > 1)
                 return best_score;
 
             // Update histories after passed LMR
@@ -650,15 +649,11 @@ namespace Search
                 best_score = SCORE_DRAW;
         }
 
-        // TT store (except at root in non-main threads)
-        if (!(RootSearch && !data.thread().is_main()))
-        {
-            Hash hash = HasExcludedMove ? position.hash() ^ Zobrist::get_move_hash(data.excluded_move) : position.hash();
-            EntryType type = best_score >= beta                  ? EntryType::LOWER_BOUND
-                           : (PvNode && best_score > alpha_init) ? EntryType::EXACT
-                           :                                       EntryType::UPPER_BOUND;
-            ttable.store(hash, depth, score_to_tt(best_score, Ply), best_move, type, data.static_eval);
-        }
+        // TT store
+        EntryType type = best_score >= beta                  ? EntryType::LOWER_BOUND
+                       : (PvNode && best_score > alpha_init) ? EntryType::EXACT
+                       :                                       EntryType::UPPER_BOUND;
+        ttable.store(hash, depth, score_to_tt(best_score, Ply), best_move, type, data.static_eval);
 
         return best_score;
     }
