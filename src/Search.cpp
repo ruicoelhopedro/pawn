@@ -244,14 +244,11 @@ namespace Search
     {
         Thread& thread = data.thread();
 
-        constexpr Score starting_window = 25;
-        Score l_window = starting_window;
-        Score r_window = starting_window;
-
         // Initial windows
         Score init_score = pv.score;
-        Score alpha = (depth <= 4) ? (-SCORE_INFINITE) : std::max(-SCORE_INFINITE, (init_score - l_window));
-        Score beta  = (depth <= 4) ? ( SCORE_INFINITE) : std::min(+SCORE_INFINITE, (init_score + r_window));
+        Score window = 5 + 200 / depth;
+        Score alpha = (depth <= 4) ? (-SCORE_INFINITE) : std::max(-SCORE_INFINITE, (init_score - window));
+        Score beta  = (depth <= 4) ? ( SCORE_INFINITE) : std::min(+SCORE_INFINITE, (init_score + window));
 
         Score score = -SCORE_INFINITE;
         while (true)
@@ -291,14 +288,12 @@ namespace Search
             if (thread.is_main() && thread.time().elapsed() > 3 && UCI::Options::MultiPV == 1)
                 thread.output_pvs();
 
-            if (pv.type == BoundType::UPPER_BOUND)
-                l_window *= 2;
-            else
-                r_window *= 2;
-
             // Increase window in the failed side exponentially
-            alpha = std::max(init_score - l_window, -SCORE_INFINITE);
-            beta  = std::min(init_score + r_window, +SCORE_INFINITE);
+            window *= 2;
+            if (score <= alpha)
+                alpha = std::max(score - window, -SCORE_INFINITE);
+            else
+                beta = std::min(score + window, +SCORE_INFINITE);
         }
 
         return score;
