@@ -434,7 +434,6 @@ namespace Search
         // Regular move search
         Move move;
         int n_moves = 0;
-        int move_number = 0;
         Move best_move = MOVE_NULL;
         Score best_score = -SCORE_INFINITE;
         Move quiet_list[NUM_MAX_MOVES];
@@ -443,20 +442,18 @@ namespace Search
         MoveOrder orderer = MoveOrder(position, depth, hash_move, history);
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
-            n_moves++;
-            move_number += !move.is_capture();
-
             // Skip excluded moves
             if (move == data.excluded_move)
                 continue;
 
-            // New search parameters
-            int extension = 0;
-            Depth curr_depth = depth;
-
             // For the root node, only search the stored root moves
             if (RootSearch && !data.thread().is_root_move(move))
                 continue;
+
+            // New search parameters
+            n_moves++;
+            int extension = 0;
+            Depth curr_depth = depth;
 
             // Output some information during search
             if (RootSearch && data.thread().is_main() &&
