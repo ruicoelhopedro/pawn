@@ -109,7 +109,7 @@ std::string BinaryBoard::fen() const
 
 bool BinaryGame::read(std::ifstream& stream, BinaryGame& result)
 {
-    result = BinaryGame();
+    result.nodes.clear();
     result.started = true;
     // Read starting position
     if (!stream.read(reinterpret_cast<char*>(&result.starting_pos), sizeof(BinaryBoard)))

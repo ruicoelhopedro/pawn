@@ -118,7 +118,7 @@ extern "C"
             Color result = Color(game.nodes.back().score);
     
              // Write each position, score and move
-            Board board(game.starting_pos);
+            Board board(game.starting_pos, true);
             for (BinaryNode node : game.nodes)
                 if (node.move != MOVE_NULL)
                 {

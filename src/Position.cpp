@@ -63,7 +63,8 @@ Board::Board()
 Board::Board(std::string fen)
     : m_hash(0),
       m_material_hash(Zobrist::get_initial_material_hash()),
-      m_phase(Phases::Total)
+      m_phase(Phases::Total),
+      m_simplified(false)
 {
     auto c = fen.cbegin();
 
@@ -129,10 +130,11 @@ Board::Board(std::string fen)
 }
 
 
-Board::Board(const BinaryBoard& bb)
+Board::Board(const BinaryBoard& bb, bool accumulator_frozen)
     : m_hash(0),
       m_material_hash(Zobrist::get_initial_material_hash()),
-      m_phase(Phases::Total)
+      m_phase(Phases::Total),
+      m_simplified(accumulator_frozen)
 {
     // Default initialisation for board pieces
     std::memset(m_castling_rights, 0, sizeof(m_castling_rights));
@@ -271,14 +273,17 @@ void Board::update_checkers()
 
 void Board::regen_psqt(Turn turn)
 {
-    m_psq[turn].clear();
-    for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
+    if (!m_simplified)
     {
-        for (Turn t : { WHITE, BLACK })
+        m_psq[turn].clear();
+        for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
         {
-            Bitboard b = get_pieces(t, p);
-            while (b)
-                m_psq[turn].push(p, b.bitscan_forward_reset(), m_king_sq[turn], t, turn);
+            for (Turn t : { WHITE, BLACK })
+            {
+                Bitboard b = get_pieces(t, p);
+                while (b)
+                    m_psq[turn].push(p, b.bitscan_forward_reset(), m_king_sq[turn], t, turn);
+            }
         }
     }
 }
