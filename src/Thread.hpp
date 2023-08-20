@@ -49,7 +49,6 @@ protected:
     Histories m_histories;
     std::atomic_uint64_t m_nodes_searched;
     std::vector<Search::MultiPVData> m_multiPV;
-    HashTable<Evaluation::MaterialEntry> m_material_table;
 
 public:
     Thread(int id, ThreadPool& pool);

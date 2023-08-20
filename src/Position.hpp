@@ -28,13 +28,11 @@ class Board
     // Updated fields
     Square m_king_sq[NUM_COLORS];
     Hash m_hash;
-    Hash m_material_hash;
     Bitboard m_checkers;
     MixedScore m_material[NUM_COLORS];
     PSQT::Accumulator m_psq[NUM_COLORS];
     uint8_t m_phase;
     Piece m_board_pieces[NUM_SQUARES];
-    uint8_t m_piece_count[NUM_PIECE_TYPES][NUM_COLORS];
 
 protected:
 
@@ -474,9 +472,6 @@ public:
         m_psq[BLACK].push(piece, square, m_king_sq[BLACK], turn, BLACK);
         m_material[turn] += piece_value[piece];
         m_phase -= Phases::Pieces[piece];
-        m_piece_count[piece][turn]++;
-        m_material_hash ^= Zobrist::get_piece_turn_square(piece, turn, m_piece_count[piece][turn])
-                         ^ Zobrist::get_piece_turn_square(piece, turn, m_piece_count[piece][turn] - 1);
     }
 
 
@@ -489,9 +484,6 @@ public:
         m_psq[BLACK].pop(piece, square, m_king_sq[BLACK], turn, BLACK);
         m_material[turn] -= piece_value[piece];
         m_phase += Phases::Pieces[piece];
-        m_piece_count[piece][turn]--;
-        m_material_hash ^= Zobrist::get_piece_turn_square(piece, turn, m_piece_count[piece][turn])
-                         ^ Zobrist::get_piece_turn_square(piece, turn, m_piece_count[piece][turn] + 1);
     }
 
 
@@ -621,9 +613,6 @@ public:
 
 
     Hash hash() const;
-
-
-    Hash material_hash() const;
 
 
     Square least_valuable(Bitboard bb) const;

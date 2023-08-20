@@ -86,40 +86,6 @@ namespace Evaluation
     };
 
 
-    class MaterialEntry
-    {
-        Hash m_hash;
-        MixedScore m_imbalance;
-
-    public:
-        inline MaterialEntry()
-            : m_hash(0),
-              m_imbalance(0, 0)
-        {}
-
-        inline bool query(Age age, Hash hash, MaterialEntry** entry)
-        {
-            (void)age;
-            *entry = this;
-            return hash == m_hash;
-        }
-
-        void store(Age age, Hash hash, const Board& board);
-
-        inline bool empty() const { return m_hash == 0; }
-
-        inline Hash hash() const { return m_hash; }
-        inline MixedScore imbalance() const { return m_imbalance; }
-
-        friend MaterialEntry material_eval(const Board& board);
-    };
-
-    MaterialEntry material_eval(const Board& board);
-
-
-    MaterialEntry* probe_material(const Board& board, HashTable<MaterialEntry>& table);
-
-
     Score evaluation(const Board& board, EvalData& data, Thread& thread);
 
 

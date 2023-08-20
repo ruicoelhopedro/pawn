@@ -23,36 +23,6 @@ EvalData::EvalData(const Board& board)
 }
 
 
-void MaterialEntry::store(Age age, Hash hash, const Board& board)
-{
-    // Store hash
-    m_hash = board.material_hash();
-
-    // Compute the imbalance terms
-    m_imbalance = MixedScore(0, 0);
-    for (PieceType p1 : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
-        for (int p2 = PAWN; p2 <= p1; p2++)
-            m_imbalance += imbalance_terms[p1][p2]
-                         * (board.get_pieces(WHITE, p1).count() * board.get_pieces(WHITE, PieceType(p2)).count()
-                          - board.get_pieces(BLACK, p1).count() * board.get_pieces(BLACK, PieceType(p2)).count());
-}
-
-
-MaterialEntry* probe_material(const Board& board, HashTable<MaterialEntry>& table)
-{
-    // Probe the table and return the entry if we get a hit
-    MaterialEntry* entry;
-    if (table.query(board.material_hash(), &entry))
-        return entry;
-
-    // We did not get a hit, recompute all terms and store them in the table
-    table.store(board.material_hash(), board);
-
-    // The entry points to the same entry that we have just written
-    return entry;
-}
-
-
 MixedScore pawns(const Board& board, EvalData& data)
 {
     // Bonuses and penalties

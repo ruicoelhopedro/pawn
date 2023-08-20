@@ -61,14 +61,12 @@ Board::Board()
 
 Board::Board(std::string fen)
     : m_hash(0),
-      m_material_hash(Zobrist::get_initial_material_hash()),
       m_phase(Phases::Total)
 {
     auto c = fen.cbegin();
 
     // Default initialisation for board pieces
     std::memset(m_board_pieces, PIECE_NONE, sizeof(m_board_pieces));
-    std::memset(m_piece_count, 0, sizeof(m_piece_count));
     std::memset(m_king_sq, 0, sizeof(m_king_sq));
 
     // Read position
@@ -381,11 +379,8 @@ bool Board::is_valid() const
         for (Turn turn : { WHITE, BLACK })
         {
             Bitboard bb = get_pieces(turn, piece);
-            if (bb.count() != m_piece_count[piece][turn])
-                return false;
             material += piece_value[piece] * bb.count() * turn_to_color(turn);
             phase -= bb.count() * Phases::Pieces[piece];
-            material_hash ^= Zobrist::get_piece_turn_square(piece, turn, bb.count());
             while (bb)
             {
                 Square s = bb.bitscan_forward_reset();
@@ -399,8 +394,6 @@ bool Board::is_valid() const
     if (material.middlegame() != total_material.middlegame() || material.endgame() != total_material.endgame())
         return false;
     if (acc[WHITE] != m_psq[WHITE] || acc[BLACK] != m_psq[BLACK])
-        return false;
-    if (material_hash != m_material_hash)
         return false;
 
     return true;
@@ -487,12 +480,6 @@ bool Board::operator==(const Board& other) const
 Hash Board::hash() const
 {
     return m_hash;
-}
-
-
-Hash Board::material_hash() const
-{
-    return m_material_hash;
 }
 
 
