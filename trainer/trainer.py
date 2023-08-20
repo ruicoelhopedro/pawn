@@ -62,6 +62,7 @@ class PawnDataset(Dataset):
         self.get_nnue_data.restype = ctypes.c_ulonglong
         self.get_nnue_data.argtypes = [ctypes.c_char_p,
                                        ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
+                                       ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
                                        ctypes.c_ulonglong,
                                        ctypes.c_ulonglong,
                                        ctypes.c_ulonglong,
@@ -118,8 +119,7 @@ class PawnDataset(Dataset):
         results = np.empty(n_max_pos, dtype=np.byte)
         phases = np.empty(n_max_pos, dtype=np.byte)
         # Read the games and get the actual number of positions
-        filtered = self.indices[games]
-        n_pos = self.get_nnue_data(self.fname, filtered, len(filtered), hash(str(index)), self.prob_skip,
+        n_pos = self.get_nnue_data(self.fname, self.indices, games, len(games), hash(str(index)), self.prob_skip,
                                    w_idx, b_idx, w_cols, b_cols, scores, results, phases)
         # Build reduced arrays
         scores_array = torch.tensor(scores[0:n_pos], dtype=torch.float32)

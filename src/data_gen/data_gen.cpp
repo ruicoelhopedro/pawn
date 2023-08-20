@@ -2,6 +2,7 @@
 #include "Position.hpp"
 #include "data_gen/data_gen.hpp"
 #include <fstream>
+#include <cstring>
 
 
 BinaryBoard::BinaryBoard(const Board& board)
@@ -118,6 +119,44 @@ bool BinaryGame::read(std::ifstream& stream, BinaryGame& result)
     BinaryNode node;
     while(stream.read(reinterpret_cast<char*>(&node), sizeof(BinaryNode)) && node.move != MOVE_NULL)
         result.nodes.push_back(node);
+    // Final sanity check
+    if (node.move == MOVE_NULL)
+    {
+        result.nodes.push_back(node);
+        return true;
+    }
+
+    // If the game did not terminate normally, do not return it
+    return false;
+}
+
+
+bool BinaryGame::read(std::ifstream& stream, BinaryGame& result, std::size_t game_size)
+{
+    result.nodes.clear();
+    result.started = true;
+
+    // Read entire game at once (this buffer size is enough for games with 1000 or less moves)
+    char buffer[4096];
+    if (game_size <= sizeof(buffer) && !stream.read(buffer, game_size))
+        return false;
+
+    // Starting position
+    char* pos = buffer;
+    std::memcpy(&result.starting_pos, buffer, sizeof(BinaryBoard));
+    pos += sizeof(BinaryBoard);
+
+    // Parse each game node
+    BinaryNode node;
+    std::memcpy(&node, pos, sizeof(BinaryNode));
+    pos += sizeof(BinaryNode);
+    while (node.move != MOVE_NULL)
+    {
+        result.nodes.push_back(node);
+        std::memcpy(&node, pos, sizeof(BinaryNode));
+        pos += sizeof(BinaryNode);
+    }
+
     // Final sanity check
     if (node.move == MOVE_NULL)
     {

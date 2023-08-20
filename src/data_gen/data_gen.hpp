@@ -78,6 +78,8 @@ struct BinaryGame
 
     static bool read(std::ifstream& stream, BinaryGame& result);
 
+    static bool read(std::ifstream& stream, BinaryGame& result, std::size_t game_size);
+
     inline void begin(const Board& board)
     {
         started = true;

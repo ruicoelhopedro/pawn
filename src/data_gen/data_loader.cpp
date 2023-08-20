@@ -75,7 +75,21 @@ extern "C"
 
 
 
-    Size get_nnue_data(const char* file_name, const Size* selection, Size n_selected, Size seed, Size prob, Size* w_idx, Size* b_idx, unsigned short* w_cols, unsigned short* b_cols, short* scores, char* results, char* phases)
+    Size get_nnue_data(
+        const char* file_name,
+        const Size* indices,
+        const Size* selection,
+        Size n_selected,
+        Size seed,
+        Size prob,
+        Size* w_idx,
+        Size* b_idx,
+        unsigned short* w_cols,
+        unsigned short* b_cols,
+        short* scores,
+        char* results,
+        char* phases
+    )
     {
         // Open files
         std::string fname_str(file_name);
@@ -111,8 +125,10 @@ extern "C"
         for (Size i = 0; i < n_selected; i++)
         {
             // Read the game at the specified index
-            ifile.seekg(selection[i]);
-            BinaryGame::read(ifile, game);
+            ifile.seekg(indices[selection[i]]);
+            std::size_t game_size = indices[selection[i] + 1] - indices[selection[i]];
+            if (!BinaryGame::read(ifile, game, game_size))
+                continue;
 
             // Find winner
             Color result = Color(game.nodes.back().score);
