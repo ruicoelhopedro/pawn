@@ -261,13 +261,18 @@ Thread* ThreadPool::get_best_thread() const
     for (auto& thread : m_threads)
         min_score = std::min(min_score, thread->m_multiPV[0].score);
 
+    // Voting function
+    auto thread_votes = [min_score](const Thread* thread)
+    {
+        return (thread->m_multiPV[0].score - min_score + 20) * thread->m_multiPV[0].depth;
+    };
+
     // Build votes for each thread
-    int most_voted = 0;
-    Thread* best_thread;
+    Thread* best_thread = m_threads.front().get();
+    int most_voted = thread_votes(best_thread);
     for (auto& thread : m_threads)
     {
-        int vote = (thread->m_multiPV[0].score - min_score + 20) * int(thread->m_multiPV[0].depth);
-
+        int vote = thread_votes(thread.get());
         if (vote > most_voted)
         {
             best_thread = thread.get();
@@ -386,7 +391,7 @@ void Thread::search()
             aspiration_search(m_position, pv, depth, data);
 
             // Timeout?
-            if (timeout())
+            if (timeout() && iDepth > 1)
                 break;
 
             // Remove the bestmove we found from the root moves list

@@ -276,15 +276,20 @@ void Board::regen_psqt(Turn turn)
     if (!m_simplified)
     {
         m_psq[turn].clear();
-        for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
-        {
-            for (Turn t : { WHITE, BLACK })
+        std::size_t num_features = 0;
+        PSQT::Feature features[PSQT::NUM_MAX_ACTIVE_FEATURES];
+
+        // Pack features to be pushed into the accumulator
+        for (Turn t : { WHITE, BLACK })
+            for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
             {
                 Bitboard b = get_pieces(t, p);
                 while (b)
-                    m_psq[turn].push(p, b.bitscan_forward_reset(), m_king_sq[turn], t, turn);
+                    features[num_features++] = m_psq[turn].get_feature(p, b.bitscan_forward_reset(), m_king_sq[turn], t, turn);
             }
-        }
+
+        // Regen entire accumulator at once
+        m_psq[turn].push_features(num_features, features);
     }
 }
 
@@ -715,6 +720,13 @@ Bitboard Board::sliders() const
 
 
 
+const PSQT::Accumulator& Board::accumulator(Turn t) const
+{
+    return m_psq[t];
+}
+
+
+
 
 
 Position::Position()
@@ -739,19 +751,19 @@ bool Position::is_draw(bool unique) const
     int cur_pos = (int)m_boards.size() - 1;
     int n_moves = std::min(cur_pos + 1, board().half_move_clock());
     int min_pos = cur_pos - n_moves + 1;
-    if (n_moves >= 8)
+    if (n_moves >= (unique ? 4 : 8))
     {
         int pos1 = cur_pos - 4;
         while (pos1 >= min_pos)
         {
-            if (board().hash() == m_boards[pos1].hash())
+            if (board() == m_boards[pos1])
             {
                 if (unique)
                     return true;
                 int pos2 = pos1 - 4;
                 while (pos2 >= min_pos)
                 {
-                    if (board().hash() == m_boards[pos2].hash())
+                    if (board() == m_boards[pos2])
                         return true;
                     pos2 -= 2;
                 }

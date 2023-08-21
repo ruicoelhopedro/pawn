@@ -91,7 +91,7 @@ public:
         Score score = Evaluation::evaluation(board, data, *this);
 
         if (OUTPUT)
-            Evaluation::eval_table(board, data, score);
+            Evaluation::eval_table(board, data);
 
         return score;
     }
@@ -104,7 +104,7 @@ public:
         Score score = Evaluation::evaluation(board, data, *this);
 
         if (OUTPUT)
-            Evaluation::eval_table(board, data, score);
+            Evaluation::eval_table(board, data);
 
         return score;
     }

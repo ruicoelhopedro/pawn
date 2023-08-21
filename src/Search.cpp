@@ -244,14 +244,11 @@ namespace Search
     {
         Thread& thread = data.thread();
 
-        constexpr Score starting_window = 25;
-        Score l_window = starting_window;
-        Score r_window = starting_window;
-
         // Initial windows
         Score init_score = pv.score;
-        Score alpha = (depth <= 4) ? (-SCORE_INFINITE) : std::max(-SCORE_INFINITE, (init_score - l_window));
-        Score beta  = (depth <= 4) ? ( SCORE_INFINITE) : std::min(+SCORE_INFINITE, (init_score + r_window));
+        Score window = 5 + 200 / depth;
+        Score alpha = (depth <= 4) ? (-SCORE_INFINITE) : std::max(-SCORE_INFINITE, (init_score - window));
+        Score beta  = (depth <= 4) ? ( SCORE_INFINITE) : std::min(+SCORE_INFINITE, (init_score + window));
 
         Score score = -SCORE_INFINITE;
         while (true)
@@ -271,7 +268,7 @@ namespace Search
             score = negamax<ROOT>(position, depth, alpha, beta, data, false);
 
             // Check for timeout: search results cannot be trusted
-            if (thread.timeout())
+            if (thread.timeout() && depth > 1)
                 return score;
 
             // Store results for this PV line
@@ -291,14 +288,12 @@ namespace Search
             if (thread.is_main() && thread.time().elapsed() > 3 && UCI::Options::MultiPV == 1)
                 thread.output_pvs();
 
-            if (pv.type == BoundType::UPPER_BOUND)
-                l_window *= 2;
-            else
-                r_window *= 2;
-
             // Increase window in the failed side exponentially
-            alpha = std::max(init_score - l_window, -SCORE_INFINITE);
-            beta  = std::min(init_score + r_window, +SCORE_INFINITE);
+            window *= 2;
+            if (score <= alpha)
+                alpha = std::max(score - window, -SCORE_INFINITE);
+            else
+                beta = std::min(score + window, +SCORE_INFINITE);
         }
 
         return score;
@@ -439,7 +434,6 @@ namespace Search
         // Regular move search
         Move move;
         int n_moves = 0;
-        int move_number = 0;
         Move best_move = MOVE_NULL;
         Score best_score = -SCORE_INFINITE;
         Move quiet_list[NUM_MAX_MOVES];
@@ -448,31 +442,29 @@ namespace Search
         MoveOrder orderer = MoveOrder(position, depth, hash_move, history);
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
-            n_moves++;
-            move_number += !move.is_capture();
-
             // Skip excluded moves
             if (move == data.excluded_move)
                 continue;
-
-            // New search parameters
-            int extension = 0;
-            Depth curr_depth = depth;
 
             // For the root node, only search the stored root moves
             if (RootSearch && !data.thread().is_root_move(move))
                 continue;
 
+            // New search parameters
+            n_moves++;
+            int extension = 0;
+            Depth curr_depth = depth;
+
             // Output some information during search
             if (RootSearch && data.thread().is_main() &&
                 data.thread().time().elapsed() > 3)
-                std::cout << "info depth " << static_cast<int>(depth)
+                std::cout << "info depth " << depth
                           << " currmove " << move.to_uci()
                           << " currmovenumber " << n_moves << std::endl;
 
             // Shallow depth pruning
             int move_score = move.is_capture() ? 0 : orderer.quiet_score(move);
-            if (!RootSearch && position.board().non_pawn_material(Turn) && !InCheck && best_score > -SCORE_MATE_FOUND &&
+            if (!RootSearch && position.board().non_pawn_material(Turn) && best_score > -SCORE_MATE_FOUND &&
                 UCI::Options::ShallowDepthPruning)
             {
                 if (move.is_capture() || move.is_promotion())
@@ -502,7 +494,6 @@ namespace Search
                 tt_hit &&
                 depth > 8 &&
                 !HasExcludedMove &&
-                !InCheck &&
                 move == tt_move &&
                 tt_depth >= depth - 3 &&
                 (tt_type == EntryType::LOWER_BOUND || tt_type == EntryType::EXACT) &&
@@ -530,13 +521,13 @@ namespace Search
             }
 
             // Make the move
-            Score score;
+            Score score = -SCORE_INFINITE;
             bool captureOrPromotion = move.is_capture() || move.is_promotion();
-            PieceType piece = static_cast<PieceType>(position.board().get_piece_at(move.from()));
+            PieceType piece = position.board().get_piece_at(move.from());
             position.make_move(move);
 
             // Check extensions
-            if (!extension && position.in_check() && abs(static_eval) > 75)
+            if (position.in_check() && abs(static_eval) > 75)
                 extension = 1;
 
             // Update depth and search data
@@ -548,8 +539,7 @@ namespace Search
             bool didLMR = false;
             if (depth > 2 &&
                 n_moves > 1 + 2 * RootSearch &&
-                (!PvNode || !captureOrPromotion) &&
-                data.thread().id() % 3 < 2)
+                (!PvNode || !captureOrPromotion))
             {
                 didLMR = true;
                 int reduction = ilog2(n_moves) / 2
@@ -589,7 +579,7 @@ namespace Search
             position.unmake_move();
 
             // After a timeout, the search results cannot be trusted
-            if (RootSearch && data.thread().timeout())
+            if (RootSearch && data.thread().timeout() && depth > 1)
                 return best_score;
 
             // Update histories after passed LMR
@@ -652,15 +642,11 @@ namespace Search
                 best_score = SCORE_DRAW;
         }
 
-        // TT store (except at root in non-main threads)
-        if (!(RootSearch && !data.thread().is_main()))
-        {
-            Hash hash = HasExcludedMove ? position.hash() ^ Zobrist::get_move_hash(data.excluded_move) : position.hash();
-            EntryType type = best_score >= beta                  ? EntryType::LOWER_BOUND
-                           : (PvNode && best_score > alpha_init) ? EntryType::EXACT
-                           :                                       EntryType::UPPER_BOUND;
-            ttable.store(hash, depth, score_to_tt(best_score, Ply), best_move, type, data.static_eval);
-        }
+        // TT store
+        EntryType type = best_score >= beta                  ? EntryType::LOWER_BOUND
+                       : (PvNode && best_score > alpha_init) ? EntryType::EXACT
+                       :                                       EntryType::UPPER_BOUND;
+        ttable.store(hash, depth, score_to_tt(best_score, Ply), best_move, type, data.static_eval);
 
         return best_score;
     }
