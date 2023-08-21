@@ -17,9 +17,6 @@ namespace GamePlayer
         int adjudication = SCORE_MATE_FOUND;
         std::string book = "";
         std::string output_file = "output.dat";
-        int random_min_ply = 0;
-        int random_max_ply = 20;
-        int random_max_count = 5;
         uint random_probability = 25;
         int store_min_ply = 15;
         int seed = 0;
@@ -38,12 +35,6 @@ namespace GamePlayer
                 stream >> book;
             else if (token == "output_file")
                 stream >> output_file;
-            else if (token == "random_min_ply")
-                stream >> random_min_ply;
-            else if (token == "random_max_ply")
-                stream >> random_max_ply;
-            else if (token == "random_max_count")
-                stream >> random_max_count;
             else if (token == "random_probability")
                 stream >> random_probability;
             else if (token == "store_min_ply")
@@ -59,7 +50,6 @@ namespace GamePlayer
             }
 
         // Minimal sanity checks
-        random_min_ply = std::max(1, random_min_ply);
         store_min_ply = std::max(1, store_min_ply);
 
         // Build list of FENs to use
@@ -102,53 +92,57 @@ namespace GamePlayer
                 pos.set_init_ply();
                 UCI::ucinewgame(stream);
 
-                // Register a new game
-                BinaryGame game;
-                int n_random_moves = 0;
-
-                // Game loop
-                SearchResult state = thread.simple_search(pos, limits);
-                while (state.bestmove != MOVE_NULL && abs(state.score) < adjudication)
+                // Position warmup stage: the initial position for the game is obtained by a
+                // mix of search-based and random moves from the list of given FEN positions
+                bool valid_game = true;
+                for (int ply = 0; ply < store_min_ply; ply++)
                 {
-                    int ply = pos.game_ply();
-
-                    // Select the move that we will play
-                    Move move = state.bestmove;
-
-                    // Check if we are going to play a random move this time
-                    if (n_random_moves < random_max_count &&
-                        ply >= random_min_ply &&
-                        ply <= random_max_ply &&
-                        random.next(100) < random_probability)
+                    // Search or pick a random move?
+                    Move move;
+                    if (random.next(100) < random_probability)
                     {
-                        n_random_moves++;
-
-                        // Generate legal moves for this position
+                        // Random mover: generate legal moves for this position
                         Move moves[NUM_MAX_MOVES];
                         MoveList move_list(moves);
                         pos.board().generate_moves(move_list, MoveGenType::LEGAL);
 
                         // Pick a move
-                        move = move_list[random.next(move_list.length())];
+                        int num_moves = move_list.length();
+                        move = num_moves > 0 ? moves[random.next(num_moves)] : MOVE_NULL;
+                    }
+                    else
+                    {
+                        // Search-based: pick the bestmove for this position
+                        move = thread.simple_search(pos, limits).bestmove;
                     }
 
-                    // Start storing the game if we have just reached the starting point
-                    if (ply == store_min_ply)
-                        game.begin(pos.board());
-
-                    // Store this node
-                    if (ply >= store_min_ply)
-                        game.push(move, state.score);
+                    // Check if the game ended
+                    valid_game = move != MOVE_NULL;
+                    if (!valid_game)
+                        break;
 
                     // Prepare next iteration
                     pos.make_move(move);
                     pos.set_init_ply();
-                    state = thread.simple_search(pos, limits);
                 }
 
-                // If the game was adjudicated, write the last node
-                if (state.bestmove != MOVE_NULL)
-                    game.push(state.bestmove, state.score);
+                // Is the reached position usable?
+                SearchResult result = thread.simple_search(pos, limits);
+                if (!valid_game || result.bestmove == MOVE_NULL)
+                    continue;
+
+                // Register a new game
+                BinaryGame game;
+                game.begin(pos.board());
+
+                // Game loop
+                while (result.bestmove != MOVE_NULL)
+                {
+                    pos.make_move(result.bestmove);
+                    pos.set_init_ply();
+                    result = thread.simple_search(pos, limits);
+                    game.push(result.bestmove, result.score);
+                }
 
                 // Game is completed, write to the output file
                 game.write(output);
@@ -219,18 +213,27 @@ namespace GamePlayer
                 if (node.move != MOVE_NULL)
                 {
                     if(!board.legal(node.move))
+                    {
+                        std::cerr << "Illegal move " << node.move << " in position " << board.to_fen() << std::endl;
                         return false;
+                    }
                     board = board.make_move(node.move);
                 }
                 // Ensure the last score is the game outcome (-1, 0 or 1)
                 else if (abs(node.score) > 1)
+                {
+                    std::cerr << "Bad game termination: " << node.score << std::endl;
                     return false;
+                }
             }
         }
 
         // Ensure the file at the end
         if (!file.eof())
+        {
+            std::cerr << "Bad EOF" << std::endl;
             return false;
+        }
 
         return true;
     }

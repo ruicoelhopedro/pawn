@@ -46,8 +46,7 @@ def main(pawn_path, games_per_batch, depth, output_dir, num_threads, num_batches
     # Run the batches
     pool = ThreadPool(num_threads)
     batches = range(seed, seed + num_batches, 1)
-    datagen = lambda seed: gen.run_batch(seed)
-    result = pool.imap_unordered(datagen, batches, chunksize=1)
+    result = pool.imap_unordered(gen.run_batch, batches, chunksize=1)
     for _ in result:
         gen.report()
 
