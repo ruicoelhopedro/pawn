@@ -20,8 +20,8 @@ OBJ_FILES = $(SRC_FILES:%.cpp=$(BUILD_DIR)/%.o)
 DEP_FILES = $(OBJ_FILES:.o=.d)
 
 # Find the network file to mark it as a dependency for the binary
-NET_HEADER_FILE = "src/PieceSquareTables.hpp"
-NET_FILE = $(subst ",,$(word 3, $(shell grep PSQT_Default_File $(NET_HEADER_FILE))))
+NET_HEADER_FILE = "src/NNUE.hpp"
+NET_FILE = $(subst ",,$(word 3, $(shell grep NNUE_Default_File $(NET_HEADER_FILE))))
 
 $(BUILD_DIR)/$(BIN_NAME) : $(OBJ_FILES) $(NET_FILE)
 	$(CXX) $(OBJ_FILES) -o $@ $(LDFLAGS)

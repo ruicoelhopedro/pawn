@@ -4,7 +4,7 @@
 #include "Bitboard.hpp"
 #include "Move.hpp"
 #include "Zobrist.hpp"
-#include "PieceSquareTables.hpp"
+#include "NNUE.hpp"
 #include <algorithm>
 #include <string>
 
@@ -30,7 +30,7 @@ class Board
     Hash m_hash;
     Bitboard m_checkers;
     MixedScore m_material[NUM_COLORS];
-    PSQT::Accumulator m_psq[NUM_COLORS];
+    NNUE::Accumulator m_acc[NUM_COLORS];
     uint8_t m_phase;
     Piece m_board_pieces[NUM_SQUARES];
 
@@ -264,10 +264,10 @@ protected:
         m_hash ^= Zobrist::get_piece_turn_square(piece, turn, to);
         m_board_pieces[from] = NO_PIECE;
         m_board_pieces[to] = get_piece(piece, turn);
-        m_psq[WHITE].pop(piece, from, m_king_sq[WHITE], turn, WHITE);
-        m_psq[BLACK].pop(piece, from, m_king_sq[BLACK], turn, BLACK);
-        m_psq[WHITE].push(piece,  to, m_king_sq[WHITE], turn, WHITE);
-        m_psq[BLACK].push(piece,  to, m_king_sq[BLACK], turn, BLACK);
+        m_acc[WHITE].pop(piece, from, m_king_sq[WHITE], turn, WHITE);
+        m_acc[BLACK].pop(piece, from, m_king_sq[BLACK], turn, BLACK);
+        m_acc[WHITE].push(piece,  to, m_king_sq[WHITE], turn, WHITE);
+        m_acc[BLACK].push(piece,  to, m_king_sq[BLACK], turn, BLACK);
     }
 
 
@@ -468,8 +468,8 @@ public:
         m_pieces[piece][turn].set(square);
         m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
         m_board_pieces[square] = get_piece(piece, turn);
-        m_psq[WHITE].push(piece, square, m_king_sq[WHITE], turn, WHITE);
-        m_psq[BLACK].push(piece, square, m_king_sq[BLACK], turn, BLACK);
+        m_acc[WHITE].push(piece, square, m_king_sq[WHITE], turn, WHITE);
+        m_acc[BLACK].push(piece, square, m_king_sq[BLACK], turn, BLACK);
         m_material[turn] += piece_value[piece];
         m_phase -= Phases::Pieces[piece];
     }
@@ -480,8 +480,8 @@ public:
         m_pieces[piece][turn].reset(square);
         m_hash ^= Zobrist::get_piece_turn_square(piece, turn, square);
         m_board_pieces[square] = NO_PIECE;
-        m_psq[WHITE].pop(piece, square, m_king_sq[WHITE], turn, WHITE);
-        m_psq[BLACK].pop(piece, square, m_king_sq[BLACK], turn, BLACK);
+        m_acc[WHITE].pop(piece, square, m_king_sq[WHITE], turn, WHITE);
+        m_acc[BLACK].pop(piece, square, m_king_sq[BLACK], turn, BLACK);
         m_material[turn] -= piece_value[piece];
         m_phase += Phases::Pieces[piece];
     }
@@ -627,12 +627,6 @@ public:
     MixedScore material(Turn turn) const;
 
 
-    MixedScore psq() const;
-
-
-    MixedScore psq(Turn t) const;
-
-
     uint8_t phase() const;
 
 
@@ -648,7 +642,7 @@ public:
     Bitboard sliders() const;
 
 
-    const PSQT::Accumulator& accumulator(Turn t) const;
+    const NNUE::Accumulator& accumulator(Turn t) const;
 };
 
 

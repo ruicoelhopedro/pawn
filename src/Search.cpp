@@ -388,7 +388,7 @@ namespace Search
             else if (data.last_move() == MOVE_NULL && Ply > 1)
                 static_eval = -data.previous(1)->static_eval;
             else
-                static_eval = turn_to_color(Turn) * data.thread().evaluate<false>(position);
+                static_eval = turn_to_color(Turn) * Evaluation::evaluation(position.board());
         }
         data.static_eval = static_eval;
 
@@ -716,7 +716,7 @@ namespace Search
             if (tt_hit && tt_static_eval != SCORE_NONE)
                 static_eval = tt_static_eval;
             else
-                static_eval = turn_to_color(Turn) * data.thread().evaluate<false>(position);
+                static_eval = turn_to_color(Turn) * Evaluation::evaluation(position.board());
             best_score = static_eval;
 
             // Can we use the TT value for a better static evaluation?

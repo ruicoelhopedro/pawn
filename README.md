@@ -77,8 +77,8 @@ The following UCI options are supported:
 - #### Clear Hash
   Button to clear the hash table.
 
-- #### PSQT_File
-  Path to the PSQT net file to use (empty by default). If empty falls back to the embedded network file.
+- #### NNUE_File
+  Path to the NNUE net file to use (empty by default). If empty falls back to the embedded network file.
 
   
 Furthermore, the following non-standard commands are available:
@@ -99,6 +99,7 @@ Furthermore, the following non-standard commands are available:
   - Combined PSQ and layer contributions
   - HalfKP_hm feature set
   - Two perspective networks for symmetric evaluations
+  - Tapered score from middlegame and endgame network outputs
 ### Search
 - Principal Variation Search in a negamax framework
 - Quiescence search with SEE

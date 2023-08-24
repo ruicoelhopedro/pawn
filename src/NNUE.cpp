@@ -1,56 +1,56 @@
 #include "Types.hpp"
-#include "PieceSquareTables.hpp"
+#include "NNUE.hpp"
 #include <iostream>
 #include <fstream>
 #include <string>
 
-namespace PSQT
+namespace NNUE
 {
-    const Net* psqt_net;
+    const Net* nnue_net;
 
 
-    INCBIN(Net, EmbeddedPSQT, PSQT_Default_File);
+    INCBIN(Net, EmbeddedNNUE, NNUE_Default_File);
 
 
     void init()
     {
-        psqt_net = nullptr;
-        if (sizeof(Net) != gEmbeddedPSQTSize)
+        nnue_net = nullptr;
+        if (sizeof(Net) != gEmbeddedNNUESize)
         {
             std::cerr << "Invalid size of embedded network! Expected "
                       << sizeof(Net)
                       << ", found "
-                      << gEmbeddedPSQTSize
+                      << gEmbeddedNNUESize
                       << std::endl;
             std::abort();
         }
-        load(PSQT_Default_File);
+        load(NNUE_Default_File);
     }
 
     
     void load(std::string file)
     {
-        if (psqt_net)
+        if (nnue_net)
             clean();
 
-        if (file == "" || file == PSQT_Default_File)
+        if (file == "" || file == NNUE_Default_File)
         {
-            psqt_net = gEmbeddedPSQTData;
+            nnue_net = gEmbeddedNNUEData;
         }
         else
         {
             std::ifstream input(file, std::ios_base::binary);
             if (!input.is_open())
             {
-                std::cerr << "Failed to open PSQ net input file!" << std::endl;
+                std::cerr << "Failed to open NNUE file!" << std::endl;
                 std::abort();
             }
 
-            psqt_net = new Net;
+            nnue_net = new Net;
     
-            if(!input.read(const_cast<char*>(reinterpret_cast<const char*>(psqt_net)), sizeof(Net)))
+            if(!input.read(const_cast<char*>(reinterpret_cast<const char*>(nnue_net)), sizeof(Net)))
             {
-                std::cerr << "Failed to read PSQ net!" << std::endl;
+                std::cerr << "Failed to read NNUE file!" << std::endl;
                 std::abort();
             }    
         }
@@ -59,9 +59,9 @@ namespace PSQT
 
     void clean()
     {
-        if (psqt_net != gEmbeddedPSQTData)
-            delete psqt_net;
-        psqt_net = nullptr;
+        if (nnue_net != gEmbeddedNNUEData)
+            delete nnue_net;
+        nnue_net = nullptr;
     }
 
     
@@ -100,7 +100,7 @@ namespace PSQT
     void Accumulator::clear()
     {
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
-            m_net[i] = psqt_net->m_bias[i];
+            m_net[i] = nnue_net->m_bias[i];
         m_psqt[MG] = 0;
         m_psqt[EG] = 0;
     }
@@ -113,9 +113,9 @@ namespace PSQT
 
         Feature idx = get_feature(p, s, ks, pt, kt);
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
-            m_net[i] += psqt_net->m_sparse_layer[idx][i];
-        m_psqt[MG] += psqt_net->m_psqt[idx][MG];
-        m_psqt[EG] += psqt_net->m_psqt[idx][EG];
+            m_net[i] += nnue_net->m_sparse_layer[idx][i];
+        m_psqt[MG] += nnue_net->m_psqt[idx][MG];
+        m_psqt[EG] += nnue_net->m_psqt[idx][EG];
     }
 
 
@@ -126,9 +126,9 @@ namespace PSQT
 
         Feature idx = get_feature(p, s, ks, pt, kt);
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
-            m_net[i] -= psqt_net->m_sparse_layer[idx][i];
-        m_psqt[MG] -= psqt_net->m_psqt[idx][MG];
-        m_psqt[EG] -= psqt_net->m_psqt[idx][EG];
+            m_net[i] -= nnue_net->m_sparse_layer[idx][i];
+        m_psqt[MG] -= nnue_net->m_psqt[idx][MG];
+        m_psqt[EG] -= nnue_net->m_psqt[idx][EG];
     }
 
 
@@ -137,26 +137,24 @@ namespace PSQT
         for (std::size_t i = 0; i < num_features; i++)
         {
             for (std::size_t j = 0; j < NUM_ACCUMULATORS; j++)
-                m_net[j] += psqt_net->m_sparse_layer[features[i]][j];
-            m_psqt[MG] += psqt_net->m_psqt[features[i]][MG];
-            m_psqt[EG] += psqt_net->m_psqt[features[i]][EG];
+                m_net[j] += nnue_net->m_sparse_layer[features[i]][j];
+            m_psqt[MG] += nnue_net->m_psqt[features[i]][MG];
+            m_psqt[EG] += nnue_net->m_psqt[features[i]][EG];
         }
     }
 
 
     MixedScore Accumulator::eval() const
     {
-        // Clipped ReLU on the accumulators
-        int accumulator[NUM_ACCUMULATORS];
-        for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
-            accumulator[i] = std::clamp(m_net[i], 0, SCALE_FACTOR);
-
-        // Net output
         int output[2] = { 0, 0 };
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
         {
-            output[MG] += psqt_net->m_dense[MG][i] * accumulator[i];
-            output[EG] += psqt_net->m_dense[EG][i] * accumulator[i];
+            // Clipped ReLU on the accumulators
+            int accumulator = std::clamp(m_net[i], 0, SCALE_FACTOR);
+
+            // Net output
+            output[MG] += nnue_net->m_dense[MG][i] * accumulator;
+            output[EG] += nnue_net->m_dense[EG][i] * accumulator;
         }
 
         // Build and return final score

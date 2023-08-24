@@ -29,7 +29,7 @@ namespace UCI
         bool Ponder;
         int Threads;
         int MoveOverhead;
-        std::string PSQT_File;
+        std::string NNUE_File;
     }
 
 
@@ -109,7 +109,7 @@ namespace UCI
                                                    [](int v) { pool->resize(v); }));
         OptionsMap.emplace("Move Overhead", Option(&Options::MoveOverhead, 0, 0, 5000));
         OptionsMap.emplace("Ponder",        Option(&Options::Ponder, false));
-        OptionsMap.emplace("PSQT_File",     Option(&Options::PSQT_File, "", PSQT::load));
+        OptionsMap.emplace("NNUE_File",     Option(&Options::NNUE_File, "", NNUE::load));
     }
 
 
@@ -153,7 +153,7 @@ namespace UCI
             else if (token == "board")
                 std::cout << pool->position().board() << std::endl;
             else if (token == "eval")
-                pool->front().evaluate<true>(pool->position());
+                Evaluation::eval_table(pool->position().board());
             else if (token == "bench")
                 bench(stream);
             else if (token == "test")

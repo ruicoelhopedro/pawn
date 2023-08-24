@@ -43,7 +43,6 @@ class Thread
 protected:
     friend class Search::SearchData;
     friend class ThreadPool;
-    friend Score Evaluation::evaluation(const Board& board, Evaluation::EvalData& data, Thread& thread);
     Depth m_seldepth;
     Search::PvContainer m_pv;
     Histories m_histories;
@@ -72,20 +71,6 @@ public:
     ThreadPool& pool() const;
     const Search::Limits& limits() const;
     const Search::SearchTime& time() const;
-
-    template<bool OUTPUT>
-    Score evaluate(const Position& pos)
-    {
-        const Board& board = pos.board();
-        Evaluation::EvalData data(board);
-
-        Score score = Evaluation::evaluation(board, data, *this);
-
-        if (OUTPUT)
-            Evaluation::eval_table(board, data);
-
-        return score;
-    }
 };
 
 

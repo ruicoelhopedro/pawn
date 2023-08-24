@@ -87,7 +87,7 @@ namespace UCI
         extern bool Ponder;
         extern int Threads;
         extern int MoveOverhead;
-        extern std::string PSQT_File;
+        extern std::string NNUE_File;
     }
 
 

@@ -183,6 +183,47 @@ public:
 };
 
 
+constexpr MixedScore   PawnValue(  125,   200);
+constexpr MixedScore KnightValue(  750,   850);
+constexpr MixedScore BishopValue(  800,   900);
+constexpr MixedScore   RookValue( 1200,  1400);
+constexpr MixedScore  QueenValue( 2500,  2600);
+constexpr MixedScore   KingValue(10000, 10000); // Needed for SEE and MVV-LVA
+
+constexpr MixedScore piece_value[] = {
+    PawnValue,
+    KnightValue,
+    BishopValue,
+    RookValue,
+    QueenValue,
+    KingValue,
+    MixedScore(0, 0), // Empty
+    MixedScore(0, 0)  // PIECE_NONE
+}; 
+
+constexpr Score piece_value_mg[] = {
+    PawnValue.middlegame(),
+    KnightValue.middlegame(),
+    BishopValue.middlegame(),
+    RookValue.middlegame(),
+    QueenValue.middlegame(),
+    KingValue.middlegame(),
+    0, // Empty
+    0  // PIECE_NONE
+};
+
+constexpr Score piece_value_eg[] = {
+    PawnValue.endgame(),
+    KnightValue.endgame(),
+    BishopValue.endgame(),
+    RookValue.endgame(),
+    QueenValue.endgame(),
+    KingValue.endgame(),
+    0, // Empty
+    0  // PIECE_NONE
+};
+
+
 constexpr uint64_t uint64(int i) { return static_cast<uint64_t>(i); }
 
 

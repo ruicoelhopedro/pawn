@@ -8,88 +8,15 @@
 
 class Thread;
 
+class Position;
+
 namespace Evaluation
 {
-    class Attacks
-    {
-        Bitboard m_total;
-        Bitboard m_double;
-        Bitboard m_attacks[NUM_PIECE_TYPES];
 
-    public:
-        template<PieceType PIECE>
-        void push(Bitboard attacks)
-        {
-            m_double |= attacks & m_total;
-            m_attacks[PIECE] |= attacks;
-            m_total |= attacks;
-        }
-
-        template <PieceType PIECE>
-        Bitboard get() const { return m_attacks[PIECE]; }
-
-        template<PieceType PIECE>
-        Bitboard get_less_valuable() const
-        {
-            if constexpr (PIECE == PAWN)
-                return Bitboard();
-            else if (PIECE == KNIGHT || PIECE == BISHOP)
-                return m_attacks[PAWN];
-            else if (PIECE == ROOK)
-                return get_less_valuable<BISHOP>() | m_attacks[KNIGHT] | m_attacks[BISHOP];
-            else if (PIECE == QUEEN)
-                return get_less_valuable<  ROOK>() | m_attacks[  ROOK];
-            else if (PIECE == KING)
-                return get_less_valuable< QUEEN>() | m_attacks[ QUEEN];
-        }
-
-        inline Bitboard get() const { return m_total; }
-        inline Bitboard get_double() const { return m_double; }
-    };
+    Score evaluation(const Board& board);
 
 
-    struct PawnStructure
-    {
-        Bitboard attacks;
-        Bitboard span;
-        Bitboard outposts;
-        Bitboard open_files;
-        Bitboard passed;
-    };
-
-
-    struct EvalFields
-    {
-        MixedScore material;
-        MixedScore imbalance;
-        MixedScore placement;
-        MixedScore space;
-        MixedScore passed;
-        MixedScore threats;
-        MixedScore scale;
-        std::array<MixedScore, NUM_PIECE_TYPES> pieces;
-    };
-
-
-    struct EvalData
-    {
-        EvalData(const Board& board);
-
-        Attacks attacks[NUM_COLORS];
-        PawnStructure pawns[NUM_COLORS];
-        Bitboard king_zone[NUM_COLORS];
-        int n_king_attacks[NUM_COLORS];
-        int king_attack_weight[NUM_COLORS];
-        Bitboard king_attackers[NUM_COLORS];
-        EvalFields fields[NUM_COLORS];
-        Bitboard mobility_area[NUM_COLORS];
-    };
-
-
-    Score evaluation(const Board& board, EvalData& data, Thread& thread);
-
-
-    void eval_table(const Board& board, EvalData& data);
+    void eval_table(const Board& board);
 
 
     class Term

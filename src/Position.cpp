@@ -1,6 +1,6 @@
 #include "Position.hpp"
 #include "Types.hpp"
-#include "PieceSquareTables.hpp"
+#include "NNUE.hpp"
 #include "Zobrist.hpp"
 #include <cassert>
 #include <sstream>
@@ -218,9 +218,9 @@ void Board::update_checkers()
 
 void Board::regen_psqt(Turn turn)
 {
-    m_psq[turn].clear();
+    m_acc[turn].clear();
     std::size_t num_features = 0;
-    PSQT::Feature features[PSQT::NUM_MAX_ACTIVE_FEATURES];
+    NNUE::Feature features[NNUE::NUM_MAX_ACTIVE_FEATURES];
 
     // Pack features to be pushed into the accumulator
     for (Turn t : { WHITE, BLACK })
@@ -228,11 +228,11 @@ void Board::regen_psqt(Turn turn)
         {
             Bitboard b = get_pieces(t, p);
             while (b)
-                features[num_features++] = m_psq[turn].get_feature(p, b.bitscan_forward_reset(), m_king_sq[turn], t, turn);
+                features[num_features++] = m_acc[turn].get_feature(p, b.bitscan_forward_reset(), m_king_sq[turn], t, turn);
         }
 
     // Regen entire accumulator at once
-    m_psq[turn].push_features(num_features, features);
+    m_acc[turn].push_features(num_features, features);
 }
 
 
@@ -373,8 +373,7 @@ bool Board::is_valid() const
     // Material and phase evaluation
     uint8_t phase = Phases::Total;
     MixedScore material(0, 0);
-    PSQT::Accumulator acc[2];
-    Hash material_hash = 0;
+    NNUE::Accumulator acc[2];
     for (PieceType piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
         for (Turn turn : { WHITE, BLACK })
         {
@@ -393,7 +392,7 @@ bool Board::is_valid() const
         return false;
     if (material.middlegame() != total_material.middlegame() || material.endgame() != total_material.endgame())
         return false;
-    if (acc[WHITE] != m_psq[WHITE] || acc[BLACK] != m_psq[BLACK])
+    if (acc[WHITE] != m_acc[WHITE] || acc[BLACK] != m_acc[BLACK])
         return false;
 
     return true;
@@ -550,18 +549,6 @@ MixedScore Board::material(Turn turn) const
 }
 
 
-MixedScore Board::psq() const
-{
-    return m_psq[WHITE].eval() - m_psq[BLACK].eval();
-}
-
-
-MixedScore Board::psq(Turn t) const
-{
-    return m_psq[t].eval();
-}
-
-
 uint8_t Board::phase() const
 {
     return m_phase;
@@ -651,9 +638,9 @@ Bitboard Board::sliders() const
 
 
 
-const PSQT::Accumulator& Board::accumulator(Turn t) const
+const NNUE::Accumulator& Board::accumulator(Turn t) const
 {
-    return m_psq[t];
+    return m_acc[t];
 }
 
 

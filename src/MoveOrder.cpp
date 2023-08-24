@@ -3,7 +3,7 @@
 #include "Position.hpp"
 #include "Move.hpp"
 #include "Hash.hpp"
-#include "PieceSquareTables.hpp"
+#include "NNUE.hpp"
 #include <iostream>
 
 
