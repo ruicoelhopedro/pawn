@@ -138,10 +138,10 @@ namespace GamePlayer
                 // Game loop
                 while (result.bestmove != MOVE_NULL)
                 {
+                    game.push(result.bestmove, result.score);
                     pos.make_move(result.bestmove);
                     pos.set_init_ply();
                     result = thread.simple_search(pos, limits);
-                    game.push(result.bestmove, result.score);
                 }
 
                 // Game is completed, write to the output file
@@ -204,17 +204,25 @@ namespace GamePlayer
             return false;
 
         BinaryGame game;
+        std::size_t game_number = 0;
         while(BinaryGame::read(file, game))
         {
+            game_number++;
+            std::size_t move_number = 0;
+
             // Loop over all moves ensuring they are legal
             Board board(game.starting_pos);
             for (BinaryNode node : game.nodes)
             {
+                move_number++;
                 if (node.move != MOVE_NULL)
                 {
                     if(!board.legal(node.move))
                     {
-                        std::cerr << "Illegal move " << node.move << " in position " << board.to_fen() << std::endl;
+                        std::cerr << "Game " << game_number << " (move " << move_number << "): "
+                                  << "Illegal move " << node.move
+                                  << " in position " << board.to_fen()
+                                  << std::endl;
                         return false;
                     }
                     board = board.make_move(node.move);
@@ -222,7 +230,9 @@ namespace GamePlayer
                 // Ensure the last score is the game outcome (-1, 0 or 1)
                 else if (abs(node.score) > 1)
                 {
-                    std::cerr << "Bad game termination: " << node.score << std::endl;
+                    std::cerr << "Game " << game_number << ": "
+                              << "Bad game termination: " << node.score
+                              << std::endl;
                     return false;
                 }
             }
