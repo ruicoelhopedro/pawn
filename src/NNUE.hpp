@@ -2,7 +2,7 @@
 #include "incbin/incbin.h"
 #include "Types.hpp"
 
-#define NNUE_Default_File "psqt-0cd848897780.nn"
+#define NNUE_Default_File "nnue-f74cea04237b.dat"
 
 
 namespace NNUE
