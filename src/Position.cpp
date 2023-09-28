@@ -2,6 +2,7 @@
 #include "Types.hpp"
 #include "NNUE.hpp"
 #include "Zobrist.hpp"
+#include "syzygy/syzygy.hpp"
 #include <cassert>
 #include <sstream>
 #include <string>
@@ -840,5 +841,25 @@ std::ostream& operator<<(std::ostream& out, const Board& board)
     out << "\n";
     out << "FEN: " << board.to_fen() << "\n";
     out << "Hash: " << std::hex << board.m_hash << std::dec << "\n";
+
+    if (board.get_pieces().count() <= Syzygy::Cardinality)
+    {
+        auto probe_result = Syzygy::probe_dtz(board);
+        Syzygy::WDL wdl = probe_result.first;
+        int dtz = probe_result.second;
+        if (wdl != Syzygy::WDL_NONE)
+        {
+            wdl = board.turn() == WHITE ? wdl : -wdl;
+            out << "Tablebase: "
+                << (wdl == Syzygy::WDL_LOSS         ? "Black wins"
+                  : wdl == Syzygy::WDL_BLESSED_LOSS ? "Draw (cursed black win)"
+                  : wdl == Syzygy::WDL_DRAW         ? "Draw"
+                  : wdl == Syzygy::WDL_CURSED_WIN   ? "Draw (cursed white win)"
+                  : wdl == Syzygy::WDL_WIN          ? "White wins"
+                  :                                   "error")
+                << " - DTZ: " << dtz
+                << "\n";
+        }
+    }
     return out;
 }

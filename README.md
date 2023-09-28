@@ -80,6 +80,15 @@ The following UCI options are supported:
 - #### NNUE_File
   Path to the NNUE net file to use (empty by default). If empty falls back to the embedded network file.
 
+- #### SyzygyPath
+  Path to the directory containing the Syzygy endgame tablebases.
+
+- #### SyzygyProbeDepth
+  Minimum depth to probe the endgame tablebases during the search.
+
+- #### SyzygyProbeLimit
+  Maximum number of pieces to allow probing the table.
+
   
 Furthermore, the following non-standard commands are available:
 - `board` - show a representation of the current board;
@@ -89,6 +98,16 @@ Furthermore, the following non-standard commands are available:
 - `go perft depth` - do the `perft` node count for the current position at depth `depth`.
 
 ## Main Features
+
+### Syzygy endgame tablebases
+The Syzygy endgame tablebases support uses [Fathom](https://github.com/jdart1/Fathom) for probing the WDL and DTZ tables.
+Similarly to the original implementation in Stockfish, `pawn` has two modes of operation:
+- If the root position **is not** on the tablebase, `pawn` will probe the WDL tables during the search (only after a move that resets the 50-move rule counter);
+- If the root position **is** on the tablebase, then only the moves that preserve the root's WDL score are searched.
+  The engine will continue to search on these moves, but the reported score is derived from the tablebase (unless a mate score is found).
+  To avoid wasting moves in long conversions or possibly drawing by repetition, DTZ tables are used to make progress whenever two-fold repetitions may arise.
+  When using `go searchmoves`, the move selection is ignored, but TB scores are still returned.
+
 
 ### Board representation
 - Bitboard representation (with GCC builtin bitscan and popcount) 

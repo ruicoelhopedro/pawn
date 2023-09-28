@@ -88,6 +88,9 @@ namespace UCI
         extern int Threads;
         extern int MoveOverhead;
         extern std::string NNUE_File;
+        extern std::string TB_Path;
+        extern int TB_ProbeDepth;
+        extern int TB_ProbeLimit;
     }
 
 

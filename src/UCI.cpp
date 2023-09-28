@@ -5,6 +5,7 @@
 #include "Types.hpp"
 #include "UCI.hpp"
 #include "Thread.hpp"
+#include "syzygy/syzygy.hpp"
 #include <array>
 #include <algorithm>
 #include <cctype>
@@ -30,6 +31,9 @@ namespace UCI
         int Threads;
         int MoveOverhead;
         std::string NNUE_File;
+        std::string TB_Path;
+        int TB_ProbeDepth;
+        int TB_ProbeLimit;
     }
 
 
@@ -110,6 +114,12 @@ namespace UCI
         OptionsMap.emplace("Move Overhead", Option(&Options::MoveOverhead, 0, 0, 5000));
         OptionsMap.emplace("Ponder",        Option(&Options::Ponder, false));
         OptionsMap.emplace("NNUE_File",     Option(&Options::NNUE_File, "", NNUE::load));
+        OptionsMap.emplace("SyzygyPath",    Option(&Options::TB_Path, "", Syzygy::load));
+        OptionsMap.emplace("SyzygyProbeDepth", Option(&Options::TB_ProbeDepth, 1, 1, 199));
+        OptionsMap.emplace("SyzygyProbeLimit", Option(&Options::TB_ProbeLimit, 7, 0, 7, [](int v)
+        {
+            Syzygy::Cardinality = std::min(Syzygy::Cardinality, v);
+        }));
     }
 
 

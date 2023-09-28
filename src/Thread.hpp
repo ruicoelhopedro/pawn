@@ -46,6 +46,7 @@ protected:
     Depth m_seldepth;
     Search::PvContainer m_pv;
     Histories m_histories;
+    std::atomic_uint64_t m_tb_hits;
     std::atomic_uint64_t m_nodes_searched;
     std::vector<Search::MultiPVData> m_multiPV;
 
@@ -71,6 +72,8 @@ public:
     ThreadPool& pool() const;
     const Search::Limits& limits() const;
     const Search::SearchTime& time() const;
+
+    void tb_hit();
 };
 
 
@@ -111,6 +114,7 @@ public:
     Position& position();
     Position position() const;
     
+    int64_t tb_hits() const;
     int64_t nodes_searched() const;
 
     int size() const;

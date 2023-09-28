@@ -609,6 +609,16 @@ public:
     }
 
 
+    inline Square ep_square() const { return m_enpassant_square; }
+
+
+    inline bool can_castle() const
+    {
+        return m_castling_rights[0][0] || m_castling_rights[0][1] ||
+               m_castling_rights[1][0] || m_castling_rights[1][1];
+    }
+
+
     bool operator==(const Board& other) const;
 
 

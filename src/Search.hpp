@@ -108,13 +108,16 @@ namespace Search
     public:
         Depth depth;
         Depth seldepth;
-        Score score;
+        Score search_score;
         Move pv[NUM_MAX_DEPTH];
-        BoundType type;
+        BoundType search_bound;
+        Score tb_score;
     
         MultiPVData();
 
-        void write_pv(int index, uint64_t nodes, double elapsed) const;
+        Score score() const;
+        BoundType bound() const;
+        void write_pv(int index, uint64_t nodes, uint64_t tb_hits, double elapsed) const;
     };
 
 
