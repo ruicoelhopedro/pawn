@@ -18,7 +18,7 @@ def main(net_file):
     hasher = sha256()
     with open(tmp_psqt_name, 'rb') as file:
         hasher.update(file.read())
-    psqt_name = f'psqt-{hasher.hexdigest()[0:12]}.nn'
+    psqt_name = f'nnue-{hasher.hexdigest()[0:12]}.dat'
     shutil.move(tmp_psqt_name, psqt_name)
     print(f'Exported net {psqt_name}')
 
