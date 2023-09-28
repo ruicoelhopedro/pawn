@@ -17,7 +17,7 @@ namespace GamePlayer
         int adjudication = SCORE_MATE_FOUND;
         std::string book = "";
         std::string output_file = "output.dat";
-        uint random_probability = 25;
+        int random_probability = 100;
         int store_min_ply = 15;
         int seed = 0;
         bool shallow_depth_pruning = false;
@@ -99,7 +99,9 @@ namespace GamePlayer
                 {
                     // Search or pick a random move?
                     Move move;
-                    if (random.next(100) < random_probability)
+                    int ply_factor = random_probability * ply * ply
+                                   / (store_min_ply * store_min_ply + 1);
+                    if (int(random.next(100)) < random_probability - ply_factor)
                     {
                         // Random mover: generate legal moves for this position
                         Move moves[NUM_MAX_MOVES];
