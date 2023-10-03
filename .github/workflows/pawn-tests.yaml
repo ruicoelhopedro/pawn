@@ -20,19 +20,11 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: Extract bench signature (firsty)
-        run: "git log HEAD"
-      - name: Extract bench signature (first)
-        run: "git log HEAD | grep 'Bench: ' | head -n 1"
-      - name: Extract bench signature (second)
-        run: "git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}'"
       - name: Extract bench signature
         run: "git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}' > bench.sig"
       - name: Build pawn
         run: "make"
       - name: Run bench
-        run: "build/pawn bench"
-      - name: Run bench (and extract signature)
         run: "build/pawn bench 2>&1 | grep 'Nodes searched:' | awk '{print $3}' > bench.out"
       - name: Verify bench signature
         run: "cmp bench.sig bench.out"
