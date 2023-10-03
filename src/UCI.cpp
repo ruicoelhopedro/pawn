@@ -182,6 +182,9 @@ namespace UCI
                 std::cout << "  TT + Orderer: " << t4 << " failed cases" << std::endl;
                 std::cout << "  Legality:     " << t5 << " failed cases" << std::endl;
                 std::cout << "  Validity:     " << t6 << " failed cases" << std::endl;
+
+                if (t1 + t2 + t3 + t4 + t5 + t6 == 0)
+                    std::cout << "\nAll tests passed" << std::endl;
             }
 
             // Unknown command
