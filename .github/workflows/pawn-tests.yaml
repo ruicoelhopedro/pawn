@@ -21,7 +21,7 @@ jobs:
       - name: Extract bench signature
         run: "git log HEAD | grep -m1 'Bench: ' | awk '{print $2}' > bench.sig"
       - name: Build pawn
-        run: make
+        run: "make"
       - name: Run bench
         run: "build/pawn bench 2>&1 | grep "Nodes searched:" | awk '{print $3}' > bench.out"
       - name: Verify bench signature
