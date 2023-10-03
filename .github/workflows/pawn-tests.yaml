@@ -18,8 +18,12 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v2
+      - name: Extract bench signature (first)
+        run: "git log HEAD | grep 'Bench: ' | head -n 1"
+      - name: Extract bench signature (second)
+        run: "git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}'"
       - name: Extract bench signature
-        run: "git log HEAD | grep -m1 'Bench: ' | awk '{print $2}' > bench.sig"
+        run: "git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}' > bench.sig"
       - name: Build pawn
         run: "make"
       - name: Run bench
