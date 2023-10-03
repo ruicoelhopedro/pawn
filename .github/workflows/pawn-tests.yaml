@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v2
+      - name: Extract bench signature (firsty)
+        run: "git log HEAD"
       - name: Extract bench signature (first)
         run: "git log HEAD | grep 'Bench: ' | head -n 1"
       - name: Extract bench signature (second)
