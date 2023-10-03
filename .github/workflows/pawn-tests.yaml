@@ -1,6 +1,5 @@
 name: Pawn tests
 
-
 on:
   push:
     branches:
@@ -9,7 +8,6 @@ on:
   pull_request:
     branches:
       - master
-
 
 jobs:
   build:
