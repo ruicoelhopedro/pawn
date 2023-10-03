@@ -23,7 +23,7 @@ jobs:
       - name: Build pawn
         run: "make"
       - name: Run bench
-        run: "build/pawn bench 2>&1 | grep "Nodes searched:" | awk '{print $3}' > bench.out"
+        run: "build/pawn bench 2>&1 | grep 'Nodes searched:' | awk '{print $3}' > bench.out"
       - name: Verify bench signature
         run: "cmp bench.sig bench.out"
       - name: Run tests
