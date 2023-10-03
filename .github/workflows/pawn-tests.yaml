@@ -1,0 +1,30 @@
+name: Pawn tests
+
+on:
+  push:
+    branches:
+      - master
+      - ci
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Building and testing pawn
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Extract bench signature
+        run: "git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}' > bench.sig"
+      - name: Build pawn
+        run: "make"
+      - name: Run bench
+        run: "build/pawn bench 2>&1 | grep 'Nodes searched:' | awk '{print $3}' > bench.out"
+      - name: Verify bench signature
+        run: "cmp bench.sig bench.out"
+      - name: Run tests
+        run: "build/pawn test | grep -q 'All tests passed'"
