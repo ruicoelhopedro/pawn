@@ -54,6 +54,7 @@ class PawnDataset(Dataset):
                                      ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS")]
 
         self.get_num_positions = self.lib.get_num_positions
+        self.get_num_positions.restype = ctypes.c_ulonglong
         self.get_num_positions.argtypes = [ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
                                            ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
                                            ctypes.c_ulonglong]
