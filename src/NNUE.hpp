@@ -2,7 +2,7 @@
 #include "incbin/incbin.h"
 #include "Types.hpp"
 
-#define NNUE_Default_File "nnue-f74cea04237b.dat"
+#define NNUE_Default_File "nnue-c205ad28b934.dat"
 
 
 namespace NNUE
