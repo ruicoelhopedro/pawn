@@ -37,7 +37,7 @@ The ratings are computed with `ordo` (anchored at zero for the first commit and 
 
 | Date     | Commit  |  Elo   | Error(+/-) |
 |----------|---------|--------|------------|
-| 23/10/06 | [`b079af8`](https://github.com/ruicoelhopedro/pawn/commit/b079af8fdb84dc061dbbed21ff29f60e7312bdaa) | 1619.7 |       17.9 |
+| 23/10/06 | [2.0](https://github.com/ruicoelhopedro/pawn/tree/v2.0)                                             | 1619.7 |       17.9 |
 | 23/08/31 | [`5a5ea8a`](https://github.com/ruicoelhopedro/pawn/commit/5a5ea8a6d999208831f9d12521a0d379450611ae) | 1556.2 |       17.8 |
 | 23/06/30 | [`b68c1df`](https://github.com/ruicoelhopedro/pawn/commit/b68c1dfbae0a5346401dff5655a87ff5f7555862) | 1549.4 |       17.8 |
 | 23/04/24 | [`c777eef`](https://github.com/ruicoelhopedro/pawn/commit/c777eef3af07889de88d51d830eb1e6f3c8423ba) | 1508.0 |       16.5 |
