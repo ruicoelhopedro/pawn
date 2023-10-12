@@ -1,9 +1,9 @@
 #include "Types.hpp"
 #include "Position.hpp"
 #include "data_gen/texel.hpp"
-#include "PieceSquareTables.hpp"
 #include "data_gen/data_gen.hpp"
 #include "Thread.hpp"
+#include "Evaluation.hpp"
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -44,7 +44,7 @@ namespace Texel
                             !node.move.is_promotion() &&
                             abs(node.score) < 2000)
                         {
-                            int error = node.score - pool->front().evaluate<false>(board);
+                            int error = node.score - Evaluation::evaluation(board);
                             error = std::clamp(error, -1000, 1000);
                             accumulator += Accumulator(error * error);
                             num_positions++;
@@ -98,7 +98,7 @@ namespace Texel
                             !node.move.is_capture() &&
                             !node.move.is_promotion())
                         {
-                            double error = ((result + 1.0) / 2 - sigmoid(pool->front().evaluate<false>(board)));
+                            double error = ((result + 1.0) / 2 - sigmoid(Evaluation::evaluation(board)));
                             accumulator += error * error;
                             num_positions++;
                         }

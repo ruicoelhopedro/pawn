@@ -1,11 +1,12 @@
 #include "Types.hpp"
 #include "Position.hpp"
-#include "PieceSquareTables.hpp"
+#include "NNUE.hpp"
 #include "Tests.hpp"
 #include "Zobrist.hpp"
 #include "Search.hpp"
 #include "UCI.hpp"
 #include "Thread.hpp"
+#include "syzygy/syzygy.hpp"
 #include <chrono>
 #include <sstream>
 
@@ -13,7 +14,8 @@ int main(int argc, char** argv)
 {
     Bitboards::init_bitboards();
     Zobrist::build_rnd_hashes();
-    PSQT::init();
+    NNUE::init();
+    Syzygy::init();
     UCI::init_options();
     ttable = HashTable<TranspositionEntry>(16);
     pool = new ThreadPool();
@@ -27,5 +29,5 @@ int main(int argc, char** argv)
     UCI::main_loop(ss.str());
 
     pool->kill_threads();
-    PSQT::clean();
+    NNUE::clean();
 }

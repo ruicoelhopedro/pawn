@@ -6,10 +6,10 @@
 #include "UCI.hpp"
 #include "Thread.hpp"
 #include "data_gen/data_gen.hpp"
-#include "data_gen/psqt.hpp"
 #include "data_gen/fen_score.hpp"
 #include "data_gen/game_player.hpp"
 #include "data_gen/texel.hpp"
+#include "syzygy/syzygy.hpp"
 #include <array>
 #include <algorithm>
 #include <cctype>
@@ -21,7 +21,7 @@
 
 namespace UCI
 {
-    constexpr std::string_view VERSION = "pawn 1.0-dev";
+    constexpr std::string_view VERSION = "pawn 2.0";
 
 
     std::map<std::string, Option, OptionNameCompare> OptionsMap;
@@ -34,7 +34,10 @@ namespace UCI
         bool Ponder;
         int Threads;
         int MoveOverhead;
-        std::string PSQT_File;
+        std::string NNUE_File;
+        std::string TB_Path;
+        int TB_ProbeDepth;
+        int TB_ProbeLimit;
         bool ShallowDepthPruning;
     }
 
@@ -115,7 +118,13 @@ namespace UCI
                                                    [](int v) { pool->resize(v); }));
         OptionsMap.emplace("Move Overhead", Option(&Options::MoveOverhead, 0, 0, 5000));
         OptionsMap.emplace("Ponder",        Option(&Options::Ponder, false));
-        OptionsMap.emplace("PSQT_File",     Option(&Options::PSQT_File, "", PSQT::load));
+        OptionsMap.emplace("NNUE_File",     Option(&Options::NNUE_File, "", NNUE::load));
+        OptionsMap.emplace("SyzygyPath",    Option(&Options::TB_Path, "", Syzygy::load));
+        OptionsMap.emplace("SyzygyProbeDepth", Option(&Options::TB_ProbeDepth, 1, 1, 199));
+        OptionsMap.emplace("SyzygyProbeLimit", Option(&Options::TB_ProbeLimit, 7, 0, 7, [](int v)
+        {
+            Syzygy::Cardinality = std::min(Syzygy::Cardinality, v);
+        }));
         OptionsMap.emplace("ShallowDepthPruning", Option(&Options::ShallowDepthPruning, true));
     }
 
@@ -160,23 +169,19 @@ namespace UCI
             else if (token == "board")
                 std::cout << pool->position().board() << std::endl;
             else if (token == "eval")
-                pool->front().evaluate<true>(pool->position());
+                Evaluation::eval_table(pool->position().board());
             else if (token == "bench")
                 bench(stream);
             else if (token == "score_fens")
                 FEN_Scores::score_fens(stream);
             else if (token == "evaluate_fens")
                 FEN_Scores::evaluate_fens(stream);
-            else if (token == "gen_data_psqt")
-                PSQT_DataGen::gen_data_psqt(stream);
             else if (token == "play_games")
                 GamePlayer::play_games(stream);
             else if (token == "games_to_epd")
                 GamePlayer::games_to_epd(stream);
             else if (token == "check_data")
                 GamePlayer::check_games(stream);
-            else if (token == "games_to_psq_data")
-                PSQT_DataGen::games_to_psq_data(stream);
             else if (token == "score_texel")
                 Texel::score_texel(stream);
             else if (token == "score_eval_error")
@@ -197,6 +202,9 @@ namespace UCI
                 std::cout << "  TT + Orderer: " << t4 << " failed cases" << std::endl;
                 std::cout << "  Legality:     " << t5 << " failed cases" << std::endl;
                 std::cout << "  Validity:     " << t6 << " failed cases" << std::endl;
+
+                if (t1 + t2 + t3 + t4 + t5 + t6 == 0)
+                    std::cout << "\nAll tests passed" << std::endl;
             }
 
             // Unknown command

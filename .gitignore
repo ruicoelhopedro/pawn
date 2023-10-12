@@ -33,3 +33,7 @@
 
 # Build directories
 build/*
+
+# Python caches
+trainer/__pycache__/
+scripts/__pycache__/

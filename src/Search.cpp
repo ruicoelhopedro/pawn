@@ -8,6 +8,7 @@
 #include "UCI.hpp"
 #include "Zobrist.hpp"
 #include "Thread.hpp"
+#include "syzygy/syzygy.hpp"
 #include <atomic>
 #include <chrono>
 #include <vector>
@@ -111,15 +112,45 @@ namespace Search
     MultiPVData::MultiPVData()
         : depth(0),
           seldepth(0),
-          score(-SCORE_NONE),
-          type(BoundType::NO_BOUND)
+          search_score(-SCORE_NONE),
+          search_bound(BoundType::NO_BOUND),
+          tb_score(-SCORE_NONE)
     {
     }
 
-    void MultiPVData::write_pv(int index, uint64_t nodes, double elapsed) const
+    Score MultiPVData::score() const
+    {
+        // Use search score if:
+        // 1. We have no TB info
+        // 2. We have found a forced mate
+        if (!Syzygy::Root.in_tb() ||
+            (is_mate(this->search_score) && this->search_bound == BoundType::EXACT))
+            return this->search_score;
+
+        return this->tb_score;
+    }
+
+    BoundType MultiPVData::bound() const
+    {
+        // Use search bound if:
+        // 1. We have no TB info
+        // 2. We have found a forced mate
+        if (!Syzygy::Root.in_tb() ||
+            (is_mate(this->search_score) && this->search_bound == BoundType::EXACT))
+            return this->search_bound;
+
+        // Choose bound based on the type of TB score
+        return this->tb_score ==  SCORE_DRAW         ? BoundType::EXACT        // Draw
+             : this->tb_score >=  SCORE_TB_WIN_FOUND ? BoundType::LOWER_BOUND  // Win
+             : this->tb_score <= -SCORE_TB_WIN_FOUND ? BoundType::UPPER_BOUND  // Loss
+             : this->tb_score >   SCORE_DRAW         ? BoundType::UPPER_BOUND  // Cursed win
+             :                                         BoundType::LOWER_BOUND; // Blessed loss
+    }
+
+    void MultiPVData::write_pv(int index, uint64_t nodes, uint64_t tb_hits, double elapsed) const
     {
         // Don't write if PV line is incomplete
-        if (type == BoundType::NO_BOUND)
+        if (search_bound == BoundType::NO_BOUND)
             return;
 
         std::cout << "info";
@@ -128,19 +159,20 @@ namespace Search
         std::cout << " multipv "  << index + 1;
 
         // Score
-        if (is_mate(score))
-            std::cout << " score mate " << mate_in(score);
+        if (is_mate(this->score()))
+            std::cout << " score mate " << mate_in(this->score());
         else
-            std::cout << " score cp " << 100 * int(score) / PawnValue.endgame();
+            std::cout << " score cp " << 100 * int(this->score()) / PawnValue.endgame();
 
         // Score bound (if any)
-        if (type != BoundType::EXACT)
-            std::cout << (type == BoundType::LOWER_BOUND ? " lowerbound" : " upperbound");
+        if (this->bound() != BoundType::EXACT)
+            std::cout << (this->bound() == BoundType::LOWER_BOUND ? " lowerbound" : " upperbound");
 
         // Nodes, nps, hashful and timing
         std::cout << " nodes "    << nodes;
         std::cout << " nps "      << static_cast<int>(nodes / elapsed);
         std::cout << " hashfull " << ttable.hashfull();
+        std::cout << " tbhits "   << tb_hits;
         std::cout << " time "     << std::max(1, static_cast<int>(elapsed * 1000));
 
         // Pv line
@@ -245,7 +277,7 @@ namespace Search
         Thread& thread = data.thread();
 
         // Initial windows
-        Score init_score = pv.score;
+        Score init_score = pv.search_score;
         Score window = 5 + 200 / depth;
         Score alpha = (depth <= 4) ? (-SCORE_INFINITE) : std::max(-SCORE_INFINITE, (init_score - window));
         Score beta  = (depth <= 4) ? ( SCORE_INFINITE) : std::min(+SCORE_INFINITE, (init_score + window));
@@ -271,17 +303,21 @@ namespace Search
             if (thread.timeout() && depth > 1)
                 return score;
 
+            // Inject TB data, if any
+            if (Syzygy::Root.in_tb())
+                pv.tb_score = Syzygy::Root.move_score(*data.pv());
+
             // Store results for this PV line
             pv.depth = depth;
-            pv.score = score;
+            pv.search_score = score;
             pv.seldepth = data.seldepth;
-            pv.type = score <= alpha ? BoundType::UPPER_BOUND
-                    : score >= beta  ? BoundType::LOWER_BOUND
-                    :                  BoundType::EXACT;
+            pv.search_bound = score <= alpha ? BoundType::UPPER_BOUND
+                            : score >= beta  ? BoundType::LOWER_BOUND
+                            :                  BoundType::EXACT;
             copy_pv(data.pv(), pv.pv);
 
             // We can exit if this score is exact
-            if (pv.type == BoundType::EXACT)
+            if (pv.search_bound == BoundType::EXACT)
                 return score;
 
             // Output failed search after some time
@@ -376,6 +412,49 @@ namespace Search
             }
         }
 
+        // Tablebases probe
+        Score best_score = -SCORE_INFINITE;
+        Score max_score = SCORE_INFINITE;
+        if (!RootSearch &&
+            !HasExcludedMove &&
+            Syzygy::Cardinality > 0 &&
+            Syzygy::Cardinality >= position.board().get_pieces().count() &&
+            depth >= UCI::Options::TB_ProbeDepth &&
+            position.board().half_move_clock() == 0 &&
+            !position.board().can_castle())
+        {
+            Syzygy::WDL wdl = Syzygy::probe_wdl(position.board());
+            if (wdl != Syzygy::WDL_NONE)
+            {
+                // Derive the TB score and bound
+                data.thread().tb_hit();
+                Score score = Syzygy::score_from_wdl(wdl, Ply);
+                EntryType bound = Syzygy::bound_from_wdl(wdl);
+
+                // Prune and cache TB score in TT
+                if ( bound == EntryType::EXACT ||
+                    (bound == EntryType::LOWER_BOUND && score >= beta) ||
+                    (bound == EntryType::UPPER_BOUND && score <= alpha))
+                {
+                    ttable.store(hash, depth, score_to_tt(score, Ply), MOVE_NULL, bound, SCORE_NONE);
+                    return score;
+                }
+
+                if (PvNode)
+                {
+                    if (bound == EntryType::LOWER_BOUND)
+                    {
+                        best_score = score;
+                        alpha = std::max(score, alpha);
+                    }
+                    else
+                    {
+                        max_score = score;
+                    }
+                }
+            }
+        }
+
         // Position static evaluation (when not in check)
         Score static_eval = SCORE_NONE;
         if (!InCheck)
@@ -388,7 +467,7 @@ namespace Search
             else if (data.last_move() == MOVE_NULL && Ply > 1)
                 static_eval = -data.previous(1)->static_eval;
             else
-                static_eval = turn_to_color(Turn) * data.thread().evaluate<false>(position);
+                static_eval = turn_to_color(Turn) * Evaluation::evaluation(position.board());
         }
         data.static_eval = static_eval;
 
@@ -402,7 +481,7 @@ namespace Search
         bool improving = !InCheck && Ply >= 2 && data.previous(2) && (data.static_eval > data.previous(2)->static_eval);
 
         // Futility pruning
-        if (!PvNode && depth < 9 && !InCheck && !is_mate(static_eval))
+        if (!PvNode && depth < 9 && !InCheck && abs(static_eval) < SCORE_TB_WIN_FOUND)
         {
             Score margin = 150 * (depth - improving);
             if (static_eval - margin >= beta)
@@ -424,7 +503,7 @@ namespace Search
             Score null = -negamax<NON_PV>(position, new_depth, -beta, -beta + 1, curr_data, !cut_node);
             position.unmake_null_move();
             if (null >= beta)
-                return null < SCORE_MATE_FOUND ? null : beta;
+                return null < SCORE_TB_WIN_FOUND ? null : beta;
         }
 
         // TT-based reduction idea
@@ -435,7 +514,6 @@ namespace Search
         Move move;
         int n_moves = 0;
         Move best_move = MOVE_NULL;
-        Score best_score = -SCORE_INFINITE;
         Move quiet_list[NUM_MAX_MOVES];
         MoveList quiets_searched(quiet_list);
         Move hash_move = (data.in_pv() && data.pv_move() != MOVE_NULL) ? data.pv_move() : tt_move;
@@ -464,7 +542,7 @@ namespace Search
 
             // Shallow depth pruning
             int move_score = move.is_capture() ? 0 : orderer.quiet_score(move);
-            if (!RootSearch && position.board().non_pawn_material(Turn) && best_score > -SCORE_MATE_FOUND &&
+            if (!RootSearch && position.board().non_pawn_material(Turn) && best_score > -SCORE_TB_WIN_FOUND &&
                 UCI::Options::ShallowDepthPruning)
             {
                 if (move.is_capture() || move.is_promotion())
@@ -642,6 +720,9 @@ namespace Search
                 best_score = SCORE_DRAW;
         }
 
+        if (PvNode)
+            best_score = std::min(best_score, max_score);
+
         // TT store
         EntryType type = best_score >= beta                  ? EntryType::LOWER_BOUND
                        : (PvNode && best_score > alpha_init) ? EntryType::EXACT
@@ -717,7 +798,7 @@ namespace Search
             if (tt_hit && tt_static_eval != SCORE_NONE)
                 static_eval = tt_static_eval;
             else
-                static_eval = turn_to_color(Turn) * data.thread().evaluate<false>(position);
+                static_eval = turn_to_color(Turn) * Evaluation::evaluation(position.board());
             best_score = static_eval;
 
             // Can we use the TT value for a better static evaluation?

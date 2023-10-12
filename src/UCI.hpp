@@ -87,7 +87,10 @@ namespace UCI
         extern bool Ponder;
         extern int Threads;
         extern int MoveOverhead;
-        extern std::string PSQT_File;
+        extern std::string NNUE_File;
+        extern std::string TB_Path;
+        extern int TB_ProbeDepth;
+        extern int TB_ProbeLimit;
         extern bool ShallowDepthPruning;
     }
 

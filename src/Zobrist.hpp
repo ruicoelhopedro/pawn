@@ -10,7 +10,6 @@ namespace Zobrist
         extern Hash rnd_black_move;
         extern Hash rnd_castle_side_turn[NUM_COLORS][NUM_CASTLE_SIDES];
         extern Hash rnd_ep_file[8];
-        extern Hash init_material_hash;
     }
 
     void build_rnd_hashes();
@@ -20,5 +19,4 @@ namespace Zobrist
     Hash get_castle_side_turn(CastleSide side, Turn turn);
     Hash get_ep_file(int file);
     Hash get_move_hash(Move move);
-    Hash get_initial_material_hash();
 }

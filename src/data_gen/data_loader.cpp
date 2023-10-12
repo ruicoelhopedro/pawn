@@ -5,7 +5,6 @@
 #include "UCI.hpp"
 #include "data_gen/data_gen.hpp"
 #include "data_gen/data_loader.hpp"
-#include "data_gen/psqt.hpp"
 #include <fstream>
 #include <string>
 #include <vector>
@@ -16,7 +15,7 @@ extern "C"
     {
         Bitboards::init_bitboards();
         Zobrist::build_rnd_hashes();
-        PSQT::init();
+        NNUE::init();
         UCI::init_options();
         pool = new ThreadPool();
     }

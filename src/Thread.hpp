@@ -44,13 +44,12 @@ class Thread
 protected:
     friend class Search::SearchData;
     friend class ThreadPool;
-    friend Score Evaluation::evaluation(const Board& board, Evaluation::EvalData& data, Thread& thread);
     Depth m_seldepth;
     Search::PvContainer m_pv;
     Histories m_histories;
+    std::atomic_uint64_t m_tb_hits;
     std::atomic_uint64_t m_nodes_searched;
     std::vector<Search::MultiPVData> m_multiPV;
-    HashTable<Evaluation::MaterialEntry> m_material_table;
     bool m_data_gen;
 
 public:
@@ -82,32 +81,7 @@ public:
     const Search::Limits& limits() const;
     const Search::SearchTime& time() const;
 
-    template<bool OUTPUT>
-    Score evaluate(const Position& pos)
-    {
-        const Board& board = pos.board();
-        Evaluation::EvalData data(board);
-
-        Score score = Evaluation::evaluation(board, data, *this);
-
-        if (OUTPUT)
-            Evaluation::eval_table(board, data);
-
-        return score;
-    }
-
-    template<bool OUTPUT>
-    Score evaluate(const Board& board)
-    {
-        Evaluation::EvalData data(board);
-
-        Score score = Evaluation::evaluation(board, data, *this);
-
-        if (OUTPUT)
-            Evaluation::eval_table(board, data);
-
-        return score;
-    }
+    void tb_hit();
 };
 
 
@@ -148,6 +122,7 @@ public:
     Position& position();
     Position position() const;
     
+    int64_t tb_hits() const;
     int64_t nodes_searched() const;
 
     int size() const;

@@ -121,6 +121,7 @@ enum ScoreType : Score
     SCORE_ZERO = 0,
     SCORE_DRAW = 0,
     SCORE_MATE = 32000,
+    SCORE_TB_WIN_FOUND = SCORE_MATE - 2 * NUM_MAX_PLY - 1,
     SCORE_MATE_FOUND = SCORE_MATE - NUM_MAX_PLY - 1,
     SCORE_INFINITE = 32001,
     SCORE_NONE = 32002
@@ -180,6 +181,47 @@ public:
     inline constexpr MixedScore operator-(int other) const { return MixedScore(mg - other, eg - other); }
     inline constexpr MixedScore operator*(int other) const { return MixedScore(mg * other, eg * other); }
     inline constexpr MixedScore operator/(int other) const { return MixedScore(mg / other, eg / other); }
+};
+
+
+constexpr MixedScore   PawnValue(  125,   200);
+constexpr MixedScore KnightValue(  750,   850);
+constexpr MixedScore BishopValue(  800,   900);
+constexpr MixedScore   RookValue( 1200,  1400);
+constexpr MixedScore  QueenValue( 2500,  2600);
+constexpr MixedScore   KingValue(10000, 10000); // Needed for SEE and MVV-LVA
+
+constexpr MixedScore piece_value[] = {
+    PawnValue,
+    KnightValue,
+    BishopValue,
+    RookValue,
+    QueenValue,
+    KingValue,
+    MixedScore(0, 0), // Empty
+    MixedScore(0, 0)  // PIECE_NONE
+}; 
+
+constexpr Score piece_value_mg[] = {
+    PawnValue.middlegame(),
+    KnightValue.middlegame(),
+    BishopValue.middlegame(),
+    RookValue.middlegame(),
+    QueenValue.middlegame(),
+    KingValue.middlegame(),
+    0, // Empty
+    0  // PIECE_NONE
+};
+
+constexpr Score piece_value_eg[] = {
+    PawnValue.endgame(),
+    KnightValue.endgame(),
+    BishopValue.endgame(),
+    RookValue.endgame(),
+    QueenValue.endgame(),
+    KingValue.endgame(),
+    0, // Empty
+    0  // PIECE_NONE
 };
 
 

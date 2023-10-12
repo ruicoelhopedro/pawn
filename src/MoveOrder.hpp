@@ -31,7 +31,7 @@ constexpr int NUM_CONTINUATION = 3;
 
 constexpr int hist_bonus(Depth d)
 {
-    return std::min(2000, 100 * d);
+    return std::min(4000, 200 * d);
 }
 
 

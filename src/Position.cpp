@@ -1,8 +1,9 @@
 #include "Position.hpp"
 #include "Types.hpp"
-#include "PieceSquareTables.hpp"
+#include "NNUE.hpp"
 #include "Zobrist.hpp"
 #include "data_gen/data_gen.hpp"
+#include "syzygy/syzygy.hpp"
 #include <cassert>
 #include <sstream>
 #include <string>
@@ -62,7 +63,6 @@ Board::Board()
 
 Board::Board(std::string fen)
     : m_hash(0),
-      m_material_hash(Zobrist::get_initial_material_hash()),
       m_phase(Phases::Total),
       m_simplified(false)
 {
@@ -70,7 +70,6 @@ Board::Board(std::string fen)
 
     // Default initialisation for board pieces
     std::memset(m_board_pieces, PIECE_NONE, sizeof(m_board_pieces));
-    std::memset(m_piece_count, 0, sizeof(m_piece_count));
     std::memset(m_king_sq, 0, sizeof(m_king_sq));
 
     // Read position
@@ -125,23 +124,25 @@ Board::Board(std::string fen)
 
     m_king_sq[WHITE] = m_pieces[KING][WHITE].bitscan_forward();
     m_king_sq[BLACK] = m_pieces[KING][BLACK].bitscan_forward();
-    regen_psqt(WHITE);
-    regen_psqt(BLACK);
+    if (!m_simplified)
+    {
+        regen_psqt(WHITE);
+        regen_psqt(BLACK);
+    }
 }
 
 
 Board::Board(const BinaryBoard& bb, bool accumulator_frozen)
     : m_hash(0),
-      m_material_hash(Zobrist::get_initial_material_hash()),
       m_phase(Phases::Total),
       m_simplified(accumulator_frozen)
 {
     // Default initialisation for board pieces
     std::memset(m_castling_rights, 0, sizeof(m_castling_rights));
     std::memset(m_board_pieces, PIECE_NONE, sizeof(m_board_pieces));
-    std::memset(m_piece_count, 0, sizeof(m_piece_count));
-    std::memset(m_psq, 0, sizeof(m_psq));
     std::memset(m_king_sq, 0, sizeof(m_king_sq));
+    if (!m_simplified)
+        std::memset(m_acc, 0, sizeof(m_acc));
 
     // Position
     for (int rank = 7; rank >= 0; rank--)
@@ -273,24 +274,21 @@ void Board::update_checkers()
 
 void Board::regen_psqt(Turn turn)
 {
-    if (!m_simplified)
-    {
-        m_psq[turn].clear();
-        std::size_t num_features = 0;
-        PSQT::Feature features[PSQT::NUM_MAX_ACTIVE_FEATURES];
+    m_acc[turn].clear();
+    std::size_t num_features = 0;
+    NNUE::Feature features[NNUE::NUM_MAX_ACTIVE_FEATURES];
 
-        // Pack features to be pushed into the accumulator
-        for (Turn t : { WHITE, BLACK })
-            for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
-            {
-                Bitboard b = get_pieces(t, p);
-                while (b)
-                    features[num_features++] = m_psq[turn].get_feature(p, b.bitscan_forward_reset(), m_king_sq[turn], t, turn);
-            }
+    // Pack features to be pushed into the accumulator
+    for (Turn t : { WHITE, BLACK })
+        for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
+        {
+            Bitboard b = get_pieces(t, p);
+            while (b)
+                features[num_features++] = m_acc[turn].get_feature(p, b.bitscan_forward_reset(), m_king_sq[turn], t, turn);
+        }
 
-        // Regen entire accumulator at once
-        m_psq[turn].push_features(num_features, features);
-    }
+    // Regen entire accumulator at once
+    m_acc[turn].push_features(num_features, features);
 }
 
 
@@ -379,7 +377,8 @@ Board Board::make_move(Move move) const
     if (piece == KING)
     {
         result.m_king_sq[m_turn] = result.m_pieces[KING][m_turn].bitscan_forward();
-        result.regen_psqt(m_turn);
+        if (!m_simplified)
+            result.regen_psqt(m_turn);
     }
 
     // Swap turns
@@ -431,17 +430,13 @@ bool Board::is_valid() const
     // Material and phase evaluation
     uint8_t phase = Phases::Total;
     MixedScore material(0, 0);
-    PSQT::Accumulator acc[2];
-    Hash material_hash = 0;
+    NNUE::Accumulator acc[2];
     for (PieceType piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
         for (Turn turn : { WHITE, BLACK })
         {
             Bitboard bb = get_pieces(turn, piece);
-            if (bb.count() != m_piece_count[piece][turn])
-                return false;
             material += piece_value[piece] * bb.count() * turn_to_color(turn);
             phase -= bb.count() * Phases::Pieces[piece];
-            material_hash ^= Zobrist::get_piece_turn_square(piece, turn, bb.count());
             while (bb)
             {
                 Square s = bb.bitscan_forward_reset();
@@ -454,9 +449,7 @@ bool Board::is_valid() const
         return false;
     if (material.middlegame() != total_material.middlegame() || material.endgame() != total_material.endgame())
         return false;
-    if (acc[WHITE] != m_psq[WHITE] || acc[BLACK] != m_psq[BLACK])
-        return false;
-    if (material_hash != m_material_hash)
+    if (acc[WHITE] != m_acc[WHITE] || acc[BLACK] != m_acc[BLACK])
         return false;
 
     return true;
@@ -546,12 +539,6 @@ Hash Board::hash() const
 }
 
 
-Hash Board::material_hash() const
-{
-    return m_material_hash;
-}
-
-
 Square Board::least_valuable(Bitboard bb) const
 {
     // Return the least valuable piece in the bitboard
@@ -616,18 +603,6 @@ MixedScore Board::material() const
 MixedScore Board::material(Turn turn) const
 {
     return m_material[turn] - KingValue;
-}
-
-
-MixedScore Board::psq() const
-{
-    return m_psq[WHITE].eval() - m_psq[BLACK].eval();
-}
-
-
-MixedScore Board::psq(Turn t) const
-{
-    return m_psq[t].eval();
 }
 
 
@@ -720,9 +695,9 @@ Bitboard Board::sliders() const
 
 
 
-const PSQT::Accumulator& Board::accumulator(Turn t) const
+const NNUE::Accumulator& Board::accumulator(Turn t) const
 {
-    return m_psq[t];
+    return m_acc[t];
 }
 
 
@@ -922,5 +897,25 @@ std::ostream& operator<<(std::ostream& out, const Board& board)
     out << "\n";
     out << "FEN: " << board.to_fen() << "\n";
     out << "Hash: " << std::hex << board.m_hash << std::dec << "\n";
+
+    if (board.get_pieces().count() <= Syzygy::Cardinality)
+    {
+        auto probe_result = Syzygy::probe_dtz(board);
+        Syzygy::WDL wdl = probe_result.first;
+        int dtz = probe_result.second;
+        if (wdl != Syzygy::WDL_NONE)
+        {
+            wdl = board.turn() == WHITE ? wdl : -wdl;
+            out << "Tablebase: "
+                << (wdl == Syzygy::WDL_LOSS         ? "Black wins"
+                  : wdl == Syzygy::WDL_BLESSED_LOSS ? "Draw (cursed black win)"
+                  : wdl == Syzygy::WDL_DRAW         ? "Draw"
+                  : wdl == Syzygy::WDL_CURSED_WIN   ? "Draw (cursed white win)"
+                  : wdl == Syzygy::WDL_WIN          ? "White wins"
+                  :                                   "error")
+                << " - DTZ: " << dtz
+                << "\n";
+        }
+    }
     return out;
 }

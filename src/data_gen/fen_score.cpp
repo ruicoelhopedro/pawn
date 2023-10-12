@@ -151,7 +151,7 @@ namespace FEN_Scores
         {            
             // Evaluate the position
             Position pos(fen);
-            Score s = 100 * pool->front().evaluate<false>(pos) / PawnValue.endgame();
+            Score s = 100 * Evaluation::evaluation(pos.board()) / PawnValue.endgame();
 
             // Write to the output file
             std::visit([pos, fen, s] (auto& output) { output.write(pos, fen, s); },

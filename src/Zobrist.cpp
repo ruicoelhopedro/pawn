@@ -10,7 +10,6 @@ namespace Zobrist
         Hash rnd_black_move;
         Hash rnd_castle_side_turn[NUM_COLORS][NUM_CASTLE_SIDES];
         Hash rnd_ep_file[8];
-        Hash init_material_hash;
     }
 
 
@@ -31,12 +30,6 @@ namespace Zobrist
 
         for (int i = 0; i < 8; i++)
             randoms::rnd_ep_file[i] = rnd.next();
-
-        // Build the initial material hash key
-        randoms::init_material_hash = 0;
-        for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
-            for (Turn t : { WHITE, BLACK })
-                randoms::init_material_hash ^= randoms::rnd_piece_turn_square[p][t][0];
     }
 
 
@@ -69,10 +62,5 @@ namespace Zobrist
         // Based on a simple linear congruential generator
         // These values have been tested for collisions for all possible Move values
         return 0x89b4fa525 * move.to_int() + 0xe3b2eb29df24cba7;
-    }
-    
-    Hash get_initial_material_hash()
-    {
-        return randoms::init_material_hash;
     }
 }

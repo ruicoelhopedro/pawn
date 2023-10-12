@@ -5,6 +5,7 @@
 #include "MoveOrder.hpp"
 #include "Thread.hpp"
 #include "UCI.hpp"
+#include "syzygy/syzygy.hpp"
 #include <algorithm>
 #include <atomic>
 #include <memory>
@@ -21,9 +22,9 @@ Thread::Thread(int id, ThreadPool& pool)
     : m_id(id),
       m_pool(pool),
       m_status(ThreadStatus::STARTING),
+      m_tb_hits(0),
       m_nodes_searched(0),
       m_multiPV(UCI::Options::MultiPV),
-      m_material_table(16192, false),
       m_data_gen(false)
 {
     m_thread = std::thread(&Thread::thread_loop, this);
@@ -60,7 +61,6 @@ void Thread::wait()
 void Thread::clear()
 {
     m_histories.clear();
-    m_material_table.clear();
 }
 
 
@@ -85,10 +85,11 @@ void Thread::output_pvs()
 {
     double elapsed = m_pool.m_time.elapsed();
     uint64_t nodes = m_pool.nodes_searched();
+    uint64_t tb_hits = m_pool.tb_hits();
 
     // Output information
     for (int iPV = 0; iPV < UCI::Options::MultiPV; iPV++)
-        m_multiPV[iPV].write_pv(iPV, nodes, elapsed);
+        m_multiPV[iPV].write_pv(iPV, nodes, tb_hits, elapsed);
 }
 
 
@@ -97,6 +98,9 @@ bool Thread::is_main() const { return m_id == 0 && !m_data_gen; }
 ThreadPool& Thread::pool() const { return m_pool; }
 const Search::SearchTime& Thread::time() const { return m_pool.m_time; }
 const Search::Limits& Thread::limits() const { return m_pool.m_limits; }
+
+
+void Thread::tb_hit() { m_tb_hits.fetch_add(1, std::memory_order_relaxed); }
 
 
 
@@ -158,6 +162,9 @@ void ThreadPool::search(const Search::Timer& timer, const Search::Limits& limits
 
     // Estimate search time
     update_time(timer, limits);
+
+    // Tablebases probe
+    Syzygy::Root = Syzygy::RootPos(m_position);
 
     // Clear debug data (if any)
     if constexpr (Debug::Enabled)
@@ -242,6 +249,15 @@ Position& ThreadPool::position() { return m_position; }
 Position ThreadPool::position() const { return m_position; }
 
 
+int64_t ThreadPool::tb_hits() const
+{
+    int64_t total = 0;
+    for (auto& thread : m_threads)
+        total += thread->m_tb_hits.load(std::memory_order_relaxed);
+    return total;
+}
+
+
 int64_t ThreadPool::nodes_searched() const
 {
     int64_t total = 0;
@@ -259,12 +275,12 @@ Thread* ThreadPool::get_best_thread() const
     // Get minimum score
     Score min_score = SCORE_INFINITE;
     for (auto& thread : m_threads)
-        min_score = std::min(min_score, thread->m_multiPV[0].score);
+        min_score = std::min(min_score, thread->m_multiPV[0].score());
 
     // Voting function
     auto thread_votes = [min_score](const Thread* thread)
     {
-        return (thread->m_multiPV[0].score - min_score + 20) * thread->m_multiPV[0].depth;
+        return (thread->m_multiPV[0].score() - min_score + 20) * thread->m_multiPV[0].depth;
     };
 
     // Build votes for each thread
@@ -336,6 +352,14 @@ void Thread::search()
             else
                 m++;
     }
+    else if (Syzygy::Root.in_tb())
+    {
+        // Only select the top TB-scored moves (and make the selection aware of MultiPV)
+        int num_tb_moves = std::max(Syzygy::Root.num_preserving_moves(), UCI::Options::MultiPV);
+        m_root_moves.clear();
+        for (int idx = 0; idx < num_tb_moves; idx++)
+            m_root_moves.push(Syzygy::Root.ordered_moves(idx));
+    }
 
     // Check for aborted search if game has ended
     if (m_root_moves.length() == 0 || m_position.is_draw(false))
@@ -366,6 +390,7 @@ void Thread::search()
     Score average_score = 0;
 
     // Clear data
+    m_tb_hits.store(0);
     m_nodes_searched.store(0);
 
     // Iterative deepening
@@ -401,7 +426,7 @@ void Thread::search()
             std::stable_sort(m_multiPV.begin(), m_multiPV.end(),
                              [](Search::MultiPVData a, Search::MultiPVData b)
                              {
-                                 return a.depth >= b.depth && a.score > b.score;
+                                 return a.depth >= b.depth && a.score() > b.score();
                              });
 
             // Output all searched Pv lines
@@ -424,14 +449,14 @@ void Thread::search()
             iter_since_best_move_change++;
 
         // Update best score and its average
-        Score best_score = m_multiPV.front().score;
+        Score best_score = m_multiPV.front().score();
         average_score = (best_score + 9 * average_score) / 10;
 
         // Additional task for main thread: check if we need to stop
         if (main_thread)
         {
             // Additional time stopping conditions
-            Score score = m_multiPV.front().score;
+            Score score = m_multiPV.front().score();
             if (time.time_management() &&
                 !limits.ponder &&
                 !limits.infinite)
@@ -534,7 +559,7 @@ SearchResult Thread::simple_search(Position& pos, const Search::Limits& limits)
     }
     m_data_gen = false;
 
-    return SearchResult(pv.score * turn_to_color(pos.get_turn()), *pv.pv);
+    return SearchResult(pv.score() * turn_to_color(pos.get_turn()), *pv.pv);
 }
 
 
