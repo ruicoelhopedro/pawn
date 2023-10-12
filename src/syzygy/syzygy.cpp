@@ -197,7 +197,7 @@ namespace Syzygy
 
 
 
-    WDL fathom_to_wdl(uint result)
+    WDL fathom_to_wdl(unsigned int result)
     {
         return result == TB_WIN          ? WDL_WIN
              : result == TB_CURSED_WIN   ? WDL_CURSED_WIN
