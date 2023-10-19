@@ -138,7 +138,7 @@ bool BinaryGame::read(std::ifstream& stream, BinaryGame& result, std::size_t gam
 
     // Read entire game at once (this buffer size is enough for games with 1000 or less moves)
     char buffer[4096];
-    if (game_size <= sizeof(buffer) && !stream.read(buffer, game_size))
+    if (game_size > sizeof(buffer) || !stream.read(buffer, game_size))
         return false;
 
     // Starting position
