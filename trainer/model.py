@@ -22,6 +22,15 @@ PIECE_VALUES = {
 }
 
 
+def sigmoid_loss(output, scores, results, phases):
+    K = 400
+    mix = 0.3
+    y = output[:, 0] * phases + output[:, 1] * (1 - phases)
+    y_wdl = torch.sigmoid(SCALE_FACTOR / K * y)
+    scores_wdl = (1 - mix) * torch.sigmoid(scores / K) + mix * results
+    return torch.mean(torch.pow(torch.abs(y_wdl - scores_wdl), 2.5))
+
+
 class CReLU(nn.Module):
 
     def __init__(self):

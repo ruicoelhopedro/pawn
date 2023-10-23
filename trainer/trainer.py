@@ -11,7 +11,7 @@ from torch.utils.data import Dataset
 from torch.utils.data.sampler import BatchSampler, RandomSampler
 from torch.optim.lr_scheduler import StepLR
 from sklearn.model_selection import train_test_split
-from model import NNUE, SCALE_FACTOR, NUM_FEATURES, NUM_MAX_FEATURES
+from model import NNUE, NUM_MAX_FEATURES, sigmoid_loss
 
 
 class BatchedDataLoader:
@@ -178,15 +178,6 @@ def test(dataloader, model, loss_fn, device, epoch, output_file):
     output_file.flush()
     print(f'Epoch {epoch + 1}: Test loss: {test_loss:>6.4e}')
 
-
-
-def sigmoid_loss(output, scores, results, phases):
-    K = 400
-    mix = 0.3
-    y = output[:, 0] * phases + output[:, 1] * (1 - phases)
-    y_wdl = torch.sigmoid(SCALE_FACTOR / K * y)
-    scores_wdl = (1 - mix) * torch.sigmoid(scores / K) + mix * results
-    return torch.mean((y_wdl - scores_wdl)**2)
 
 
 
