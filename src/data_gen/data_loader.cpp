@@ -132,7 +132,8 @@ extern "C"
             // Find winner
             Color result = Color(game.nodes.back().score);
     
-             // Write each position, score and move
+            // Write each position, score and move
+            std::size_t num_pos = 0; 
             Board board(game.starting_pos, true);
             for (BinaryNode node : game.nodes)
                 if (node.move != MOVE_NULL)
@@ -144,7 +145,7 @@ extern "C"
                     if (!board.checkers() &&
                         !node.move.is_capture() &&
                         !node.move.is_promotion() &&
-                        prng.next(prob) < 1)
+                        (prng.next(prob) < 1 || num_pos == 0))
                     {
                         // Update features
                         w_idx[count+1] = w_idx[count];
@@ -178,6 +179,7 @@ extern "C"
                         phases[count] = MixedScore(64, 0).tapered(board.phase());
                         results[count] = result;
                         count++;
+                        num_pos++;
                     }
 
                     // Make the move
