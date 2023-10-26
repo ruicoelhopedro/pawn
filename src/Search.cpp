@@ -436,7 +436,7 @@ namespace Search
                     (bound == EntryType::LOWER_BOUND && score >= beta) ||
                     (bound == EntryType::UPPER_BOUND && score <= alpha))
                 {
-                    ttable.store(hash, depth, score_to_tt(score, Ply), MOVE_NULL, bound, SCORE_NONE);
+                    entry->store(hash, depth, score_to_tt(score, Ply), MOVE_NULL, bound, SCORE_NONE);
                     return score;
                 }
 
@@ -726,7 +726,7 @@ namespace Search
         EntryType type = best_score >= beta                  ? EntryType::LOWER_BOUND
                        : (PvNode && best_score > alpha_init) ? EntryType::EXACT
                        :                                       EntryType::UPPER_BOUND;
-        ttable.store(hash, depth, score_to_tt(best_score, Ply), best_move, type, data.static_eval);
+        entry->store(hash, depth, score_to_tt(best_score, Ply), best_move, type, data.static_eval);
 
         return best_score;
     }
@@ -878,7 +878,7 @@ namespace Search
         EntryType type = best_score >= beta                  ? EntryType::LOWER_BOUND
                        : (PvNode && best_score > alpha_init) ? EntryType::EXACT
                        :                                       EntryType::UPPER_BOUND;
-        ttable.store(position.hash(), 0, score_to_tt(best_score, Ply), best_move, type, static_eval);
+        entry->store(position.hash(), 0, score_to_tt(best_score, Ply), best_move, type, static_eval);
 
         return best_score;
     }

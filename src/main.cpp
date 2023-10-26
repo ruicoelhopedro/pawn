@@ -17,7 +17,7 @@ int main(int argc, char** argv)
     NNUE::init();
     Syzygy::init();
     UCI::init_options();
-    ttable = HashTable<TranspositionEntry>(16);
+    ttable = TranspositionTable(16);
     pool = new ThreadPool();
 
     // Handle passed arguments

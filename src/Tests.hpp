@@ -36,14 +36,10 @@ namespace Tests
     void bench(Search::Limits limits, int threads, int hash);
 
 
-    template<bool USE_ORDER, bool TT, bool LEGALITY, bool VALIDITY>
+    template<bool USE_ORDER, bool LEGALITY, bool VALIDITY>
     int perft_techniques_tests()
     {
         auto tests = test_suite();
-
-        // Allocate TT
-        if (TT)
-            perft_table.resize(16);
 
         int n_failed = 0;
         for (auto& test : tests)
@@ -51,7 +47,7 @@ namespace Tests
             Histories hists;
             Position pos(test.fen());
             auto result_base = Search::perft<false>(pos, test.depth() - 1, hists);
-            auto result_test = Search::template perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(pos, test.depth() - 1, hists);
+            auto result_test = Search::template perft<false, USE_ORDER, LEGALITY, VALIDITY>(pos, test.depth() - 1, hists);
             if (result_base == result_test)
             {
                 std::cout << "[ OK ] " << test.fen() << " (" << result_test << ")" << std::endl;
@@ -62,10 +58,6 @@ namespace Tests
                 n_failed++;
             }
         }
-
-        // Deallocate TT
-        if (TT)
-            perft_table.resize(0);
 
         std::cout << "\nFailed/total tests: " << n_failed << "/" << tests.size() << std::endl;
         return n_failed;

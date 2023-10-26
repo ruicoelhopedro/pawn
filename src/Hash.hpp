@@ -6,48 +6,6 @@
 
 using Age = uint8_t;
 
-class TableEntry
-{
-    virtual bool query(Age age, Hash hash, TableEntry** entry) = 0;
-    virtual void store(Age age, Hash hash, Depth depth) = 0;
-    virtual bool empty() const = 0;
-};
-
-
-class PerftEntry
-{
-    Hash m_hash;
-    Depth m_depth;
-    uint64_t m_nodes;
-
-public:
-    inline PerftEntry()
-        : m_hash(0), m_depth(0), m_nodes(0)
-    {}
-
-    inline bool query(Age age, Hash hash, PerftEntry** entry)
-    {
-        (void)age;
-        *entry = this;
-        return hash == m_hash;
-    }
-    inline void store(Age age, Hash hash, Depth depth, uint64_t n_nodes)
-    {
-        (void)age;
-        m_hash = hash;
-        m_depth = depth;
-        m_nodes = n_nodes;
-    }
-    inline bool empty() const
-    {
-        return m_depth == 0 && m_nodes == 0;
-    }
-
-    Hash hash() const { return m_hash; }
-    Depth depth() const { return m_depth; }
-    uint64_t n_nodes() const { return m_nodes; }
-};
-
 
 enum class EntryType
 {
@@ -99,25 +57,19 @@ public:
         }
         return false;
     }
-    inline void store(Age age, Hash hash, Depth depth, Score score, Move best_move, EntryType type, Score static_eval)
+    inline void store(Hash hash, Depth depth, Score score, Move best_move, EntryType type, Score static_eval)
     {
-        bool replace = type == EntryType::EXACT
-                    || age != this->age()
-                    || depth > m_depth - 4;
-        if (replace)
-        {
-            m_hash = hash ^ data_hash(depth, score, gen_type(age, type), static_eval);
-            m_depth = depth;
-            m_type = gen_type(age, type);
-            m_score = score;
-            m_static_eval = static_eval;
+        m_hash = hash ^ data_hash(depth, score, gen_type(this->age(), type), static_eval);
+        m_depth = depth;
+        m_type = gen_type(this->age(), type);
+        m_score = score;
+        m_static_eval = static_eval;
 
-            // Only replace the best move if we have a new one to store
-            if (best_move != MOVE_NULL)
-                m_best_move = best_move;
-        }
+        // Only replace the best move if we have a new one to store
+        if (best_move != MOVE_NULL)
+            m_best_move = best_move;
     }
-    bool empty() const { return type() == EntryType::EMPTY; }
+    inline bool empty() const { return type() == EntryType::EMPTY; }
 
     inline Hash hash() const { return m_hash ^ data_hash(); }
     inline Depth depth() const { return m_depth; }
@@ -125,51 +77,66 @@ public:
     inline Score score() const { return m_score; }
     inline Move hash_move() const { return m_best_move; }
     inline Score static_eval() const { return m_static_eval; }
+
+    inline int value(int age) const { return m_depth - 255 * (age != this->age()); }
 };
 
 
-template<typename Entry>
-class HashTable
+struct Bucket
 {
-    std::vector<Entry> m_table;
+    static constexpr int BUCKET_SIZE = 3;
+    TranspositionEntry entries[BUCKET_SIZE];
+
+    inline bool query(Age age, Hash hash, TranspositionEntry** entry_ptr)
+    {
+        // Search for this entry in the bucket
+        for (std::size_t i = 1; i < BUCKET_SIZE; i++)
+            if (entries[i].query(age, hash, entry_ptr))
+                return true;
+
+        // No entry found: find the least valuable entry and return it for replacement
+        *entry_ptr = &entries[0];
+        for (std::size_t i = 1; i < BUCKET_SIZE; i++)
+            if (entries[i].depth() < (*entry_ptr)->depth())
+                *entry_ptr = &entries[i];
+        return false;
+    }
+};
+
+
+class TranspositionTable
+{
+    std::vector<Bucket> m_table;
     std::size_t m_full;
     Age m_age;
 
-    static std::size_t size_from_mb(std::size_t mb)   { return mb * 1024 / sizeof(Entry) * 1024 + 1; }
-    static std::size_t mb_from_size(std::size_t size) { return (size - 1) / 1024 * sizeof(Entry) / 1024; }
+    static std::size_t size_from_mb(std::size_t mb)   { return mb * 1024 / sizeof(Bucket) * 1024 + 1; }
+    static std::size_t mb_from_size(std::size_t size) { return (size - 1) / 1024 * sizeof(Bucket) / 1024; }
 
     std::size_t index(Hash hash) const { return hash % m_table.size(); }
 
 public:
-    HashTable()
-        : HashTable(0)
+    TranspositionTable()
+        : TranspositionTable(0)
     {}
 
-    HashTable(std::size_t size, bool size_in_mb = true)
+    TranspositionTable(std::size_t size, bool size_in_mb = true)
         : m_table(size_in_mb ? size_from_mb(size) : size),
           m_full(0),
           m_age(0)
     {}
 
-    template<typename EntryReturn>
-    bool query(Hash hash, EntryReturn** entry_ptr)
+    bool query(Hash hash, TranspositionEntry** entry_ptr)
     {
         return m_table[index(hash)].query(m_age, hash, entry_ptr);
     }
 
-    template<typename... Args>
-    void store(Hash hash, Args... args)
-    {
-        auto& entry = m_table[index(hash)];
-        m_full += entry.empty();
-        entry.store(m_age, hash, args...);
-    }
 
     void clear()
     {
         m_full = 0;
         m_age = 0;
-        std::fill(m_table.begin(), m_table.end(), Entry());
+        std::fill(m_table.begin(), m_table.end(), Bucket());
     }
 
     void new_search()
@@ -181,16 +148,20 @@ public:
 
     void resize(std::size_t size_mb)
     {
-        m_table = std::vector<Entry>(size_from_mb(size_mb));
+        m_table = std::vector<Bucket>(size_from_mb(size_mb));
         m_full = 0;
     }
 
     int hashfull() const
     {
-        return m_full * 1000 / m_table.size();
+        int count = 0;
+        for (int i = 0; i < 1000; i++)
+            for (int j = 0; j < Bucket::BUCKET_SIZE; j++)
+                if (!m_table[i].entries[j].empty())
+                    count++;
+        return count / Bucket::BUCKET_SIZE;
     }
 };
 
 
-extern HashTable<TranspositionEntry> ttable;
-extern HashTable<PerftEntry> perft_table;
+extern TranspositionTable ttable;
