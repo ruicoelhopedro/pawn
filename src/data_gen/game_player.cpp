@@ -20,6 +20,7 @@ namespace GamePlayer
         int random_probability = 100;
         int store_min_ply = 15;
         int seed = 0;
+        int accept_threshold = 300;
         bool shallow_depth_pruning = false;
 
         // Read passed parameters
@@ -41,6 +42,8 @@ namespace GamePlayer
                 stream >> store_min_ply;
             else if (token == "seed")
                 stream >> seed;
+            else if (token == "accept_threshold")
+                stream >> accept_threshold;
             else if (token == "shallow_depth_pruning")
                 shallow_depth_pruning = true;
             else
@@ -131,6 +134,11 @@ namespace GamePlayer
                 // Is the reached position usable?
                 SearchResult result = thread.simple_search(pos, limits);
                 if (!valid_game || result.bestmove == MOVE_NULL)
+                    continue;
+
+                // Determine if we keep using this position or discard it based on the score
+                int prob = 50 * (1 + accept_threshold) / (1 + abs(result.score));
+                if (int(random.next(100)) > prob)
                     continue;
 
                 // Register a new game
