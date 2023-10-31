@@ -2,7 +2,7 @@
 #include "incbin/incbin.h"
 #include "Types.hpp"
 
-#define NNUE_Default_File "nnue-7e7da72ba552.dat"
+#define NNUE_Default_File "nnue-389acbc7fffc.dat"
 
 
 namespace NNUE
@@ -27,7 +27,8 @@ namespace NNUE
         Weight m_psqt[NUM_FEATURES][NUM_PHASES];
         Weight m_sparse_layer[NUM_FEATURES][NUM_ACCUMULATORS];
         Weight m_bias[NUM_ACCUMULATORS];
-        Weight m_dense[NUM_PHASES][NUM_ACCUMULATORS];
+        Weight m_dense[NUM_PHASES][2 * NUM_ACCUMULATORS];
+        Weight m_dense_bias[NUM_PHASES];
     };
 
     class Accumulator
@@ -48,9 +49,9 @@ namespace NNUE
 
         void push_features(std::size_t num_features, Feature* features);
 
-        MixedScore eval() const;
+        static MixedScore eval(const Accumulator& stm, const Accumulator& ntm);
 
-        MixedScore eval_psq() const;
+        static MixedScore eval_psq(const Accumulator& stm, const Accumulator& ntm);
 
         bool operator==(const Accumulator& other) const;
 

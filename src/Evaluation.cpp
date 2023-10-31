@@ -12,10 +12,10 @@ namespace Evaluation
 
 Score evaluation(const Board& board)
 {
-    const NNUE::Accumulator& white_acc = board.accumulator(WHITE);
-    const NNUE::Accumulator& black_acc = board.accumulator(BLACK);
-    MixedScore mixed_result = white_acc.eval() - black_acc.eval();
-    Score result = mixed_result.tapered(board.phase());
+    const Turn stm = board.turn();
+    MixedScore mixed_result = NNUE::Accumulator::eval(board.accumulator( stm),
+                                                      board.accumulator(~stm));
+    Score result = mixed_result.tapered(board.phase()) * turn_to_color(stm);
     return std::clamp(result, -SCORE_MATE_FOUND + 1, SCORE_MATE_FOUND - 1);
 }
 
@@ -30,10 +30,11 @@ void eval_table(const Board& board)
     }
 
     // Get total and partial NNUE scores
-    auto white_acc = board.accumulator(WHITE);
-    auto black_acc = board.accumulator(BLACK);
-    MixedScore mixed_nnue = white_acc.eval() - black_acc.eval();
-    MixedScore psqt = white_acc.eval_psq() - black_acc.eval_psq();
+    const Turn stm = board.turn();
+    MixedScore mixed_nnue = NNUE::Accumulator::eval(board.accumulator( stm),
+                                                    board.accumulator(~stm));
+    MixedScore psqt = NNUE::Accumulator::eval_psq(board.accumulator( stm),
+                                                  board.accumulator(~stm));
     MixedScore positional = mixed_nnue - psqt;
     Score nnue = mixed_nnue.tapered(board.phase());
 

@@ -144,29 +144,34 @@ namespace NNUE
     }
 
 
-    MixedScore Accumulator::eval() const
+    MixedScore Accumulator::eval(const Accumulator& stm, const Accumulator& ntm)
     {
-        int output[2] = { 0, 0 };
+        int output[2] = { nnue_net->m_dense_bias[0], nnue_net->m_dense_bias[1] };
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
         {
             // Clipped ReLU on the accumulators
-            int accumulator = std::clamp(m_net[i], 0, SCALE_FACTOR);
+            int stm_acc = std::clamp(stm.m_net[i], 0, SCALE_FACTOR);
+            int ntm_acc = std::clamp(ntm.m_net[i], 0, SCALE_FACTOR);
 
             // Net output
-            output[MG] += nnue_net->m_dense[MG][i] * accumulator;
-            output[EG] += nnue_net->m_dense[EG][i] * accumulator;
+            int j = i + NUM_ACCUMULATORS;
+            output[MG] += nnue_net->m_dense[MG][i] * stm_acc
+                        + nnue_net->m_dense[MG][j] * ntm_acc;
+            output[EG] += nnue_net->m_dense[EG][i] * stm_acc
+                        + nnue_net->m_dense[EG][j] * ntm_acc;
         }
 
         // Build and return final score
-        int mg = (m_psqt[MG] + output[MG] / SCALE_FACTOR) ;
-        int eg = (m_psqt[EG] + output[EG] / SCALE_FACTOR) ;
+        int mg = (stm.m_psqt[MG] - ntm.m_psqt[MG] + output[MG] / SCALE_FACTOR) ;
+        int eg = (stm.m_psqt[EG] - ntm.m_psqt[EG] + output[EG] / SCALE_FACTOR) ;
         return MixedScore(mg, eg);
     }
 
 
-    MixedScore Accumulator::eval_psq() const
+    MixedScore Accumulator::eval_psq(const Accumulator& stm, const Accumulator& ntm)
     {
-        return MixedScore(m_psqt[MG], m_psqt[EG]);
+        return MixedScore(stm.m_psqt[MG] - ntm.m_psqt[MG],
+                          stm.m_psqt[EG] - ntm.m_psqt[EG]);
     }
     
 
