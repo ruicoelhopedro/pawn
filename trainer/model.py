@@ -48,7 +48,7 @@ class NNUE(nn.Module):
         self.psqt = nn.EmbeddingBag(NUM_FEATURES, 2, mode='sum')
         self.accumulator_emb = nn.EmbeddingBag(NUM_FEATURES, NUM_ACCUMULATORS, mode='sum')
         self.accumulator_bias = nn.Parameter(torch.zeros(NUM_ACCUMULATORS))
-        self.layer = nn.Linear(NUM_ACCUMULATORS, 2, bias=False)
+        self.layer = nn.Linear(2 * NUM_ACCUMULATORS, 2)
         # Clear weights and biases for sparse input layer and PSQT
         self.psqt.weight.data.fill_(0.0)
         self.accumulator_emb.weight.data.fill_(0.0)
@@ -60,13 +60,18 @@ class NNUE(nn.Module):
                     self.psqt.weight.data[map_features(piece, square, king, True), 0] = mg / SCALE_FACTOR
                     self.psqt.weight.data[map_features(piece, square, king, True), 1] = eg / SCALE_FACTOR
 
+    @staticmethod
+    def perspective(w_values, b_values, stms):
+        return (1 - stms[:,None]) * w_values + stms[:,None] * b_values
 
-    def forward(self, w_offset, w_cols, b_offset, b_cols):
+    def forward(self, w_offset, w_cols, b_offset, b_cols, stms):
         psqt = self.psqt(w_cols, w_offset) - self.psqt(b_cols, b_offset)
         white_acc = self.crelu(self.accumulator_emb(w_cols, w_offset) + self.accumulator_bias)
         black_acc = self.crelu(self.accumulator_emb(b_cols, b_offset) + self.accumulator_bias)
-        positional = self.layer(white_acc) - self.layer(black_acc)
-        return psqt + positional
+        w_acc = torch.cat([white_acc, black_acc], dim=1)
+        b_acc = torch.cat([black_acc, white_acc], dim=1)
+        positional = self.layer(self.perspective(w_acc, b_acc, stms))
+        return psqt + self.perspective(positional, -positional, stms)
 
 
     @staticmethod
@@ -85,3 +90,4 @@ class NNUE(nn.Module):
             self.__dump(self.accumulator_emb.weight.data, np.short, SCALE_FACTOR, output_file)
             self.__dump(self.accumulator_bias.data, np.short, SCALE_FACTOR, output_file)
             self.__dump(self.layer.weight.data, np.short, SCALE_FACTOR, output_file)
+            self.__dump(self.layer.bias.data, np.short, SCALE_FACTOR, output_file)

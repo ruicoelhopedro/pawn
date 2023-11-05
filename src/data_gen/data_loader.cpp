@@ -87,7 +87,8 @@ extern "C"
         unsigned short* b_cols,
         short* scores,
         char* results,
-        char* phases
+        char* phases,
+        char* stms
     )
     {
         // Open files
@@ -178,6 +179,7 @@ extern "C"
                         scores[count] = node.score;
                         phases[count] = MixedScore(64, 0).tapered(board.phase());
                         results[count] = result;
+                        stms[count] = board.turn();
                         count++;
                         num_pos++;
                     }

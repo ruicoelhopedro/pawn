@@ -73,6 +73,7 @@ class PawnDataset(Dataset):
                                        ndpointer(ctypes.c_ushort, flags="C_CONTIGUOUS"),
                                        ndpointer(ctypes.c_short, flags="C_CONTIGUOUS"),
                                        ndpointer(ctypes.c_byte, flags="C_CONTIGUOUS"),
+                                       ndpointer(ctypes.c_byte, flags="C_CONTIGUOUS"),
                                        ndpointer(ctypes.c_byte, flags="C_CONTIGUOUS")]
 
         # Load total number of games in the dataset
@@ -119,19 +120,21 @@ class PawnDataset(Dataset):
         scores = np.empty(n_max_pos, dtype=np.int16)
         results = np.empty(n_max_pos, dtype=np.byte)
         phases = np.empty(n_max_pos, dtype=np.byte)
+        stms = np.empty(n_max_pos, dtype=np.byte)
         # Read the games and get the actual number of positions
         n_pos = self.get_nnue_data(self.fname, self.indices, games, len(games), hash(str(index)), self.prob_skip,
-                                   w_idx, b_idx, w_cols, b_cols, scores, results, phases)
+                                   w_idx, b_idx, w_cols, b_cols, scores, results, phases, stms)
         # Build reduced arrays
         scores_array = torch.tensor(scores[0:n_pos], dtype=torch.float32)
         phases_array = torch.tensor(phases[0:n_pos], dtype=torch.float32) / 64.0
         results_array = (torch.tensor(results[0:n_pos], dtype=torch.float32) + 1) / 2
+        stms_array = torch.tensor(stms[0:n_pos], dtype=torch.float32)
         # Build the embedding tensors
         w_cols =   torch.LongTensor(np.array(w_cols[:w_idx[n_pos]], dtype=np.int_))
         b_cols =   torch.LongTensor(np.array(b_cols[:b_idx[n_pos]], dtype=np.int_))
         w_offset = torch.LongTensor(np.array(w_idx[:n_pos], dtype=np.int_))
         b_offset = torch.LongTensor(np.array(b_idx[:n_pos], dtype=np.int_))
-        return w_offset, w_cols, b_offset, b_cols, scores_array, results_array, phases_array
+        return w_offset, w_cols, b_offset, b_cols, scores_array, results_array, phases_array, stms_array
 
 
 
@@ -143,10 +146,10 @@ def train(dataloader, model, loss_fn, optimiser, device, epoch, output_file):
     n_batches = size // dataloader.batch_size + 1
     pbar = tqdm(dataloader, desc=f'Epoch {epoch + 1}', total=n_batches, unit='batch')
     for batch, indices in enumerate(dataloader):
-        w_offset, w_cols, b_offset, b_cols, scores, results, phases = map(send, dataloader.load(indices))
+        w_offset, w_cols, b_offset, b_cols, scores, results, phases, stms = map(send, dataloader.load(indices))
 
         # Compute prediction error
-        pred = model(w_offset, w_cols, b_offset, b_cols)
+        pred = model(w_offset, w_cols, b_offset, b_cols, stms)
         loss = loss_fn(pred.squeeze(), scores, results, phases)
 
         # Backpropagation
@@ -169,8 +172,8 @@ def test(dataloader, model, loss_fn, device, epoch, output_file):
     dataloader.set_test()
     with torch.no_grad():
         for indices in dataloader:
-            w_offset, w_cols, b_offset, b_cols, scores, results, phases = map(send, dataloader.load(indices))
-            pred = model(w_offset, w_cols, b_offset, b_cols)
+            w_offset, w_cols, b_offset, b_cols, scores, results, phases, stms = map(send, dataloader.load(indices))
+            pred = model(w_offset, w_cols, b_offset, b_cols, stms)
             test_loss += loss_fn(pred.squeeze(), scores, results, phases).item()
             num_batches += 1
         test_loss /= num_batches

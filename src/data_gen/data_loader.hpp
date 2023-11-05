@@ -28,6 +28,7 @@ extern "C"
         unsigned short* b_cols,
         short* scores,
         char* results,
-        char* phases
+        char* phases,
+        char* stms
     );
 }
