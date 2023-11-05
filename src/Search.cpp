@@ -503,8 +503,11 @@ namespace Search
         }
 
         // TT-based reduction idea
-        if (PvNode && !InCheck && depth >= 6 && !position.board().legal(tt_move))
+        if (!RootSearch && PvNode && !InCheck && !position.board().legal(tt_move))
             depth -= 2;
+
+        if (depth <= 0)
+            return quiescence<ST>(position, alpha, beta, data);
 
         // Regular move search
         Move move;
