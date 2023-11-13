@@ -587,6 +587,9 @@ namespace Search
                 {
                     // TT move is singular, we are extending it
                     extension = 1;
+
+                    if (!PvNode && score < singularBeta - 40 && Ply < data.thread().root_depth())
+                        extension = 2;
                 }
                 else if (!PvNode && singularBeta >= beta)
                 {
