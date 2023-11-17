@@ -115,6 +115,19 @@ enum CastleSide
     NO_SIDE = 2
 };
 
+enum class CastleFile
+{
+    NONE,
+    FILE_A,
+    FILE_B,
+    FILE_C,
+    FILE_D,
+    FILE_E,
+    FILE_F,
+    FILE_G,
+    FILE_H
+};
+
 
 enum ScoreType : Score
 {
@@ -312,6 +325,12 @@ inline int rank(Square s) { return TURN == WHITE ? rank(s) : 7 - rank(s); }
 constexpr int rank(Square s, Turn turn) { return turn == WHITE ? rank(s) : 7 - rank(s); }
 
 std::string get_square(Square square);
+
+
+inline constexpr Square get_rook_square(CastleFile f, Turn turn)
+{
+    return (turn == WHITE ? SQUARE_A1 : SQUARE_A8) + static_cast<int>(f) - 1;
+}
 
 
 // Pseudo random number generator based on SplitMix64

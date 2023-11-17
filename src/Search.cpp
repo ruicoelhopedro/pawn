@@ -147,7 +147,7 @@ namespace Search
              :                                         BoundType::LOWER_BOUND; // Blessed loss
     }
 
-    void MultiPVData::write_pv(int index, uint64_t nodes, uint64_t tb_hits, double elapsed) const
+    void MultiPVData::write_pv(const Board& board, int index, uint64_t nodes, uint64_t tb_hits, double elapsed) const
     {
         // Don't write if PV line is incomplete
         if (search_bound == BoundType::NO_BOUND)
@@ -177,9 +177,9 @@ namespace Search
 
         // Pv line
         const Move* m = pv;
-        std::cout << " pv " << *(m++);
+        std::cout << " pv " << board.to_uci(*(m++));
         while (*m != MOVE_NULL)
-            std::cout << " " << (*m++);
+            std::cout << " " << board.to_uci(*(m++));
         
         std::cout << std::endl;
     }
@@ -536,7 +536,7 @@ namespace Search
             if (RootSearch && data.thread().is_main() &&
                 data.thread().time().elapsed() > 3)
                 std::cout << "info depth " << depth
-                          << " currmove " << move.to_uci()
+                          << " currmove " << position.board().to_uci(move)
                           << " currmovenumber " << n_moves << std::endl;
 
             // Shallow depth pruning
@@ -894,7 +894,7 @@ namespace Search
         for (auto move : move_list)
             if (!position.board().legal(move))
             {
-                std::cout << "Bad illegal move " << move.to_uci() << " (" << move.to_int() << ") in " << position.board().to_fen() << std::endl;
+                std::cout << "Bad illegal move " << position.board().to_uci(move) << " (" << move.to_int() << ") in " << position.board().to_fen() << std::endl;
                 final = false;
             }
 
@@ -911,7 +911,7 @@ namespace Search
             {
                 Move move = Move::from_int(number);
                 if (position.board().legal(move) && !move_list.contains(move))
-                    std::cout << "Bad legal move " << move.to_uci() << " (" << move.to_int() << ") in " << position.board().to_fen() << std::endl;
+                    std::cout << "Bad legal move " << position.board().to_uci(move) << " (" << move.to_int() << ") in " << position.board().to_fen() << std::endl;
             }
             final = false;
         }

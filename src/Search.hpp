@@ -117,7 +117,7 @@ namespace Search
 
         Score score() const;
         BoundType bound() const;
-        void write_pv(int index, uint64_t nodes, uint64_t tb_hits, double elapsed) const;
+        void write_pv(const Board& board, int index, uint64_t nodes, uint64_t tb_hits, double elapsed) const;
     };
 
 
@@ -223,7 +223,7 @@ namespace Search
                 n_nodes += count;
 
                 if (OUTPUT)
-                    std::cout << move.to_uci() << ": " << count << std::endl;
+                    std::cout << position.board().to_uci(move) << ": " << count << std::endl;
             }
         }
         else
@@ -247,7 +247,7 @@ namespace Search
                     n_nodes += count;
 
                     if (OUTPUT)
-                        std::cout << move.to_uci() << ": " << count << std::endl;
+                        std::cout << position.board().to_uci(move) << ": " << count << std::endl;
                 }
             }
             else
@@ -255,7 +255,7 @@ namespace Search
                 n_nodes = move_list.length();
                 if (OUTPUT)
                     for (auto move : move_list)
-                        std::cout << move.to_uci() << ": " << 1 << std::endl;
+                        std::cout << position.board().to_uci(move) << ": " << 1 << std::endl;
             }
         }
 

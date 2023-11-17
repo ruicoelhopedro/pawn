@@ -42,33 +42,8 @@ public:
     constexpr Hash hash() const { return (m_move & 0b111111111111) | ((m_move & 0b11000000000000000) >> 3); }
     constexpr Hash to_int() const { return m_move; }
 
-    std::string to_uci() const
-    {
-        if (from() == to())
-            return "0000";
-
-        if (is_promotion())
-        {
-            // Promotion
-            PieceType piece = promo_piece();
-            char promo_code = piece == KNIGHT ? 'n'
-                            : piece == BISHOP ? 'b'
-                            : piece == ROOK   ? 'r'
-                            :                   'q';
-            return get_square(from()) + get_square(to()) + promo_code;
-        }
-        else
-        {
-            // Regular move
-            return get_square(from()) + get_square(to());
-        }
-    }
-
     constexpr bool operator==(const Move& other) const { return m_move == other.m_move; }
     constexpr bool operator!=(const Move& other) const { return m_move != other.m_move; }
-
-    // IO operators
-    friend std::ostream& operator<<(std::ostream& out, const Move& move);
 };
 
 
@@ -171,9 +146,6 @@ public:
     const Move* end()   const { return m_end; }
     const Move* cbegin() const { return m_moves; }
     const Move* cend()   const { return m_end; }
-
-    // IO operators
-    friend std::ostream& operator<<(std::ostream& out, const MoveList& list);
 };
 
 

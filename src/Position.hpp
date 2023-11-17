@@ -20,7 +20,7 @@ class Board
     // Required fields
     Bitboard m_pieces[NUM_PIECE_TYPES][NUM_COLORS];
     Turn m_turn;
-    bool m_castling_rights[NUM_CASTLE_SIDES][NUM_COLORS];
+    CastleFile m_castling_rights[NUM_CASTLE_SIDES][NUM_COLORS];
     Square m_enpassant_square;
     int m_half_move_clock;
     int m_full_move_clock;
@@ -159,7 +159,7 @@ protected:
 
 
     template<Turn TURN>
-    void generate_moves_king(MoveList& list, Bitboard filter, Bitboard occupancy) const
+    void generate_moves_king(MoveList& list, Bitboard filter, Bitboard occupancy, MoveGenType type) const
     {
         Square king_square = get_pieces<TURN, KING>().bitscan_forward();
         Bitboard attacks = Bitboards::get_attacks<KING>(king_square, occupancy) & filter;
@@ -174,11 +174,11 @@ protected:
         }
 
         // Castling when not in check
-        if (!checkers())
+        if (!checkers() && type != MoveGenType::CAPTURES)
         {
-            if (m_castling_rights[KINGSIDE][TURN] && filter.test(Bitboards::castle_target_square[TURN][KINGSIDE]) && can_castle<TURN>(KINGSIDE, occupancy))
+            if (castling_rights(KINGSIDE, TURN) && can_castle<TURN>(KINGSIDE, occupancy))
                 list.push(king_square, Bitboards::castle_target_square[TURN][KINGSIDE], KING_CASTLE);
-            if (m_castling_rights[QUEENSIDE][TURN] && filter.test(Bitboards::castle_target_square[TURN][QUEENSIDE]) && can_castle<TURN>(QUEENSIDE, occupancy))
+            if (castling_rights(QUEENSIDE, TURN) && can_castle<TURN>(QUEENSIDE, occupancy))
                 list.push(king_square, Bitboards::castle_target_square[TURN][QUEENSIDE], QUEEN_CASTLE);
         }
 
@@ -217,7 +217,7 @@ protected:
         }
 
         // King moves: always legal
-        generate_moves_king<TURN>(list, filter, occupancy);
+        generate_moves_king<TURN>(list, filter, occupancy, type);
 
         // Check for pins
         if (pinned)
@@ -250,6 +250,12 @@ protected:
     }
 
 
+    inline bool castling_rights(CastleSide side, Turn turn) const
+    {
+        return m_castling_rights[side][turn] != CastleFile::NONE;
+    }
+
+
     Hash generate_hash() const;
 
 
@@ -271,13 +277,19 @@ protected:
     }
 
 
-    template<bool CAN_CASTLE>
-    inline void set_castling(CastleSide side, Turn turn)
+    inline void set_castling(CastleSide side, Turn turn, CastleFile file)
     {
-        if (m_castling_rights[side][turn] != CAN_CASTLE)
+        m_hash ^= Zobrist::get_castle_side_turn(side, turn);
+        m_castling_rights[side][turn] = file;
+    }
+
+
+    inline void unset_castling(CastleSide side, Turn turn)
+    {
+        if (m_castling_rights[side][turn] != CastleFile::NONE)
         {
             m_hash ^= Zobrist::get_castle_side_turn(side, turn);
-            m_castling_rights[side][turn] = CAN_CASTLE;
+            m_castling_rights[side][turn] = CastleFile::NONE;
         }
     }
 
@@ -400,12 +412,12 @@ protected:
                 if (move.from() != (TURN == WHITE ? SQUARE_E1 : SQUARE_E8))
                     return false;
                 // Kingside
-                if (m_castling_rights[KINGSIDE][TURN] && move.move_type() == KING_CASTLE &&
+                if (castling_rights(KINGSIDE, TURN) && move.move_type() == KING_CASTLE &&
                     move.to() == Bitboards::castle_target_square[TURN][KINGSIDE] &&
                     can_castle<TURN>(KINGSIDE, occupancy))
                     return true;
                 // Queenside
-                if (m_castling_rights[QUEENSIDE][TURN] && move.move_type() == QUEEN_CASTLE &&
+                if (castling_rights(QUEENSIDE, TURN) && move.move_type() == QUEEN_CASTLE &&
                     move.to() == Bitboards::castle_target_square[TURN][QUEENSIDE] &&
                     can_castle<TURN>(QUEENSIDE, occupancy))
                     return true;
@@ -595,14 +607,25 @@ public:
     template<Turn TURN>
     bool can_castle(CastleSide side, Bitboard occupancy) const
     {
-        // Check if target squares are empty
-        if (occupancy & Bitboards::castle_non_occupied_squares[TURN][side])
+        // Remove king and rook from occupancy
+        Square king_sq = m_king_sq[TURN];
+        Square rook_sq = get_rook_square(m_castling_rights[side][TURN], TURN);
+        occupancy.reset(king_sq);
+        occupancy.reset(rook_sq);
+        
+        // Build bitboards for the squares that the king and rook will travel
+        Square king_target = Bitboards::castle_target_square[TURN][side];
+        Square rook_target = Bitboards::castle_target_square[TURN][side] + (side == KINGSIDE ? -1 : 1);
+        Bitboard king_travel = Bitboards::between(king_sq, king_target) | Bitboard::from_single_bit(king_target);
+        Bitboard rook_travel = Bitboards::between(rook_sq, rook_target) | Bitboard::from_single_bit(rook_target);
+
+        // Check if traveling squares are empty
+        if (bool(occupancy & king_travel) || bool(occupancy & rook_travel))
             return false;
 
-        // Check if middle squares are attacked
-        Bitboard attackable = Bitboards::castle_non_attacked_squares[TURN][side];
-        while (attackable)
-            if (attackers<~TURN>(attackable.bitscan_forward_reset(), occupancy))
+        // Check if the king's traveling squares are attacked
+        while (king_travel)
+            if (attackers<~TURN>(king_travel.bitscan_forward_reset(), occupancy))
                 return false;
 
         return true;
@@ -614,8 +637,8 @@ public:
 
     inline bool can_castle() const
     {
-        return m_castling_rights[0][0] || m_castling_rights[0][1] ||
-               m_castling_rights[1][0] || m_castling_rights[1][1];
+        return castling_rights(KINGSIDE, WHITE)  || castling_rights(KINGSIDE, BLACK) ||
+               castling_rights(QUEENSIDE, WHITE) || castling_rights(QUEENSIDE, BLACK);
     }
 
 
@@ -653,6 +676,9 @@ public:
 
 
     const NNUE::Accumulator& accumulator(Turn t) const;
+
+
+    std::string to_uci(Move m) const;
 };
 
 
