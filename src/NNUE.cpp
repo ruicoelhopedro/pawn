@@ -101,8 +101,8 @@ namespace NNUE
     {
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
             m_net[i] = nnue_net->m_bias[i];
-        m_psqt[MG] = 0;
-        m_psqt[EG] = 0;
+        for (std::size_t bucket = 0; bucket < NUM_BUCKETS; bucket++)
+            m_psqt[bucket] = 0;
     }
 
 
@@ -114,8 +114,8 @@ namespace NNUE
         Feature idx = get_feature(p, s, ks, pt, kt);
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
             m_net[i] += nnue_net->m_sparse_layer[idx][i];
-        m_psqt[MG] += nnue_net->m_psqt[idx][MG];
-        m_psqt[EG] += nnue_net->m_psqt[idx][EG];
+        for (std::size_t bucket = 0; bucket < NUM_BUCKETS; bucket++)
+            m_psqt[bucket] += nnue_net->m_psqt[idx][bucket];
     }
 
 
@@ -127,8 +127,8 @@ namespace NNUE
         Feature idx = get_feature(p, s, ks, pt, kt);
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
             m_net[i] -= nnue_net->m_sparse_layer[idx][i];
-        m_psqt[MG] -= nnue_net->m_psqt[idx][MG];
-        m_psqt[EG] -= nnue_net->m_psqt[idx][EG];
+        for (std::size_t bucket = 0; bucket < NUM_BUCKETS; bucket++)
+            m_psqt[bucket] -= nnue_net->m_psqt[idx][bucket];
     }
 
 
@@ -138,15 +138,15 @@ namespace NNUE
         {
             for (std::size_t j = 0; j < NUM_ACCUMULATORS; j++)
                 m_net[j] += nnue_net->m_sparse_layer[features[i]][j];
-            m_psqt[MG] += nnue_net->m_psqt[features[i]][MG];
-            m_psqt[EG] += nnue_net->m_psqt[features[i]][EG];
+            for (std::size_t bucket = 0; bucket < NUM_BUCKETS; bucket++)
+                m_psqt[bucket] += nnue_net->m_psqt[features[i]][bucket];
         }
     }
 
 
-    MixedScore Accumulator::eval(const Accumulator& stm, const Accumulator& ntm)
+    Score Accumulator::eval(const Accumulator& stm, const Accumulator& ntm, int bucket)
     {
-        int output[2] = { nnue_net->m_dense_bias[0], nnue_net->m_dense_bias[1] };
+        int output = nnue_net->m_dense_bias[bucket];
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
         {
             // Clipped ReLU on the accumulators
@@ -155,23 +155,18 @@ namespace NNUE
 
             // Net output
             int j = i + NUM_ACCUMULATORS;
-            output[MG] += nnue_net->m_dense[MG][i] * stm_acc
-                        + nnue_net->m_dense[MG][j] * ntm_acc;
-            output[EG] += nnue_net->m_dense[EG][i] * stm_acc
-                        + nnue_net->m_dense[EG][j] * ntm_acc;
+            output += nnue_net->m_dense[bucket][i] * stm_acc
+                    + nnue_net->m_dense[bucket][j] * ntm_acc;
         }
 
         // Build and return final score
-        int mg = (stm.m_psqt[MG] - ntm.m_psqt[MG] + output[MG] / SCALE_FACTOR) ;
-        int eg = (stm.m_psqt[EG] - ntm.m_psqt[EG] + output[EG] / SCALE_FACTOR) ;
-        return MixedScore(mg, eg);
+        return Score(stm.m_psqt[bucket] - ntm.m_psqt[bucket] + output / SCALE_FACTOR);
     }
 
 
-    MixedScore Accumulator::eval_psq(const Accumulator& stm, const Accumulator& ntm)
+    Score Accumulator::eval_psq(const Accumulator& stm, const Accumulator& ntm, int bucket)
     {
-        return MixedScore(stm.m_psqt[MG] - ntm.m_psqt[MG],
-                          stm.m_psqt[EG] - ntm.m_psqt[EG]);
+        return Score(stm.m_psqt[bucket] - ntm.m_psqt[bucket]);
     }
     
 
@@ -180,8 +175,9 @@ namespace NNUE
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
             if (m_net[i] != other.m_net[i])
                 return false;
-        if (m_psqt[MG] != other.m_psqt[MG] || m_psqt[EG] != other.m_psqt[EG])
-            return false;
+        for (std::size_t i = 0; i < NUM_BUCKETS; i++)
+            if (m_psqt[i] != other.m_psqt[i])
+                return false;
         return true;
     }
 
@@ -190,8 +186,9 @@ namespace NNUE
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
             if (m_net[i] != other.m_net[i])
                 return true;
-        if (m_psqt[MG] != other.m_psqt[MG] || m_psqt[EG] != other.m_psqt[EG])
-            return true;
+        for (std::size_t i = 0; i < NUM_BUCKETS; i++)
+            if (m_psqt[i] != other.m_psqt[i])
+                return true;
         return false;
     }
 }
