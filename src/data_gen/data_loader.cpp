@@ -87,7 +87,7 @@ extern "C"
         unsigned short* b_cols,
         short* scores,
         char* results,
-        char* phases,
+        char* buckets,
         char* stms
     )
     {
@@ -177,7 +177,7 @@ extern "C"
 
                         // Store eval and phase
                         scores[count] = node.score;
-                        phases[count] = MixedScore(64, 0).tapered(board.phase());
+                        buckets[count] = (board.get_pieces().count() - 1) / 8;
                         results[count] = result;
                         stms[count] = board.turn();
                         count++;

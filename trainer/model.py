@@ -7,6 +7,7 @@ from utils import map_features
 
 NUM_FEATURES = 20480
 NUM_ACCUMULATORS = 128
+NUM_BUCKETS = 4
 
 
 SCALE_FACTOR = 1024
@@ -22,10 +23,10 @@ PIECE_VALUES = {
 }
 
 
-def sigmoid_loss(output, scores, results, phases):
+def sigmoid_loss(output, scores, results, buckets):
     K = 400
     mix = 0.3
-    y = output[:, 0] * phases + output[:, 1] * (1 - phases)
+    y = output.gather(1, buckets.view(-1, 1)).squeeze(-1)
     y_wdl = torch.sigmoid(SCALE_FACTOR / K * y)
     scores_wdl = (1 - mix) * torch.sigmoid(scores / K) + mix * results
     return torch.mean(torch.pow(torch.abs(y_wdl - scores_wdl), 2.5))
@@ -45,10 +46,10 @@ class NNUE(nn.Module):
     def __init__(self):
         super().__init__()
         self.crelu = CReLU()
-        self.psqt = nn.EmbeddingBag(NUM_FEATURES, 2, mode='sum')
+        self.psqt = nn.EmbeddingBag(NUM_FEATURES, NUM_BUCKETS, mode='sum')
         self.accumulator_emb = nn.EmbeddingBag(NUM_FEATURES, NUM_ACCUMULATORS, mode='sum')
         self.accumulator_bias = nn.Parameter(torch.zeros(NUM_ACCUMULATORS))
-        self.layer = nn.Linear(2 * NUM_ACCUMULATORS, 2)
+        self.layer = nn.Linear(2 * NUM_ACCUMULATORS, NUM_BUCKETS)
         # Clear weights and biases for sparse input layer and PSQT
         self.psqt.weight.data.fill_(0.0)
         self.accumulator_emb.weight.data.fill_(0.0)
@@ -56,9 +57,8 @@ class NNUE(nn.Module):
         # Initialise PSQT weights using material balance
         for square in range(64):
             for king in range(64):
-                for piece, (mg, eg) in PIECE_VALUES.items():
-                    self.psqt.weight.data[map_features(piece, square, king, True), 0] = mg / SCALE_FACTOR
-                    self.psqt.weight.data[map_features(piece, square, king, True), 1] = eg / SCALE_FACTOR
+                for piece, (_, eg) in PIECE_VALUES.items():
+                    self.psqt.weight.data[map_features(piece, square, king, True), :] = eg / SCALE_FACTOR
 
     @staticmethod
     def perspective(w_values, b_values, stms):
