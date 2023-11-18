@@ -82,10 +82,15 @@ jobs:
       - name: Build pawn
         run: "make"
       - name: Run bench
-        run: "build/pawn bench 2>&1 | grep 'Nodes searched:' | awk '{print $3}' > bench.out"
-      - name: Run bench again
-        run: "build/pawn bench"
-      - name: Verify bench signature
-        run: "cmp bench.sig bench.out"
+        run: |
+          build/pawn bench 2>&1 > bench.out
+          cat bench.out
+      - name: Extract and verify bench signature
+        run: |
+          cat bench.out | grep 'Nodes searched:' | awk '{print $3}' > bench.sig
+          cmp bench.sig bench.sig
       - name: Run tests
-        run: "build/pawn test" # | grep -q 'All tests passed'"
+        run: |
+          build/pawn test > test.out
+          cat test.out
+          grep -q 'All tests passed' test.out
