@@ -6,9 +6,10 @@ SRC_DIR=src
 ARCH = native
 
 # Compiler flags
-CFLAGS = -Wall -Isrc/syzygy/Fathom/src -O3 -flto -march=$(ARCH)
-CXXFLAGS = -Wall -std=c++17 -Isrc/syzygy/Fathom/src -O3 -flto -march=$(ARCH)
-LDFLAGS = -pthread -flto -march=$(ARCH)
+COMMON = -Wall -Isrc/syzygy/Fathom/src -O3 -flto -march=$(ARCH) -m64
+CFLAGS = $(COMMON)
+CXXFLAGS = $(COMMON) -std=c++17
+LDFLAGS = -pthread -flto -march=$(ARCH) -m64
 
 # Windows-specific stuff
 ifeq ($(OS), Windows_NT)
