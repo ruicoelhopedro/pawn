@@ -21,42 +21,42 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          # - name: "Ubuntu Latest - GCC"
-          #   os: ubuntu-latest
-          #   cc: gcc
-          #   cxx: g++
-          #   shell: bash
-          #   bin_name: build/pawn
-          # - name: "Ubuntu Latest - Clang"
-          #   os: ubuntu-latest
-          #   cc: clang
-          #   cxx: clang++
-          #   shell: bash
-          #   bin_name: build/pawn
-          # - name: "Ubuntu 20.04 - GCC"
-          #   os: ubuntu-20.04
-          #   cc: gcc
-          #   cxx: g++
-          #   shell: bash
-          #   bin_name: build/pawn
-          # - name: "Ubuntu 20.04 - Clang"
-          #   os: ubuntu-20.04
-          #   cc: clang
-          #   cxx: clang++
-          #   shell: bash
-          #   bin_name: build/pawn
-          # - name: "MacOS - GCC 11"
-          #   os: macos-latest
-          #   cc: gcc-11
-          #   cxx: g++-11
-          #   shell: bash
-          #   bin_name: build/pawn
-          # - name: "MacOS - Clang"
-          #   os: macos-latest
-          #   cc: clang
-          #   cxx: clang++
-          #   shell: bash
-          #   bin_name: build/pawn
+          - name: "Ubuntu Latest - GCC"
+            os: ubuntu-latest
+            cc: gcc
+            cxx: g++
+            shell: bash
+            bin_name: build/pawn
+          - name: "Ubuntu Latest - Clang"
+            os: ubuntu-latest
+            cc: clang
+            cxx: clang++
+            shell: bash
+            bin_name: build/pawn
+          - name: "Ubuntu 20.04 - GCC"
+            os: ubuntu-20.04
+            cc: gcc
+            cxx: g++
+            shell: bash
+            bin_name: build/pawn
+          - name: "Ubuntu 20.04 - Clang"
+            os: ubuntu-20.04
+            cc: clang
+            cxx: clang++
+            shell: bash
+            bin_name: build/pawn
+          - name: "MacOS - GCC 11"
+            os: macos-latest
+            cc: gcc-11
+            cxx: g++-11
+            shell: bash
+            bin_name: build/pawn
+          - name: "MacOS - Clang"
+            os: macos-latest
+            cc: clang
+            cxx: clang++
+            shell: bash
+            bin_name: build/pawn
           - name: "Windows 2022 - GCC"
             os: windows-2022
             cc: gcc
@@ -105,6 +105,6 @@ jobs:
         run: |
           ls -l 
           ls -l build
-          ./$BIN_NAME test > test.out  2>&1
+          ./$BIN_NAME test > test.out 2>&1
           cat test.out
           grep -q 'All tests passed' test.out
