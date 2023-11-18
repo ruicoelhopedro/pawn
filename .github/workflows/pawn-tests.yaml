@@ -95,7 +95,7 @@ jobs:
         run: |
           ls -l 
           ls -l build
-          $BIN_NAME bench > bench.out 2>&1
+          ./$BIN_NAME bench > bench.out 2>&1
           cat bench.out
       - name: Extract and verify bench signature
         run: |
@@ -105,6 +105,6 @@ jobs:
         run: |
           ls -l 
           ls -l build
-          $BIN_NAME test > test.out
+          ./$BIN_NAME test > test.out
           cat test.out
           grep -q 'All tests passed' test.out
