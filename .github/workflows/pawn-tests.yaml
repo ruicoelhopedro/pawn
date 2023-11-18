@@ -83,6 +83,8 @@ jobs:
         run: "make"
       - name: Run bench
         run: "build/pawn bench 2>&1 | grep 'Nodes searched:' | awk '{print $3}' > bench.out"
+      - name: Run bench again
+        run: "build/pawn bench"
       - name: Verify bench signature
         run: "cmp bench.sig bench.out"
       - name: Run tests
