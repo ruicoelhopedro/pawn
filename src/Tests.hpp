@@ -48,10 +48,10 @@ namespace Tests
         int n_failed = 0;
         for (auto& test : tests)
         {
-            Histories hists;
             Position pos(test.fen());
-            auto result_base = Search::perft<false>(pos, test.depth() - 1, hists);
-            auto result_test = Search::template perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(pos, test.depth() - 1, hists);
+            auto hists = std::make_unique<Histories>();
+            auto result_base = Search::perft<false>(pos, test.depth() - 1, *hists);
+            auto result_test = Search::template perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(pos, test.depth() - 1, *hists);
             if (result_base == result_test)
             {
                 std::cout << "[ OK ] " << test.fen() << " (" << result_test << ")" << std::endl;
