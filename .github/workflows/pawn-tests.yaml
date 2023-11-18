@@ -105,6 +105,6 @@ jobs:
         run: |
           ls -l 
           ls -l build
-          ./$BIN_NAME test > test.out
+          ./$BIN_NAME test > test.out  2>&1
           cat test.out
           grep -q 'All tests passed' test.out
