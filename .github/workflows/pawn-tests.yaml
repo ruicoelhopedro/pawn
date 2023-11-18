@@ -69,7 +69,7 @@ jobs:
         uses: msys2/setup-msys2@v2
         with:
           msystem: ${{matrix.config.sys}}
-          install: make git mingw-w64-${{matrix.config.env}}
+          install: make git mingw-w64-${{matrix.config.env}}-gcc
       - name: Extract bench signature
         run: "git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}' > bench.sig"
       - name: Build pawn
