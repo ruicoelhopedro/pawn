@@ -54,7 +54,14 @@ jobs:
             cc: gcc
             cxx: g++
             sys: mingw64
-            env: x86_64
+            env_comp: x86_64-gcc
+            shell: msys2 {0}
+          - name: "Windows 2022 - Clang"
+            os: windows-2022
+            cc: clang
+            cxx: clang++
+            sys: mingw64
+            env_comp: x86_64-clang
             shell: msys2 {0}
     defaults:
       run:
@@ -69,7 +76,7 @@ jobs:
         uses: msys2/setup-msys2@v2
         with:
           msystem: ${{matrix.config.sys}}
-          install: make git mingw-w64-${{matrix.config.env}}-gcc
+          install: make git mingw-w64-${{matrix.config.env_comp}} diffutils
       - name: Extract bench signature
         run: "git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}' > bench.sig"
       - name: Build pawn
