@@ -83,7 +83,7 @@ jobs:
         run: "make"
       - name: Run bench
         run: |
-          build/pawn bench &> bench.out
+          build/pawn bench > bench.out 2>&1
           cat bench.out
       - name: Extract and verify bench signature
         run: |
@@ -91,6 +91,6 @@ jobs:
           cmp bench.sig bench.sig
       - name: Run tests
         run: |
-          build/pawn test &> test.out
+          build/pawn test > test.out
           cat test.out
           grep -q 'All tests passed' test.out
