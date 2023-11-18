@@ -10,12 +10,16 @@
 namespace Evaluation
 {
 
+
+std::size_t eval_bucket(const Board& board) { return (board.get_pieces().count() - 1) / 8; }
+
+
 Score evaluation(const Board& board)
 {
-    const NNUE::Accumulator& white_acc = board.accumulator(WHITE);
-    const NNUE::Accumulator& black_acc = board.accumulator(BLACK);
-    MixedScore mixed_result = white_acc.eval() - black_acc.eval();
-    Score result = mixed_result.tapered(board.phase());
+    const Turn stm = board.turn();
+    Score result = NNUE::Accumulator::eval(board.accumulator( stm),
+                                           board.accumulator(~stm),
+                                           eval_bucket(board)) * turn_to_color(stm);
     return std::clamp(result, -SCORE_MATE_FOUND + 1, SCORE_MATE_FOUND - 1);
 }
 
@@ -30,13 +34,8 @@ void eval_table(const Board& board)
     }
 
     // Get total and partial NNUE scores
-    auto white_acc = board.accumulator(WHITE);
-    auto black_acc = board.accumulator(BLACK);
-    MixedScore mixed_nnue = white_acc.eval() - black_acc.eval();
-    MixedScore psqt = white_acc.eval_psq() - black_acc.eval_psq();
-    MixedScore positional = mixed_nnue - psqt;
-    Score nnue = mixed_nnue.tapered(board.phase());
-
+    const Turn stm = board.turn();
+    Score nnue = evaluation(board);
 
     // Print board with NNUE-derived piece values
     Board b = board;
@@ -89,14 +88,25 @@ void eval_table(const Board& board)
     std::cout << ""                                                   << std::endl;
     std::cout << "NNUE Scores"                                        << std::endl;
     std::cout << "--------------------------------------"             << std::endl;
-    std::cout << " Term                |    MG      EG  "             << std::endl;
+    std::cout << " Bucket   |  PSQT   Layers  |  Total  "             << std::endl;
     std::cout << "--------------------------------------"             << std::endl;
-    std::cout << " Material   (PSQT)   | " << Term(psqt)       << " " << std::endl;
-    std::cout << " Positional (Layers) | " << Term(positional) << " " << std::endl;
+    for (std::size_t bucket = 0; bucket < NNUE::NUM_BUCKETS; bucket++)
+    {
+        Score s = NNUE::Accumulator::eval(board.accumulator(stm), board.accumulator(~stm), bucket);
+        Score psqt = NNUE::Accumulator::eval_psq(board.accumulator(stm), board.accumulator(~stm), bucket);
+        Score layers = s - psqt;
+        std::cout << " "
+                  << int(bucket)
+                  << (bucket == eval_bucket(board) ? " (used)" : "       ")
+                  << " |"
+                  << Term(psqt)
+                  << "   "
+                  << Term(layers)
+                  << "  | "
+                  << Term(s)
+                  << std::endl;
+    }
     std::cout << "--------------------------------------"             << std::endl;
-    std::cout << " Final               | " << Term(mixed_nnue) << " " << std::endl;
-    std::cout << "--------------------------------------"             << std::endl;
-    std::cout << "Game Phase:       " << int(board.phase()) << std::endl;
     std::cout << "Final evaluation: " <<  100 * nnue / PawnValue.endgame() << " cp (White)" << std::endl;
     std::cout << std::endl;
 }

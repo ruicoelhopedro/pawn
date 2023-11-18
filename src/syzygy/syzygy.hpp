@@ -55,7 +55,7 @@ namespace Syzygy
 
     std::pair<WDL, int> probe_dtz(const Board& board);
 
-    WDL fathom_to_wdl(uint result);
+    WDL fathom_to_wdl(unsigned int result);
 
     Score score_from_wdl(WDL wdl, Depth ply = 0);
 

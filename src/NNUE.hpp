@@ -2,7 +2,7 @@
 #include "incbin/incbin.h"
 #include "Types.hpp"
 
-#define NNUE_Default_File "nnue-f74cea04237b.dat"
+#define NNUE_Default_File "nnue-10427ad1e4e6.dat"
 
 
 namespace NNUE
@@ -14,26 +14,21 @@ namespace NNUE
     constexpr std::size_t NUM_FEATURES = 20480;
     constexpr std::size_t NUM_ACCUMULATORS = 128;
     constexpr std::size_t NUM_MAX_ACTIVE_FEATURES = 30;
-    
-    enum Phase
-    {
-        MG = 0,
-        EG = 1,
-        NUM_PHASES
-    };
+    constexpr std::size_t NUM_BUCKETS = 4;
 
     struct Net
     {
-        Weight m_psqt[NUM_FEATURES][NUM_PHASES];
+        Weight m_psqt[NUM_FEATURES][NUM_BUCKETS];
         Weight m_sparse_layer[NUM_FEATURES][NUM_ACCUMULATORS];
         Weight m_bias[NUM_ACCUMULATORS];
-        Weight m_dense[NUM_PHASES][NUM_ACCUMULATORS];
+        Weight m_dense[NUM_BUCKETS][2 * NUM_ACCUMULATORS];
+        Weight m_dense_bias[NUM_BUCKETS];
     };
 
     class Accumulator
     {
         int m_net[NUM_ACCUMULATORS];
-        int m_psqt[NUM_PHASES];
+        int m_psqt[NUM_BUCKETS];
 
     public:
         Accumulator();
@@ -48,9 +43,9 @@ namespace NNUE
 
         void push_features(std::size_t num_features, Feature* features);
 
-        MixedScore eval() const;
+        static Score eval(const Accumulator& stm, const Accumulator& ntm, int bucket);
 
-        MixedScore eval_psq() const;
+        static Score eval_psq(const Accumulator& stm, const Accumulator& ntm, int bucket);
 
         bool operator==(const Accumulator& other) const;
 

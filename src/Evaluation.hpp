@@ -21,10 +21,10 @@ namespace Evaluation
 
     class Term
     {
-        MixedScore m_score;
+        Score m_score;
 
     public:
-        Term(MixedScore score)
+        Term(Score score)
             : m_score(score)
         {}
 
@@ -37,9 +37,7 @@ namespace Evaluation
     inline std::ostream& operator<<(std::ostream& out, const Term& term)
     {
         out << std::showpoint << std::noshowpos << std::fixed << std::setprecision(2);
-        out << std::setw(6) << term.adjust(term.m_score.middlegame());
-        out << "  ";
-        out << std::setw(6) << term.adjust(term.m_score.endgame());
+        out << std::setw(6) << term.adjust(term.m_score);
         return out;
     }
 }

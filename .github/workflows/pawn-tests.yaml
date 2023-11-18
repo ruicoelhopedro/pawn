@@ -3,11 +3,11 @@ name: Pawn tests
 on:
   push:
     branches:
-      - master
+      - main
       - ci
   pull_request:
     branches:
-      - master
+      - main
 
 jobs:
   build:

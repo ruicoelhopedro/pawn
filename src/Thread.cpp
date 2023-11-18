@@ -93,6 +93,7 @@ void Thread::output_pvs()
 
 
 int Thread::id() const { return m_id; }
+Depth Thread::root_depth() const { return m_root_depth; }
 bool Thread::is_main() const { return m_id == 0; }
 ThreadPool& Thread::pool() const { return m_pool; }
 const Search::SearchTime& Thread::time() const { return m_pool.m_time; }
@@ -403,6 +404,7 @@ void Thread::search()
 
             // Carry the aspirated search
             Depth depth = iDepth + m_id % 4;
+            m_root_depth = depth;
             aspiration_search(m_position, pv, depth, data);
 
             // Timeout?
