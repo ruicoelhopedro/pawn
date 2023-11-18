@@ -68,7 +68,7 @@ jobs:
         shell: ${{ matrix.config.shell }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
       - name: Prepare Windows with MSYS2
@@ -88,4 +88,4 @@ jobs:
       - name: Verify bench signature
         run: "cmp bench.sig bench.out"
       - name: Run tests
-        run: "build/pawn test " # | grep -q 'All tests passed'"
+        run: "build/pawn test" # | grep -q 'All tests passed'"
