@@ -17,6 +17,7 @@ jobs:
       CC: ${{ matrix.config.cc }}
       CXX: ${{ matrix.config.cxx }}
     strategy:
+      fail-fast: false
       matrix:
         config:
           - name: "Ubuntu Latest - GCC"
