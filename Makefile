@@ -16,6 +16,8 @@ ifeq ($(OS), Windows_NT)
 	LDFLAGS += -static
 	BIN_NAME := $(BIN_NAME).exe
 	ifeq ($(CC), clang)
+		CFLAGS += -fuse-ld=lld
+		CXXFLAGS += -fuse-ld=lld
 		LDFLAGS += -fuse-ld=lld
 	endif
 endif
