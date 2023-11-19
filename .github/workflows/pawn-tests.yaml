@@ -14,7 +14,6 @@ jobs:
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
     env:
-      BIN_NAME: ${{ matrix.config.bin_name }}
       CC: ${{ matrix.config.cc }}
       CXX: ${{ matrix.config.cxx }}
     strategy:
@@ -26,37 +25,31 @@ jobs:
             cc: gcc
             cxx: g++
             shell: bash
-            bin_name: build/pawn
           - name: "Ubuntu Latest - Clang"
             os: ubuntu-latest
             cc: clang
             cxx: clang++
             shell: bash
-            bin_name: build/pawn
           - name: "Ubuntu 20.04 - GCC"
             os: ubuntu-20.04
             cc: gcc
             cxx: g++
             shell: bash
-            bin_name: build/pawn
           - name: "Ubuntu 20.04 - Clang"
             os: ubuntu-20.04
             cc: clang
             cxx: clang++
             shell: bash
-            bin_name: build/pawn
           - name: "MacOS - GCC 11"
             os: macos-latest
             cc: gcc-11
             cxx: g++-11
             shell: bash
-            bin_name: build/pawn
           - name: "MacOS - Clang"
             os: macos-latest
             cc: clang
             cxx: clang++
             shell: bash
-            bin_name: build/pawn
           - name: "Windows 2022 - GCC"
             os: windows-2022
             cc: gcc
@@ -64,7 +57,6 @@ jobs:
             sys: mingw64
             packages: mingw-w64-x86_64-gcc
             shell: msys2 {0}
-            bin_name: build/pawn.exe
           - name: "Windows 2022 - Clang"
             os: windows-2022
             cc: clang
@@ -72,7 +64,6 @@ jobs:
             sys: mingw64
             packages: mingw-w64-x86_64-clang mingw-w64-x86_64-lld
             shell: msys2 {0}
-            bin_name: build/pawn.exe
     defaults:
       run:
         shell: ${{ matrix.config.shell }}
@@ -87,15 +78,13 @@ jobs:
         with:
           msystem: ${{matrix.config.sys}}
           install: make git diffutils ${{matrix.config.packages}}
-      - name: Extract bench signature
+      - name: Fetch bench signature
         run: "git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}' > bench.sig"
       - name: Build pawn
         run: "make"
       - name: Run bench
         run: |
-          ls -l 
-          ls -l build
-          ./$BIN_NAME bench > bench.out 2>&1
+          build/pawn bench > bench.out 2>&1
           cat bench.out
       - name: Extract and verify bench signature
         run: |
@@ -103,8 +92,6 @@ jobs:
           cmp bench.sig bench.sig
       - name: Run tests
         run: |
-          ls -l 
-          ls -l build
-          ./$BIN_NAME test > test.out 2>&1
+          build/pawn test > test.out
           cat test.out
           grep -q 'All tests passed' test.out
