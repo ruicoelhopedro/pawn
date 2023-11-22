@@ -79,7 +79,7 @@ jobs:
           msystem: ${{matrix.config.sys}}
           install: make git diffutils ${{matrix.config.packages}}
       - name: Fetch bench signature
-        run: "git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}' > bench.sig"
+        run: "git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}' > bench.sig_ref"
       - name: Build pawn
         run: "make"
       - name: Run bench
@@ -89,7 +89,7 @@ jobs:
       - name: Extract and verify bench signature
         run: |
           cat bench.out | grep 'Nodes searched:' | awk '{print $3}' > bench.sig
-          cmp bench.sig bench.sig
+          cmp bench.sig bench.sig_ref
       - name: Run tests
         run: |
           build/pawn test > test.out
