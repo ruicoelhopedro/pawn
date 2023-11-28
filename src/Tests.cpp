@@ -103,6 +103,9 @@ namespace Tests
         bench.push_back("2r2rk1/1bqnbpp1/1p1ppn1p/pP6/N1P1P3/P2B1N1P/1B2QPP1/R2R2K1 b - - 0 1");
         bench.push_back("r1bqk2r/pp2bppp/2p5/3pP3/P2Q1P2/2N1B3/1PP3PP/R4RK1 b kq - 0 1");
         bench.push_back("r2qnrnk/p2b2b1/1p1p2pp/2pPpp2/1PP1P3/PRNBB3/3QNPPP/5RK1 w - - 0 1");
+        bench.push_back("qrb1nnkr/ppp2ppp/4pb2/3p4/2P5/1P3N2/P2PPPPP/QRBB1NKR w HBhb - 1 4 (FRC)");
+        bench.push_back("rbknnrbq/1pppp1pp/8/p7/P3p3/2N5/1PPP1PPP/RBK1NRBQ w FAfa - 0 4 (FRC)");
+        bench.push_back("1bbnrkqr/ppp2ppp/1n6/3pp3/7P/1N1P4/PPP1PPP1/1BBNRKQR w HEhe - 0 4 (FRC)");
 
         return bench;
     }
@@ -145,12 +148,18 @@ namespace Tests
         Search::Timer time;
         uint64_t nodes = 0;
 
+        // Store initial state
+        bool Chess960 = UCI::Options::UCI_Chess960;
+
         // Loop over each position
         int i = 0;
         Position& pos = pool->position();
         std::vector<std::string> fens = bench_suite();
         for (auto fen : fens)
         {
+            // Check if this is a FRC position
+            UCI::Options::UCI_Chess960 = (fen.find("(FRC)") != std::string::npos);
+
             // Update position
             pos = Position(fen);
             pos.set_init_ply();
@@ -173,7 +182,8 @@ namespace Tests
         std::cerr << "Elapsed time (s): " << std::setw(7) << elapsed   << std::endl;
         std::cerr << "Nodes per second: " << uint64_t(nodes / elapsed) << std::endl;
 
-        // Restore initial thread pool and hash
+        // Restore initial options, thread pool and hash
+        UCI::Options::UCI_Chess960 = Chess960;
         pool->resize(UCI::Options::Threads);
         ttable.resize(UCI::Options::Hash);
     }
