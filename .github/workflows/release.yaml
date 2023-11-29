@@ -54,6 +54,13 @@ jobs:
           install: make git diffutils mingw-w64-x86_64-github-cli ${{matrix.config.packages}}
       - name: Build
         run: make ARCH=${{matrix.binaries}} -j
+      - name: Verify bench signature
+        run: |
+          git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}' > bench.sig_ref
+          build/pawn bench > bench.out 2>&1
+          cat bench.out
+          cat bench.out | grep 'Nodes searched:' | awk '{print $3}' > bench.sig
+          cmp bench.sig bench.sig_ref
       - name: Upload Release Asset
         if: runner.os != 'Windows'
         env:
