@@ -121,10 +121,21 @@ Board::Board(std::string fen)
     {
         if (UCI::Options::UCI_Chess960)
         {
-            CastleFile file = fen_castle_file_chess960(*c);
-            if (file != CastleFile::NONE)
+            char lower = tolower(*c);
+            if (lower == 'k' || lower == 'q')
             {
+                // X-FEN notation: find available rook
                 Turn turn = isupper(*c) ? WHITE : BLACK;
+                Direction dir = lower == 'k' ? 1 : -1;
+                for (int f = file(m_king_sq[turn]); f >= 0 && f < 8; f += dir)
+                    if (get_piece_type(m_board_pieces[make_square(turn == WHITE ? 0 : 7, f)]) == ROOK)
+                        set_castling(lower == 'k' ? KINGSIDE : QUEENSIDE, turn, fen_castle_file_chess960('a' + f));
+            }
+            else if (lower >= 'a' && lower <= 'h')
+            {
+                // Shredder-FEN notation
+                Turn turn = isupper(*c) ? WHITE : BLACK;
+                CastleFile file = fen_castle_file_chess960(*c);
                 set_castling(get_rook_square(file, turn) > m_king_sq[turn] ? KINGSIDE : QUEENSIDE, turn, file);
             }
         }
@@ -612,7 +623,7 @@ uint8_t Board::phase() const
 bool Board::legal(Move move) const
 {
     // Same source and destination squares?
-    if (move.from() == move.to())
+    if (move.from() == move.to() && !(UCI::Options::UCI_Chess960 && move.is_castle()))
         return false;
 
     // Ep without the square defined?
@@ -623,9 +634,13 @@ bool Board::legal(Move move) const
     if (move.move_type() == INVALID_1 || move.move_type() == INVALID_2)
         return false;
 
-    // Source square is not ours or destination ours?
+    // Source square is not ours?
     Bitboard our_pieces = (m_turn == WHITE ? get_pieces<WHITE>() : get_pieces<BLACK>());
-    if (!our_pieces.test(move.from()) || our_pieces.test(move.to()))
+    if (!our_pieces.test(move.from()))
+        return false;
+
+    // Destination square ours?
+    if (our_pieces.test(move.to()) && !(UCI::Options::UCI_Chess960 && move.is_castle()))
         return false;
 
     // Capture and destination square not occupied by the opponent (including ep)?

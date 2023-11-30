@@ -409,7 +409,7 @@ protected:
             if (!checkers() && move.is_castle())
             {
                 // Starting square
-                if (move.from() != (TURN == WHITE ? SQUARE_E1 : SQUARE_E8))
+                if (move.from() != m_king_sq[TURN])
                     return false;
                 // Kingside
                 if (castling_rights(KINGSIDE, TURN) && move.move_type() == KING_CASTLE &&
