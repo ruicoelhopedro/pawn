@@ -217,7 +217,7 @@ namespace Search
                 if (depth > 1)
                 {
                     position.make_move(move);
-                    count = perft<false, USE_ORDER, TT, VALIDITY>(position, depth - 1, hists);
+                    count = perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(position, depth - 1, hists);
                     position.unmake_move();
                 }
                 n_nodes += count;
@@ -241,7 +241,7 @@ namespace Search
                         return 0;
 
                     position.make_move(move);
-                    count = perft<false, USE_ORDER, TT, VALIDITY>(position, depth - 1, hists);
+                    count = perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(position, depth - 1, hists);
                     position.unmake_move();
 
                     n_nodes += count;

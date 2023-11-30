@@ -894,26 +894,27 @@ namespace Search
         for (auto move : move_list)
             if (!position.board().legal(move))
             {
-                std::cout << "Bad illegal move " << position.board().to_uci(move) << " (" << move.to_int() << ") in " << position.board().to_fen() << std::endl;
+                std::cout << "Bad illegal move "
+                          << position.board().to_uci(move)
+                          << " (" << move.to_int() << ") in "
+                          << position.board().to_fen()
+                          << std::endl;
                 final = false;
             }
 
-        // Illegality check: first count number of legal moves
-        int result = 0;
+        // Illegality check
         for (uint16_t number = 0; number < UINT16_MAX; number++)
-            if (position.board().legal(Move::from_int(number)))
-                result++;
-        // Something is wrong, find the bad legals
-        if (result != move_list.length())
         {
-            std::cout << result << " vs " << move_list.length() << std::endl;
-            for (uint16_t number = 0; number < UINT16_MAX; number++)
+            Move move = Move::from_int(number);
+            if (position.board().legal(move) && !move_list.contains(move))
             {
-                Move move = Move::from_int(number);
-                if (position.board().legal(move) && !move_list.contains(move))
-                    std::cout << "Bad legal move " << position.board().to_uci(move) << " (" << move.to_int() << ") in " << position.board().to_fen() << std::endl;
+                std::cout << "Bad legal move "
+                          << position.board().to_uci(move)
+                          << " (" << move.to_int() << ") in "
+                          << position.board().to_fen()
+                          << std::endl;
+                final = false;
             }
-            final = false;
         }
         return final;
     }
