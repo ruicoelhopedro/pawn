@@ -135,8 +135,8 @@ namespace Tests
             UCI::Options::UCI_Chess960 = (test.fen().find("(FRC)") != std::string::npos);
 
             Position pos(test.fen());
-            Histories hists;
-            auto result = Search::perft<false>(pos, test.depth(), hists);
+            auto hists = std::make_unique<Histories>();
+            auto result = Search::perft<false>(pos, test.depth(), *hists);
             if (result == test.result())
             {
                 std::cout << "[ OK ] " << test.fen() << " (" << result << ")" << std::endl;

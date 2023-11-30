@@ -1,3 +1,4 @@
+#include "incbin/incbin.h"
 #include "Types.hpp"
 #include "NNUE.hpp"
 #include <iostream>

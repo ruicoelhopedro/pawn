@@ -55,11 +55,11 @@ namespace Tests
             // Check if this is a FRC position
             UCI::Options::UCI_Chess960 = (test.fen().find("(FRC)") != std::string::npos);
 
-            Histories hists;
             Position pos(test.fen());
+            auto hists = std::make_unique<Histories>();
             Depth depth = test.depth() - 1 - 2 * (LEGALITY || VALIDITY);
-            auto result_base = Search::perft<false>(pos, depth, hists);
-            auto result_test = Search::template perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(pos, depth, hists);
+            auto result_base = Search::perft<false>(pos, depth, *hists);
+            auto result_test = Search::template perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(pos, depth, *hists);
             if (result_base == result_test)
             {
                 std::cout << "[ OK ] " << test.fen() << " (" << result_test << ")" << std::endl;

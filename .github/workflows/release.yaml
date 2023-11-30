@@ -1,0 +1,77 @@
+name: Upload binaries to release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{matrix.config.name}}
+    runs-on: ${{matrix.config.os}}
+    env:
+      CC: ${{matrix.config.cc}}
+      CXX: ${{matrix.config.cxx}}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: ubuntu
+            os: ubuntu-20.04
+            cc: gcc
+            cxx: g++
+            shell: bash
+          - name: macos
+            os: macos-latest
+            cc: gcc-11
+            cxx: g++-11
+            shell: bash
+          - name: windows
+            os: windows-2022
+            cc: gcc
+            cxx: g++
+            sys: mingw64
+            packages: mingw-w64-x86_64-gcc
+            shell: msys2 {0}
+        binaries:
+          - x86-64
+          - haswell
+    defaults:
+      run:
+        shell: ${{matrix.config.shell}}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Prepare Windows with MSYS2
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{matrix.config.sys}}
+          install: make git diffutils mingw-w64-x86_64-github-cli ${{matrix.config.packages}}
+      - name: Build
+        run: make ARCH=${{matrix.binaries}} -j
+      - name: Verify bench signature
+        run: |
+          git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}' > bench.sig_ref
+          build/pawn bench > bench.out 2>&1
+          cat bench.out
+          cat bench.out | grep 'Nodes searched:' | awk '{print $3}' > bench.sig
+          cmp bench.sig bench.sig_ref
+      - name: Upload Release Asset
+        if: runner.os != 'Windows'
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        run: |
+          cp build/pawn pawn-${{github.event.release.tag_name}}-${{matrix.config.name}}-${{matrix.binaries}}
+          gh release upload ${{github.event.release.tag_name}} pawn-${{github.event.release.tag_name}}-${{matrix.config.name}}-${{matrix.binaries}}
+      - name: Upload Release Asset (Windows)
+        if: runner.os == 'Windows'
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        run: |
+          cp build/pawn.exe pawn-${{github.event.release.tag_name}}-${{matrix.config.name}}-${{matrix.binaries}}.exe
+          gh release upload ${{github.event.release.tag_name}} pawn-${{github.event.release.tag_name}}-${{matrix.config.name}}-${{matrix.binaries}}.exe

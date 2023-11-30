@@ -1,4 +1,4 @@
-name: Pawn tests
+name: Build and test pawn
 
 on:
   push:
@@ -11,20 +11,87 @@ on:
 
 jobs:
   build:
-    name: Building and testing pawn
-    runs-on: ubuntu-latest
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    env:
+      CC: ${{ matrix.config.cc }}
+      CXX: ${{ matrix.config.cxx }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: "Ubuntu Latest - GCC"
+            os: ubuntu-latest
+            cc: gcc
+            cxx: g++
+            shell: bash
+          - name: "Ubuntu Latest - Clang"
+            os: ubuntu-latest
+            cc: clang
+            cxx: clang++
+            shell: bash
+          - name: "Ubuntu 20.04 - GCC"
+            os: ubuntu-20.04
+            cc: gcc
+            cxx: g++
+            shell: bash
+          - name: "Ubuntu 20.04 - Clang"
+            os: ubuntu-20.04
+            cc: clang
+            cxx: clang++
+            shell: bash
+          - name: "MacOS - GCC 11"
+            os: macos-latest
+            cc: gcc-11
+            cxx: g++-11
+            shell: bash
+          - name: "MacOS - Clang"
+            os: macos-latest
+            cc: clang
+            cxx: clang++
+            shell: bash
+          - name: "Windows 2022 - GCC"
+            os: windows-2022
+            cc: gcc
+            cxx: g++
+            sys: mingw64
+            packages: mingw-w64-x86_64-gcc
+            shell: msys2 {0}
+          - name: "Windows 2022 - Clang"
+            os: windows-2022
+            cc: clang
+            cxx: clang++
+            sys: mingw64
+            packages: mingw-w64-x86_64-clang mingw-w64-x86_64-lld
+            shell: msys2 {0}
+    defaults:
+      run:
+        shell: ${{ matrix.config.shell }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Extract bench signature
-        run: "git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}' > bench.sig"
+      - name: Prepare Windows with MSYS2
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{matrix.config.sys}}
+          install: make git diffutils ${{matrix.config.packages}}
+      - name: Fetch bench signature
+        run: "git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}' > bench.sig_ref"
       - name: Build pawn
         run: "make"
       - name: Run bench
-        run: "build/pawn bench 2>&1 | grep 'Nodes searched:' | awk '{print $3}' > bench.out"
-      - name: Verify bench signature
-        run: "cmp bench.sig bench.out"
+        run: |
+          build/pawn bench > bench.out 2>&1
+          cat bench.out
+      - name: Extract and verify bench signature
+        run: |
+          cat bench.out | grep 'Nodes searched:' | awk '{print $3}' > bench.sig
+          cmp bench.sig bench.sig_ref
       - name: Run tests
-        run: "build/pawn test | grep -q 'All tests passed'"
+        run: |
+          build/pawn test > test.out
+          cat test.out
+          grep -q 'All tests passed' test.out

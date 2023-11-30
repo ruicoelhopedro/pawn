@@ -6,14 +6,26 @@ SRC_DIR=src
 ARCH = native
 
 # Compiler flags
-CFLAGS = -Wall -Isrc/syzygy/Fathom/src -O3 -flto -march=$(ARCH)
-CXXFLAGS = -Wall -std=c++17 -Isrc/syzygy/Fathom/src -O3 -flto -march=$(ARCH)
-LDFLAGS = -pthread -flto -march=$(ARCH)
+COMMON = -Wall -Isrc/syzygy/Fathom/src -O3 -flto -march=$(ARCH)
+CFLAGS = $(COMMON)
+CXXFLAGS = $(COMMON) -std=c++17
+LDFLAGS = -flto -march=$(ARCH)
 
 # Windows-specific stuff
 ifeq ($(OS), Windows_NT)
 	LDFLAGS += -static
 	BIN_NAME := $(BIN_NAME).exe
+	ifeq ($(CC), clang)
+# Needed for -flto to work on Windows Clang
+# This is also the only case where we don't use -pthread
+		CFLAGS += -fuse-ld=lld
+		CXXFLAGS += -fuse-ld=lld
+		LDFLAGS += -fuse-ld=lld
+	else
+		LDFLAGS += -pthread
+	endif
+else
+	LDFLAGS += -pthread
 endif
 
 SRC_FILES := $(shell find $(SRC_DIR) -name *.cpp) src/syzygy/Fathom/src/tbprobe.c
