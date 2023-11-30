@@ -115,8 +115,8 @@ namespace Tests
         for (auto& test : tests)
         {
             Position pos(test.fen());
-            Histories hists;
-            auto result = Search::perft<false>(pos, test.depth(), hists);
+            auto hists = std::make_unique<Histories>();
+            auto result = Search::perft<false>(pos, test.depth(), *hists);
             if (result == test.result())
             {
                 std::cout << "[ OK ] " << test.fen() << " (" << result << ")" << std::endl;

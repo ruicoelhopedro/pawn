@@ -1,6 +1,6 @@
 #pragma once
-#include "incbin/incbin.h"
 #include "Types.hpp"
+
 
 #define NNUE_Default_File "nnue-10427ad1e4e6.dat"
 
