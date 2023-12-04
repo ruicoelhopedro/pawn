@@ -252,7 +252,7 @@ namespace Search
             }
             else
             {
-                n_nodes = move_list.length();
+                n_nodes = move_list.size();
                 if (OUTPUT)
                     for (auto move : move_list)
                         std::cout << move.to_uci() << ": " << 1 << std::endl;

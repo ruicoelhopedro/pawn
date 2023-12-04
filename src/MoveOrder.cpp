@@ -132,11 +132,10 @@ Move MoveOrder::next_move()
         else if (m_stage == MoveStage::CAPTURES_INIT)
         {
             ++m_stage;
-            m_captures = m_position.move_list();
-            m_position.board().generate_moves(m_captures, MoveGenType::CAPTURES);
-            partial_sort<true>(m_captures, 0);
-            m_curr = m_captures.begin();
-            m_bad_captures = m_captures.end();
+            m_position.board().generate_moves(m_move_list, MoveGenType::CAPTURES);
+            partial_sort<true>(m_move_list.begin(), m_move_list.end(), 0);
+            m_curr = m_move_list.begin();
+            m_bad_captures = m_move_list.end();
         }
         else if (m_stage == MoveStage::CAPTURES)
         {
@@ -177,14 +176,14 @@ Move MoveOrder::next_move()
         else if (m_stage == MoveStage::QUIET_INIT)
         {
             ++m_stage;
-            m_moves = MoveList(m_captures.end());
-            m_position.board().generate_moves(m_moves, MoveGenType::QUIETS);
-            partial_sort<false>(m_moves, -1000 * m_depth);
-            m_curr = m_moves.begin();
+            m_quiet_begin = m_move_list.end();
+            m_position.board().generate_moves(m_move_list, MoveGenType::QUIETS);
+            partial_sort<false>(m_quiet_begin, m_move_list.end(), -1000 * m_depth);
+            m_curr = m_quiet_begin;
         }
         else if (m_stage == MoveStage::QUIET)
         {
-            while (next(move, m_moves.end()))
+            while (next(move, m_move_list.end()))
                 if (move != m_hash_move && move != m_killer)
                     return move;
             ++m_stage;
@@ -196,7 +195,7 @@ Move MoveOrder::next_move()
         }
         else if (m_stage == MoveStage::BAD_CAPTURES)
         {
-            while (next(move, m_captures.end()))
+            while (next(move, m_quiet_begin))
                 if (move != m_hash_move)
                     return move;
             ++m_stage;

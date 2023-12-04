@@ -64,12 +64,10 @@ namespace Syzygy
             if (root_wdl != WDL_NONE)
             {
                 // Generate root moves
-                Move moves[NUM_MAX_MOVES];
-                MoveList root_moves = MoveList(moves);
-                pos.board().generate_moves(root_moves, MoveGenType::LEGAL);
+                MoveList root_moves = pos.generate_moves(MoveGenType::LEGAL);
 
                 // Evaluate each root move using DTZ tables
-                bool success = root_moves.length() > 0;
+                bool success = root_moves.size() > 0;
                 for (const Move& move : root_moves)
                 {
                     WDL wdl;

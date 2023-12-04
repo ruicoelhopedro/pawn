@@ -100,11 +100,11 @@ public:
 
 class MoveOrder
 {
-    MoveList m_moves;
-    MoveList m_captures;
+    MoveList m_move_list;
     Position& m_position;
     const CurrentHistory& m_history;
     Move* m_curr;
+    Move* m_quiet_begin;
     Move* m_bad_captures;
     MoveStage m_stage;
     Move m_hash_move;
@@ -137,11 +137,11 @@ class MoveOrder
 
 
     template<bool CAPTURES>
-    void partial_sort(MoveList& list, int threshold)
+    void partial_sort(Move* begin, Move* end, int threshold)
     {
         // Partial move sorting based on Stockfish's partial insertion sort
-        Move* sorted_end = list.begin();
-        for (Move* i = list.begin() + 1; i < list.end(); i++)
+        Move* sorted_end = begin;
+        for (Move* i = begin + 1; i < end; i++)
         {
             // Only sort moves above the threshold
             int i_score = move_score<CAPTURES>(*i);
@@ -158,7 +158,7 @@ class MoveOrder
                 Move* j = sorted_end;
 
                 // Actual insertion sorting
-                for (; j > list.begin() && i_score > move_score<CAPTURES>(*(j - 1)); j--)
+                for (; j > begin && i_score > move_score<CAPTURES>(*(j - 1)); j--)
                     *j = *(j - 1);
                 *j = curr;
             }

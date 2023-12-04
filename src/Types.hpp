@@ -340,6 +340,48 @@ public:
 };
 
 
+// Static-storage vector
+template<class T, std::size_t N>
+class StaticVector
+{
+    T m_data[N];
+    std::size_t m_size;
+
+public:
+    StaticVector() : m_size(0) {}
+
+    // Modifiers
+    void clear() { m_size = 0; }
+    void push(const T& value) { m_data[m_size++] = value; }
+    T pop() { return m_data[--m_size]; }
+    void pop(T* entry) { *entry = m_data[--m_size]; }
+    
+    // Variadic push operation
+    template<typename... Args>
+    void push(Args... args) { push(T(args...)); }
+
+    // Access operations
+    std::size_t size() const { return m_size; }
+    T& operator[](std::size_t idx) { return m_data[idx]; }
+    const T& operator[](std::size_t idx) const { return m_data[idx]; }
+    bool contains(const T& value) const
+    {
+        for (std::size_t idx = 0; idx < m_size; idx++)
+            if (m_data[idx] == value)
+                return true;
+        return false;
+    }
+
+    // Iterators
+    T* begin() { return m_data; }
+    T* end()   { return m_data + m_size; }
+    const T* begin() const { return m_data; }
+    const T* end()   const { return m_data + m_size; }
+    const T* cbegin() const { return m_data; }
+    const T* cend()   const { return m_data + m_size; }
+};
+
+
 // Debug tools
 namespace Debug
 {

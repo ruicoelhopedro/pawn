@@ -329,9 +329,7 @@ void Thread::search()
     const Search::SearchTime& time = m_pool.m_time;
 
     // Generate root moves
-    Move moves[NUM_MAX_MOVES];
-    m_root_moves = MoveList(moves);
-    m_position.board().generate_moves(m_root_moves, MoveGenType::LEGAL);
+    m_root_moves = m_position.generate_moves(MoveGenType::LEGAL);
 
     // Filter root moves if searchmoves has been passed
     if (limits.searchmoves.size() > 0)
@@ -353,7 +351,7 @@ void Thread::search()
     }
 
     // Check for aborted search if game has ended
-    if (m_root_moves.length() == 0 || m_position.is_draw(false))
+    if (m_root_moves.size() == 0 || m_position.is_draw(false))
     {
         if (main_thread)
         {
@@ -368,7 +366,7 @@ void Thread::search()
     }
 
     // Maximum PV lines
-    int maxPv = std::min(m_root_moves.length(), UCI::Options::MultiPV);
+    int maxPv = std::min(int(m_root_moves.size()), UCI::Options::MultiPV);
 
     // Prepare multiPV data
     m_multiPV.resize(UCI::Options::MultiPV);

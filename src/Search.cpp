@@ -512,9 +512,8 @@ namespace Search
         // Regular move search
         Move move;
         int n_moves = 0;
+        MoveList quiets_searched;
         Move best_move = MOVE_NULL;
-        Move quiet_list[NUM_MAX_MOVES];
-        MoveList quiets_searched(quiet_list);
         Move hash_move = (data.in_pv() && data.pv_move() != MOVE_NULL) ? data.pv_move() : tt_move;
         MoveOrder orderer = MoveOrder(position, depth, hash_move, history);
         while ((move = orderer.next_move()) != MOVE_NULL)
@@ -899,14 +898,14 @@ namespace Search
             }
 
         // Illegality check: first count number of legal moves
-        int result = 0;
+        std::size_t result = 0;
         for (uint16_t number = 0; number < UINT16_MAX; number++)
             if (position.board().legal(Move::from_int(number)))
                 result++;
         // Something is wrong, find the bad legals
-        if (result != move_list.length())
+        if (result != move_list.size())
         {
-            std::cout << result << " vs " << move_list.length() << std::endl;
+            std::cout << result << " vs " << move_list.size() << std::endl;
             for (uint16_t number = 0; number < UINT16_MAX; number++)
             {
                 Move move = Move::from_int(number);
