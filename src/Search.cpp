@@ -374,7 +374,7 @@ namespace Search
             return quiescence<ST>(position, alpha, beta, data);
 
         // Early check for draw or maximum depth reached
-        if (position.is_draw(!RootSearch) ||
+        if (position.is_draw(Ply > 1) ||
             Ply >= NUM_MAX_PLY)
             return SCORE_DRAW;
 
@@ -751,7 +751,7 @@ namespace Search
         }
 
         // Early check for draw or maximum depth reached
-        if (position.is_draw(true) ||
+        if (position.is_draw(Ply > 1) ||
             Ply >= NUM_MAX_PLY)
             return SCORE_DRAW;
 
