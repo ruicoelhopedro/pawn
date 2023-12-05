@@ -85,6 +85,7 @@ namespace UCI
         extern int Hash;
         extern int MultiPV;
         extern bool Ponder;
+        extern bool UCI_Chess960;
         extern int Threads;
         extern int MoveOverhead;
         extern std::string NNUE_File;

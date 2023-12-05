@@ -216,12 +216,14 @@ namespace Bitboards
     {
         for (int i = 0; i < NUM_SQUARES; i++)
             for (int j = 0; j < NUM_SQUARES; j++)
-                if (diagonals[i].test(j))
-                    between_squares[i][j] = get_attacks<BISHOP>(static_cast<Square>(i), Bitboard::from_single_bit(j))&
-                    get_attacks<BISHOP>(static_cast<Square>(j), Bitboard::from_single_bit(i));
+                if (i == j)
+                    between_squares[i][j] = Bitboard();
+                else if (diagonals[i].test(j))
+                    between_squares[i][j] = get_attacks<BISHOP>(static_cast<Square>(i), Bitboard::from_single_bit(j)) &
+                                            get_attacks<BISHOP>(static_cast<Square>(j), Bitboard::from_single_bit(i));
                 else if (ranks_files[i].test(j))
-                    between_squares[i][j] = get_attacks<ROOK  >(static_cast<Square>(i), Bitboard::from_single_bit(j))&
-                    get_attacks<ROOK  >(static_cast<Square>(j), Bitboard::from_single_bit(i));
+                    between_squares[i][j] = get_attacks<ROOK  >(static_cast<Square>(i), Bitboard::from_single_bit(j)) &
+                                            get_attacks<ROOK  >(static_cast<Square>(j), Bitboard::from_single_bit(i));
     }
 
 

@@ -147,7 +147,7 @@ namespace Search
              :                                         BoundType::LOWER_BOUND; // Blessed loss
     }
 
-    void MultiPVData::write_pv(int index, uint64_t nodes, uint64_t tb_hits, double elapsed) const
+    void MultiPVData::write_pv(const Board& board, int index, uint64_t nodes, uint64_t tb_hits, double elapsed) const
     {
         // Don't write if PV line is incomplete
         if (search_bound == BoundType::NO_BOUND)
@@ -177,9 +177,9 @@ namespace Search
 
         // Pv line
         const Move* m = pv;
-        std::cout << " pv " << *(m++);
+        std::cout << " pv " << board.to_uci(*(m++));
         while (*m != MOVE_NULL)
-            std::cout << " " << (*m++);
+            std::cout << " " << board.to_uci(*(m++));
         
         std::cout << std::endl;
     }
@@ -536,7 +536,7 @@ namespace Search
             if (RootSearch && data.thread().is_main() &&
                 data.thread().time().elapsed() > 3)
                 std::cout << "info depth " << depth
-                          << " currmove " << move.to_uci()
+                          << " currmove " << position.board().to_uci(move)
                           << " currmovenumber " << n_moves << std::endl;
 
             // Shallow depth pruning
@@ -894,26 +894,27 @@ namespace Search
         for (auto move : move_list)
             if (!position.board().legal(move))
             {
-                std::cout << "Bad illegal move " << move.to_uci() << " (" << move.to_int() << ") in " << position.board().to_fen() << std::endl;
+                std::cout << "Bad illegal move "
+                          << position.board().to_uci(move)
+                          << " (" << move.to_int() << ") in "
+                          << position.board().to_fen()
+                          << std::endl;
                 final = false;
             }
 
-        // Illegality check: first count number of legal moves
-        int result = 0;
+        // Illegality check
         for (uint16_t number = 0; number < UINT16_MAX; number++)
-            if (position.board().legal(Move::from_int(number)))
-                result++;
-        // Something is wrong, find the bad legals
-        if (result != move_list.length())
         {
-            std::cout << result << " vs " << move_list.length() << std::endl;
-            for (uint16_t number = 0; number < UINT16_MAX; number++)
+            Move move = Move::from_int(number);
+            if (position.board().legal(move) && !move_list.contains(move))
             {
-                Move move = Move::from_int(number);
-                if (position.board().legal(move) && !move_list.contains(move))
-                    std::cout << "Bad legal move " << move.to_uci() << " (" << move.to_int() << ") in " << position.board().to_fen() << std::endl;
+                std::cout << "Bad legal move "
+                          << position.board().to_uci(move)
+                          << " (" << move.to_int() << ") in "
+                          << position.board().to_fen()
+                          << std::endl;
+                final = false;
             }
-            final = false;
         }
         return final;
     }
