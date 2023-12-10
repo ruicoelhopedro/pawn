@@ -151,8 +151,8 @@ namespace NNUE
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
         {
             // Clipped ReLU on the accumulators
-            int stm_acc = std::clamp(stm.m_net[i], 0, SCALE_FACTOR);
-            int ntm_acc = std::clamp(ntm.m_net[i], 0, SCALE_FACTOR);
+            int stm_acc = std::clamp(stm.m_net[i], int16_t(0), SCALE_FACTOR);
+            int ntm_acc = std::clamp(ntm.m_net[i], int16_t(0), SCALE_FACTOR);
 
             // Net output
             int j = i + NUM_ACCUMULATORS;
