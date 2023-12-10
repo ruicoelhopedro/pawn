@@ -147,7 +147,7 @@ namespace NNUE
 
     Score Accumulator::eval(const Accumulator& stm, const Accumulator& ntm, int bucket)
     {
-        int output = nnue_net->m_dense_bias[bucket];
+        int output = nnue_net->m_dense_bias[bucket] * SCALE_FACTOR;
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
         {
             // Clipped ReLU on the accumulators
