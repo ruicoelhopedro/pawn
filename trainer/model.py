@@ -86,8 +86,8 @@ class NNUE(nn.Module):
     def export(self, filename):
         # Export each layer to the output NNUE file
         with open(filename, 'w') as output_file:
-            self.__dump(self.psqt.weight.data, np.short, SCALE_FACTOR, output_file)
             self.__dump(self.accumulator_emb.weight.data, np.short, SCALE_FACTOR, output_file)
+            self.__dump(self.psqt.weight.data, np.short, SCALE_FACTOR, output_file)
             self.__dump(self.accumulator_bias.data, np.short, SCALE_FACTOR, output_file)
             self.__dump(self.layer.weight.data, np.short, SCALE_FACTOR, output_file)
             self.__dump(self.layer.bias.data, np.short, SCALE_FACTOR, output_file)
