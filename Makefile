@@ -10,8 +10,6 @@ COMMON = -Wall -Isrc/syzygy/Fathom/src -O3 -flto -march=$(ARCH) -Isrc
 LDFLAGS = -flto -march=$(ARCH)
 ifeq ($(findstring library, $(MAKECMDGOALS)), library)
 	COMMON += -fPIC -g
-    CFLAGS = -Wall -Isrc/syzygy/Fathom/src -O3 -march=$(ARCH) -flto -fPIC -g
-    CXXFLAGS = -Wall -Isrc/syzygy/Fathom/src -std=c++17 -O3 -march=$(ARCH) -flto -fPIC -g
     LDFLAGS += -fPIC -shared
 	BIN_NAME=pawn.so
 endif

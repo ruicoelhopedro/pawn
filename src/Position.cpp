@@ -207,6 +207,8 @@ Board::Board(const BinaryBoard& bb, bool accumulator_frozen)
                 set_piece(get_piece_type(pc), get_turn(pc), make_square(rank, file));
         }
     }
+    m_king_sq[WHITE] = m_pieces[KING][WHITE].bitscan_forward();
+    m_king_sq[BLACK] = m_pieces[KING][BLACK].bitscan_forward();
 
     // Side to move
     m_turn = bb.get_turn();
