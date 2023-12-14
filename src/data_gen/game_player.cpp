@@ -198,7 +198,7 @@ namespace GamePlayer
             for (BinaryNode node : game.nodes)
                 if (node.move != MOVE_NULL)
                 {
-                    ofile << board.to_fen() << " " << node.move << " " << node.score << "\n";
+                    ofile << board.to_fen() << " " << board.to_uci(node.move) << " " << node.score << "\n";
                     // Make the move
                     assert(board.legal(node.move) && "Illegal move!");
                     board = board.make_move(node.move);
@@ -230,7 +230,7 @@ namespace GamePlayer
                     if(!board.legal(node.move))
                     {
                         std::cerr << "Game " << game_number << " (move " << move_number << "): "
-                                  << "Illegal move " << node.move
+                                  << "Illegal move " << board.to_uci(node.move)
                                   << " in position " << board.to_fen()
                                   << std::endl;
                         return false;

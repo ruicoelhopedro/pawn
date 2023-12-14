@@ -33,7 +33,7 @@ namespace FEN_Scores
 
     void FENFileFormat::write(const Position& pos, const std::string& fen, Move m, Score s)
     {
-        file << fen << " " << m << " " << s << "\n";
+        file << fen << " " << pos.board().to_uci(m) << " " << s << "\n";
     }
 
 

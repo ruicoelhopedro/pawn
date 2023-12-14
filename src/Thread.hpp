@@ -45,6 +45,7 @@ protected:
     friend class Search::SearchData;
     friend class ThreadPool;
     Depth m_seldepth;
+    Depth m_root_depth;
     Search::PvContainer m_pv;
     Histories m_histories;
     std::atomic_uint64_t m_tb_hits;
@@ -74,6 +75,8 @@ public:
     SearchResult simple_search(Position& pos, const Search::Limits& limits);
 
     GameResult play_game(std::string fen, Depth depth, Score adjudication);
+
+    Depth root_depth() const;
 
     int id() const;
     bool is_main() const;

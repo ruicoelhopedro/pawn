@@ -21,7 +21,7 @@
 
 namespace UCI
 {
-    constexpr std::string_view VERSION = "pawn 2.0";
+    constexpr std::string_view VERSION = "pawn 2.0-dev";
 
 
     std::map<std::string, Option, OptionNameCompare> OptionsMap;
@@ -32,6 +32,7 @@ namespace UCI
         int Hash;
         int MultiPV;
         bool Ponder;
+        bool UCI_Chess960;
         int Threads;
         int MoveOverhead;
         std::string NNUE_File;
@@ -118,6 +119,7 @@ namespace UCI
                                                    [](int v) { pool->resize(v); }));
         OptionsMap.emplace("Move Overhead", Option(&Options::MoveOverhead, 0, 0, 5000));
         OptionsMap.emplace("Ponder",        Option(&Options::Ponder, false));
+        OptionsMap.emplace("UCI_Chess960",  Option(&Options::UCI_Chess960, false));
         OptionsMap.emplace("NNUE_File",     Option(&Options::NNUE_File, "", NNUE::load));
         OptionsMap.emplace("SyzygyPath",    Option(&Options::TB_Path, "", Syzygy::load));
         OptionsMap.emplace("SyzygyProbeDepth", Option(&Options::TB_ProbeDepth, 1, 1, 199));
@@ -418,7 +420,7 @@ namespace UCI
 
         // Search for the move in the move list
         for (auto& move : list)
-            if (move.to_uci() == move_str)
+            if (position.board().to_uci(move) == move_str)
                 return move;
 
         return MOVE_NULL;

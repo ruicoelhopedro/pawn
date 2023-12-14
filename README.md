@@ -3,8 +3,11 @@ A UCI alpha-beta chess engine, largely inspired by Stockfish.
 
 As with most UCI chess engines, `pawn` should be used with a compatible graphical user interface (such as [CuteChess](https://github.com/cutechess/cutechess)).
 
-The engine uses a hybrid evaluation function combining both handcrafted terms (such as material, mobility and king safety) and an efficiently updatable neural network for positional scores (derived from a set of trained PSQ tables in earlier versions).
+The engine uses an efficiently updatable neural network (NNUE) for evaluation.
+Currently, the net is shallow with a single 256-neuron layer and 4 output buckets (selected according to the number of pieces on the board).
+A separate set of PSQ tables is directly propagated to the output, which is also initialised using the material values of each piece.
 All training data has been generated in self-play at low depth using the tools in the branch [`data_gen`](https://github.com/ruicoelhopedro/pawn/tree/data_gen).
+The training scripts can also be found in that branch, which use a PyTorch backend.
 The default network is embedded in the binary file with `incbin`.
 
 ## Getting `pawn`
@@ -120,8 +123,7 @@ Similarly to the original implementation in Stockfish, `pawn` has two modes of o
 - Efficiently updatable neural network (NNUE):
   - Combined PSQ and layer contributions
   - HalfKP_hm feature set
-  - Two perspective networks for symmetric evaluations
-  - Tapered score from middlegame and endgame network outputs
+  - Four output buckets, selected according to the number of pieces on the board
 ### Search
 - Principal Variation Search in a negamax framework
 - Quiescence search with SEE

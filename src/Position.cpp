@@ -1,6 +1,7 @@
 #include "Position.hpp"
 #include "Types.hpp"
 #include "NNUE.hpp"
+#include "UCI.hpp"
 #include "Zobrist.hpp"
 #include "data_gen/data_gen.hpp"
 #include "syzygy/syzygy.hpp"
@@ -47,6 +48,21 @@ CastleSide fen_castle_side(char c)
 }
 
 
+CastleFile fen_castle_file_chess960(char c)
+{
+    char lower = tolower(c);
+    return lower == 'a' ? CastleFile::FILE_A
+         : lower == 'b' ? CastleFile::FILE_B
+         : lower == 'c' ? CastleFile::FILE_C
+         : lower == 'd' ? CastleFile::FILE_D
+         : lower == 'e' ? CastleFile::FILE_E
+         : lower == 'f' ? CastleFile::FILE_F
+         : lower == 'g' ? CastleFile::FILE_G
+         : lower == 'h' ? CastleFile::FILE_H
+         : CastleFile::NONE;
+}
+
+
 char fen_castle_side(CastleSide side, Turn turn)
 {
     char c = side == KINGSIDE  ? 'k'
@@ -56,8 +72,16 @@ char fen_castle_side(CastleSide side, Turn turn)
 }
 
 
+char fen_castle_side_chess960(CastleFile side, Turn turn)
+{
+    char c = "xabcdefgh"[static_cast<int>(side)];
+    return turn == WHITE ? toupper(c) : c;
+}
+
+
 Board::Board()
-    : Board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+    : Board(UCI::Options::UCI_Chess960 ? "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w HAha - 0 1"
+                                       : "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 {}
 
 
@@ -85,6 +109,8 @@ Board::Board(std::string fen)
 
         c++;
     }
+    m_king_sq[WHITE] = m_pieces[KING][WHITE].bitscan_forward();
+    m_king_sq[BLACK] = m_pieces[KING][BLACK].bitscan_forward();
 
     // Side to move
     m_turn = WHITE;
@@ -94,8 +120,35 @@ Board::Board(std::string fen)
     // Castling rights
     std::memset(m_castling_rights, 0, sizeof(m_castling_rights));
     while ((++c) < fen.cend() && !isspace(*c))
-        if (fen_castle_side(*c) != NO_SIDE)
-            set_castling<true>(fen_castle_side(*c), isupper(*c) ? WHITE : BLACK);
+    {
+        if (UCI::Options::UCI_Chess960)
+        {
+            char lower = tolower(*c);
+            if (lower == 'k' || lower == 'q')
+            {
+                // X-FEN notation: find available rook
+                Turn turn = isupper(*c) ? WHITE : BLACK;
+                Direction dir = lower == 'k' ? 1 : -1;
+                for (int f = file(m_king_sq[turn]); f >= 0 && f < 8; f += dir)
+                    if (get_piece_type(m_board_pieces[make_square(turn == WHITE ? 0 : 7, f)]) == ROOK)
+                        set_castling(lower == 'k' ? KINGSIDE : QUEENSIDE, turn, fen_castle_file_chess960('a' + f));
+            }
+            else if (lower >= 'a' && lower <= 'h')
+            {
+                // Shredder-FEN notation
+                Turn turn = isupper(*c) ? WHITE : BLACK;
+                CastleFile file = fen_castle_file_chess960(*c);
+                set_castling(get_rook_square(file, turn) > m_king_sq[turn] ? KINGSIDE : QUEENSIDE, turn, file);
+            }
+        }
+        else
+        {
+            CastleSide side = fen_castle_side(*c);
+            if (side != NO_SIDE)
+                set_castling(side, isupper(*c) ? WHITE : BLACK, side == KINGSIDE ? CastleFile::FILE_H : CastleFile::FILE_A);
+        }
+    }
+              
 
     // Ep square
     m_enpassant_square = SQUARE_NULL;
@@ -160,10 +213,10 @@ Board::Board(const BinaryBoard& bb, bool accumulator_frozen)
 
     // Castling rights
     uint8_t rights = bb.get_castle_rights();
-    if (rights & 0b1)    set_castling<true>(KINGSIDE,  WHITE);
-    if (rights & 0b10)   set_castling<true>(QUEENSIDE, WHITE);
-    if (rights & 0b100)  set_castling<true>(KINGSIDE,  BLACK);
-    if (rights & 0b1000) set_castling<true>(QUEENSIDE, BLACK);
+    if (rights & 0b1)    set_castling(KINGSIDE,  WHITE, get_castling_rook(WHITE, KINGSIDE));
+    if (rights & 0b10)   set_castling(QUEENSIDE, WHITE, get_castling_rook(WHITE, QUEENSIDE));
+    if (rights & 0b100)  set_castling(KINGSIDE,  BLACK, get_castling_rook(BLACK, KINGSIDE));
+    if (rights & 0b1000) set_castling(QUEENSIDE, BLACK, get_castling_rook(BLACK, QUEENSIDE));
 
     // Ep square
     m_enpassant_square = bb.get_ep_square();
@@ -215,10 +268,11 @@ std::string Board::to_fen() const
     bool found = false;
     for (auto turn : { WHITE, BLACK })
         for (auto side : { KINGSIDE, QUEENSIDE })
-            if (m_castling_rights[side][turn])
+            if (castling_rights(side, turn))
             {
                 found = true;
-                ss << fen_castle_side(side, turn);
+                ss << (UCI::Options::UCI_Chess960 ? fen_castle_side_chess960(m_castling_rights[side][turn], turn)
+                                                  : fen_castle_side(side, turn));
             }
     ss << (found ? " " : "- ");
 
@@ -256,7 +310,7 @@ Hash Board::generate_hash() const
     // Castling rights
     for (CastleSide side : { KINGSIDE, QUEENSIDE })
         for (Turn turn : { WHITE, BLACK })
-            if (m_castling_rights[side][turn])
+            if (castling_rights(side, turn))
                 hash ^= Zobrist::get_castle_side_turn(side, turn);
 
     return hash;
@@ -317,22 +371,6 @@ Board Board::make_move(Move move) const
     // Initial empty ep square
     result.m_enpassant_square = SQUARE_NULL;
 
-    // Update castling rights after this move
-    if (piece == KING)
-    {
-        // Unset all castling rights after a king move
-        for (auto side : { KINGSIDE, QUEENSIDE })
-            result.set_castling<false>(side, m_turn);
-    }
-    else if (piece == ROOK)
-    {
-        // Unset castling rights for a certain side if a rook moves
-        if (move.from() == (m_turn == WHITE ? SQUARE_H1 : SQUARE_H8))
-            result.set_castling<false>(KINGSIDE, m_turn);
-        if (move.from() == (m_turn == WHITE ? SQUARE_A1 : SQUARE_A8))
-            result.set_castling<false>(QUEENSIDE, m_turn);
-    }
-
     // Per move type action
     if (move.is_capture())
     {
@@ -343,10 +381,9 @@ Board Board::make_move(Move move) const
         result.pop_piece(get_piece_at(target), ~m_turn, target);
 
         // Castling: check if any rook has been captured
-        if (move.to() == (m_turn == WHITE ? SQUARE_H8 : SQUARE_H1))
-            result.set_castling<false>(KINGSIDE, ~m_turn);
-        if (move.to() == (m_turn == WHITE ? SQUARE_A8 : SQUARE_A1))
-            result.set_castling<false>(QUEENSIDE, ~m_turn);
+        for (auto side : { KINGSIDE, QUEENSIDE })
+            if (castling_rights(side, ~m_turn) && move.to() == get_rook_square(m_castling_rights[side][~m_turn], ~m_turn))
+                result.unset_castling(side, ~m_turn);
     }
     else if (move.is_double_pawn_push())
     {
@@ -356,10 +393,23 @@ Board Board::make_move(Move move) const
     }
     else if (move.is_castle())
     {
-        // Move the rook to the new square
-        Square iS = move.to() + (move.to() > move.from() ? +1 : -2);
-        Square iE = move.to() + (move.to() > move.from() ? -1 : +1);
-        result.move_piece(ROOK, m_turn, iS, iE);
+        // Get the start and ending squares for the rook
+        CastleSide side = file(move.to()) >= 4 ? KINGSIDE : QUEENSIDE;
+        Square iS = get_rook_square(m_castling_rights[side][m_turn], m_turn);
+        Square iE = move.to() + (side == KINGSIDE ? -1 : +1);
+
+        // Make the move in stages to ensure correct updates in Chess960
+        if (UCI::Options::UCI_Chess960)
+        {
+            result.pop_piece(ROOK, m_turn, iS);
+            result.move_piece(piece, m_turn, move.from(), move.to());
+            result.set_piece(ROOK, m_turn, iE);
+        }
+        else
+        {
+            result.move_piece(piece, m_turn, move.from(), move.to());
+            result.move_piece(ROOK, m_turn, iS, iE);
+        }
     }
 
     // Set piece on target square
@@ -368,7 +418,7 @@ Board Board::make_move(Move move) const
         result.pop_piece(piece, m_turn, move.from());
         result.set_piece(move.promo_piece(), m_turn, move.to());
     }
-    else
+    else if (!move.is_castle())
     {
         result.move_piece(piece, m_turn, move.from(), move.to());
     }
@@ -379,6 +429,22 @@ Board Board::make_move(Move move) const
         result.m_king_sq[m_turn] = result.m_pieces[KING][m_turn].bitscan_forward();
         if (!m_simplified)
             result.regen_psqt(m_turn);
+    }
+
+    // Update castling rights after this move
+    if (piece == KING)
+    {
+        // Unset all castling rights after a king move
+        for (auto side : { KINGSIDE, QUEENSIDE })
+            result.unset_castling(side, m_turn);
+    }
+    else if (piece == ROOK)
+    {
+        // Unset castling rights for a certain side if a rook moves
+        if (move.from() == get_rook_square(m_castling_rights[KINGSIDE][m_turn], m_turn))
+            result.unset_castling(KINGSIDE, m_turn);
+        if (move.from() == get_rook_square(m_castling_rights[QUEENSIDE][m_turn], m_turn))
+            result.unset_castling(QUEENSIDE, m_turn);
     }
 
     // Swap turns
@@ -615,7 +681,7 @@ uint8_t Board::phase() const
 bool Board::legal(Move move) const
 {
     // Same source and destination squares?
-    if (move.from() == move.to())
+    if (move.from() == move.to() && !(UCI::Options::UCI_Chess960 && move.is_castle()))
         return false;
 
     // Ep without the square defined?
@@ -626,9 +692,13 @@ bool Board::legal(Move move) const
     if (move.move_type() == INVALID_1 || move.move_type() == INVALID_2)
         return false;
 
-    // Source square is not ours or destination ours?
+    // Source square is not ours?
     Bitboard our_pieces = (m_turn == WHITE ? get_pieces<WHITE>() : get_pieces<BLACK>());
-    if (!our_pieces.test(move.from()) || our_pieces.test(move.to()))
+    if (!our_pieces.test(move.from()))
+        return false;
+
+    // Destination square ours?
+    if (our_pieces.test(move.to()) && !(UCI::Options::UCI_Chess960 && move.is_castle()))
         return false;
 
     // Capture and destination square not occupied by the opponent (including ep)?
@@ -698,6 +768,47 @@ Bitboard Board::sliders() const
 const NNUE::Accumulator& Board::accumulator(Turn t) const
 {
     return m_acc[t];
+}
+
+CastleFile Board::get_castling_rook(Turn turn, CastleSide side) const
+{
+    Direction dir = side == KINGSIDE ? 1 : -1;
+    for (int f = file(m_king_sq[turn]); f >= 0 && f < 8; f += dir)
+        if (get_piece_type(m_board_pieces[make_square(turn == WHITE ? 0 : 7, f)]) == ROOK)
+            return fen_castle_file_chess960('a' + f);
+    return CastleFile::NONE;
+}
+
+
+
+std::string Board::to_uci(Move m) const
+{
+    // Castling for Chess960 (this needs to come before null moves)
+    if (UCI::Options::UCI_Chess960 && m.is_castle())
+    {
+        CastleSide side = file(m.to()) >= 4 ? KINGSIDE : QUEENSIDE;
+        Turn turn = rank(m.from()) < 4 ? WHITE : BLACK;
+        return get_square(m.from()) + get_square(get_rook_square(m_castling_rights[side][turn], turn));
+    }
+
+    // Null moves
+    if (m.from() == m.to())
+        return "0000";
+
+    // Promotions
+    if (m.is_promotion())
+    {
+        // Promotion
+        PieceType piece = m.promo_piece();
+        char promo_code = piece == KNIGHT ? 'n'
+                        : piece == BISHOP ? 'b'
+                        : piece == ROOK   ? 'r'
+                        :                   'q';
+        return get_square(m.from()) + get_square(m.to()) + promo_code;
+    }
+
+    // Regular move
+    return get_square(m.from()) + get_square(m.to());
 }
 
 

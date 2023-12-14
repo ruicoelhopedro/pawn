@@ -3,6 +3,7 @@
 #include "Search.hpp"
 #include "Types.hpp"
 #include "Position.hpp"
+#include "UCI.hpp"
 #include <fstream>
 #include <string>
 
@@ -39,6 +40,9 @@ namespace Tests
     template<bool USE_ORDER, bool TT, bool LEGALITY, bool VALIDITY>
     int perft_techniques_tests()
     {
+        // Store initial state
+        bool Chess960 = UCI::Options::UCI_Chess960;
+
         auto tests = test_suite();
 
         // Allocate TT
@@ -48,10 +52,14 @@ namespace Tests
         int n_failed = 0;
         for (auto& test : tests)
         {
-            Histories hists;
+            // Check if this is a FRC position
+            UCI::Options::UCI_Chess960 = (test.fen().find("(FRC)") != std::string::npos);
+
             Position pos(test.fen());
-            auto result_base = Search::perft<false>(pos, test.depth() - 1, hists);
-            auto result_test = Search::template perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(pos, test.depth() - 1, hists);
+            auto hists = std::make_unique<Histories>();
+            Depth depth = test.depth() - 1 - 2 * (LEGALITY || VALIDITY);
+            auto result_base = Search::perft<false>(pos, depth, *hists);
+            auto result_test = Search::template perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(pos, depth, *hists);
             if (result_base == result_test)
             {
                 std::cout << "[ OK ] " << test.fen() << " (" << result_test << ")" << std::endl;
@@ -67,6 +75,7 @@ namespace Tests
         if (TT)
             perft_table.resize(0);
 
+        UCI::Options::UCI_Chess960 = Chess960;
         std::cout << "\nFailed/total tests: " << n_failed << "/" << tests.size() << std::endl;
         return n_failed;
     }

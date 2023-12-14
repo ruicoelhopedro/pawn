@@ -89,12 +89,13 @@ void Thread::output_pvs()
 
     // Output information
     for (int iPV = 0; iPV < UCI::Options::MultiPV; iPV++)
-        m_multiPV[iPV].write_pv(iPV, nodes, tb_hits, elapsed);
+        m_multiPV[iPV].write_pv(m_position.board(), iPV, nodes, tb_hits, elapsed);
 }
 
 
 int Thread::id() const { return m_id; }
 bool Thread::is_main() const { return m_id == 0 && !m_data_gen; }
+Depth Thread::root_depth() const { return m_root_depth; }
 ThreadPool& Thread::pool() const { return m_pool; }
 const Search::SearchTime& Thread::time() const { return m_pool.m_time; }
 const Search::Limits& Thread::limits() const { return m_pool.m_limits; }
@@ -368,7 +369,7 @@ void Thread::search()
         {
             // Even in this case, output a score and bestmove
             std::cout << "info depth 0 score " << (m_position.in_check() ? "mate 0" : "cp 0") << std::endl;
-            std::cout << "bestmove " << MOVE_NULL << std::endl;
+            std::cout << "bestmove (0000)" << std::endl;
             
             // Stop the search
             m_pool.stop();
@@ -413,6 +414,7 @@ void Thread::search()
 
             // Carry the aspirated search
             Depth depth = iDepth + m_id % 4;
+            m_root_depth = depth;
             aspiration_search(m_position, pv, depth, data);
 
             // Timeout?
@@ -513,9 +515,9 @@ void Thread::search()
         Move pondermove = *(best_pv + 1);
 
         // Mandatory output to the GUI
-        std::cout << "bestmove " << bestmove;
+        std::cout << "bestmove " << m_position.board().to_uci(bestmove);
         if (pondermove != MOVE_NULL)
-            std::cout << " ponder " << pondermove;
+            std::cout << " ponder " << m_position.board().to_uci(pondermove);
         std::cout << std::endl;
 
         // Debug prints

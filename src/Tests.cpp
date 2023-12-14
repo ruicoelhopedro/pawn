@@ -61,6 +61,17 @@ namespace Tests
         tests.push_back(PerftTest("r2q1b1r/ppp1ppp1/n1k2n1p/3p4/P4P2/2NP3P/1PPKP1BP/R1BQ3R b - f3 0 8", 6, 542729390));
         tests.push_back(PerftTest("rnbqkbnr/Pp1ppppp/8/8/2P5/4B3/PP2PPPP/RN1QKBNR b KQkq - 0 4", 6, 632428291));
         tests.push_back(PerftTest("3r1r2/2q2p1k/p3b3/1p6/4Pp1P/P1Nn2P1/1PP5/R4R1K b - h3 0 4", 6, 2719206243));
+        tests.push_back(PerftTest("bqnb1rkr/pp3ppp/3ppn2/2p5/5P2/P2P4/NPP1P1PP/BQ1BNRKR w HFhf - 2 9 (FRC)", 6, 227689589));
+        tests.push_back(PerftTest("2nnrbkr/p1qppppp/8/1ppb4/6PP/3PP3/PPP2P2/BQNNRBKR w HEhe - 1 9 (FRC)", 6, 590751109));
+        tests.push_back(PerftTest("b1q1rrkb/pppppppp/3nn3/8/P7/1PPP4/4PPPP/BQNNRKRB w GE - 1 9 (FRC)", 6, 177654692));
+        tests.push_back(PerftTest("qbbnnrkr/2pp2pp/p7/1p2pp2/8/P3PP2/1PPP1KPP/QBBNNR1R w hf - 0 9 (FRC)", 6, 274103539));
+        tests.push_back(PerftTest("1nbbnrkr/p1p1ppp1/3p4/1p3P1p/3Pq2P/8/PPP1P1P1/QNBBNRKR w HFhf - 0 9 (FRC)", 6, 1250970898));
+        tests.push_back(PerftTest("1qnrkbbr/1pppppp1/p1n4p/8/P7/1P1N1P2/2PPP1PP/QN1RKBBR w HDhd - 0 9 (FRC)", 6, 783201510));
+        tests.push_back(PerftTest("qn1rkrbb/pp1p1ppp/2p1p3/3n4/4P2P/2NP4/PPP2PP1/Q1NRKRBB w FDfd - 1 9 (FRC)", 6, 233468620));
+        tests.push_back(PerftTest("bb1qnrkr/pp1p1pp1/1np1p3/4N2p/8/1P4P1/P1PPPP1P/BBNQ1RKR w HFhf - 0 9 (FRC)", 6, 776836316));
+        tests.push_back(PerftTest("bnqbnr1r/p1p1ppkp/3p4/1p4p1/P7/3NP2P/1PPP1PP1/BNQB1RKR w HF - 0 9 (FRC)", 6, 809194268));
+        tests.push_back(PerftTest("bnqnrbkr/1pp2pp1/p7/3pP2p/4P1P1/8/PPPP3P/BNQNRBKR w HEhe d6 0 9 (FRC)", 6, 1008880643));
+        tests.push_back(PerftTest("b1qnrrkb/ppp1pp1p/n2p1Pp1/8/8/P7/1PPPP1PP/BNQNRKRB w GE - 0 9 (FRC)", 6, 193594729));
 
         return tests;
     }
@@ -103,20 +114,29 @@ namespace Tests
         bench.push_back("2r2rk1/1bqnbpp1/1p1ppn1p/pP6/N1P1P3/P2B1N1P/1B2QPP1/R2R2K1 b - - 0 1");
         bench.push_back("r1bqk2r/pp2bppp/2p5/3pP3/P2Q1P2/2N1B3/1PP3PP/R4RK1 b kq - 0 1");
         bench.push_back("r2qnrnk/p2b2b1/1p1p2pp/2pPpp2/1PP1P3/PRNBB3/3QNPPP/5RK1 w - - 0 1");
+        bench.push_back("qrb1nnkr/ppp2ppp/4pb2/3p4/2P5/1P3N2/P2PPPPP/QRBB1NKR w HBhb - 1 4 (FRC)");
+        bench.push_back("rbknnrbq/1pppp1pp/8/p7/P3p3/2N5/1PPP1PPP/RBK1NRBQ w FAfa - 0 4 (FRC)");
+        bench.push_back("1bbnrkqr/ppp2ppp/1n6/3pp3/7P/1N1P4/PPP1PPP1/1BBNRKQR w HEhe - 0 4 (FRC)");
 
         return bench;
     }
 
     int perft_tests()
     {
-        auto tests = test_suite();
+        // Store initial state
+        bool Chess960 = UCI::Options::UCI_Chess960;
 
+        // Loop over each position
         int n_failed = 0;
+        auto tests = test_suite();
         for (auto& test : tests)
         {
+            // Check if this is a FRC position
+            UCI::Options::UCI_Chess960 = (test.fen().find("(FRC)") != std::string::npos);
+
             Position pos(test.fen());
-            Histories hists;
-            auto result = Search::perft<false>(pos, test.depth(), hists);
+            auto hists = std::make_unique<Histories>();
+            auto result = Search::perft<false>(pos, test.depth(), *hists);
             if (result == test.result())
             {
                 std::cout << "[ OK ] " << test.fen() << " (" << result << ")" << std::endl;
@@ -128,6 +148,7 @@ namespace Tests
             }
         }
 
+        UCI::Options::UCI_Chess960 = Chess960;
         std::cout << "\nFailed/total tests: " << n_failed << "/" << tests.size() << std::endl;
         return n_failed;
     }
@@ -145,12 +166,18 @@ namespace Tests
         Search::Timer time;
         uint64_t nodes = 0;
 
+        // Store initial state
+        bool Chess960 = UCI::Options::UCI_Chess960;
+
         // Loop over each position
         int i = 0;
         Position& pos = pool->position();
         std::vector<std::string> fens = bench_suite();
         for (auto fen : fens)
         {
+            // Check if this is a FRC position
+            UCI::Options::UCI_Chess960 = (fen.find("(FRC)") != std::string::npos);
+
             // Update position
             pos = Position(fen);
             pos.set_init_ply();
@@ -173,7 +200,8 @@ namespace Tests
         std::cerr << "Elapsed time (s): " << std::setw(7) << elapsed   << std::endl;
         std::cerr << "Nodes per second: " << uint64_t(nodes / elapsed) << std::endl;
 
-        // Restore initial thread pool and hash
+        // Restore initial options, thread pool and hash
+        UCI::Options::UCI_Chess960 = Chess960;
         pool->resize(UCI::Options::Threads);
         ttable.resize(UCI::Options::Hash);
     }

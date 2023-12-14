@@ -11,10 +11,10 @@ BinaryBoard::BinaryBoard(const Board& board)
         pieces[i / 2] = (uint8_t(board.piece(i)) << 4) | uint8_t(board.piece(i + 1));
 
     uint8_t compressed_ep = board.ep_square() == SQUARE_NULL ? 0x8 : file(board.ep_square());
-    uint8_t castling = (board.castle_rights(WHITE, KINGSIDE)  << 0)
-                     + (board.castle_rights(WHITE, QUEENSIDE) << 1)
-                     + (board.castle_rights(BLACK, KINGSIDE)  << 2)
-                     + (board.castle_rights(BLACK, QUEENSIDE) << 3);
+    uint8_t castling = (board.castle_rights_side(WHITE, KINGSIDE)  << 0)
+                     + (board.castle_rights_side(WHITE, QUEENSIDE) << 1)
+                     + (board.castle_rights_side(BLACK, KINGSIDE)  << 2)
+                     + (board.castle_rights_side(BLACK, QUEENSIDE) << 3);
     
     other = (uint8_t(board.turn())            << 0)
           | (compressed_ep                    << 1)
