@@ -2,6 +2,7 @@
 #include "Position.hpp"
 #include "Thread.hpp"
 #include "UCI.hpp"
+#include "syzygy/syzygy.hpp"
 #include "data_gen/data_gen.hpp"
 #include "data_gen/fen_score.hpp"
 #include <string>
@@ -22,6 +23,8 @@ namespace GamePlayer
         int seed = 0;
         int accept_threshold = 300;
         bool shallow_depth_pruning = false;
+        std::string syzygy_path = "";
+        bool chess_960 = false;
 
         // Read passed parameters
         std::string token;
@@ -46,6 +49,10 @@ namespace GamePlayer
                 stream >> accept_threshold;
             else if (token == "shallow_depth_pruning")
                 shallow_depth_pruning = true;
+            else if (token == "syzygy_path")
+                stream >> syzygy_path;
+            else if (token == "chess_960")
+                chess_960 = true;
             else
             {
                 std::cout << "Unknown option " << token << std::endl;
@@ -54,6 +61,14 @@ namespace GamePlayer
 
         // Minimal sanity checks
         store_min_ply = std::max(1, store_min_ply);
+
+        // Load Syzygy tablebases
+        if (syzygy_path != "")
+            Syzygy::load(syzygy_path);
+
+        // Update Chess960 status
+        bool init_chess960 = UCI::Options::UCI_Chess960;
+        UCI::Options::UCI_Chess960 = chess_960;
 
         // Build list of FENs to use
         std::vector<std::string> fens;
@@ -168,8 +183,9 @@ namespace GamePlayer
         }
         std::cout << std::endl;
 
-        // Restore shallow depth pruning
+        // Restore options
         UCI::Options::ShallowDepthPruning = sdp;
+        UCI::Options::UCI_Chess960 = init_chess960;
     }
 
 

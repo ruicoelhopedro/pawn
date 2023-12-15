@@ -548,6 +548,15 @@ SearchResult Thread::simple_search(Position& pos, const Search::Limits& limits)
                                            : SCORE_DRAW,
                             MOVE_NULL);
 
+    // Probe tablebases and only select the top TB-scored moves
+    Syzygy::Root = Syzygy::RootPos(pos);
+    if (Syzygy::Root.in_tb())
+    {
+        m_root_moves.clear();
+        for (int idx = 0; idx < Syzygy::Root.num_preserving_moves(); idx++)
+            m_root_moves.push(Syzygy::Root.ordered_moves(idx));
+    }
+
     // Clear data
     Search::MultiPVData pv;
     m_nodes_searched.store(0);

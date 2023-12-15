@@ -12,24 +12,28 @@ def get_seed(filename):
 
 class DataGenerator:
 
-    def __init__(self, pawn_path, games_per_batch, depth, output_dir):
+    def __init__(self, pawn_path, games_per_batch, depth, output_dir, syzygy_path):
         self.n_games = 0
         self.n_batches = 0
         self.pawn_path = pawn_path
         self.games_per_batch = games_per_batch
         self.depth = depth
         self.output_dir = output_dir
+        self.syzygy_path = syzygy_path
 
     def report(self):
         sys.stdout.write(f'\r{self.n_games} games completed ({self.n_batches} batches)')
 
     def run_batch(self, seed):
         ofile = os.path.join(self.output_dir, f'output-{seed}.dat')
-        args = [self.pawn_path, 'play_games',
-                'runs_per_fen', str(self.games_per_batch),
-                'depth', str(self.depth),
-                'seed', str(seed),
-                'output_file', ofile]
+        args = [
+            self.pawn_path, 'play_games',
+            'runs_per_fen', str(self.games_per_batch),
+            'depth', str(self.depth),
+            'seed', str(seed),
+            'output_file', ofile,
+            'syzygy_path', self.syzygy_path,
+        ]
         result = subprocess.run(args, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         if result.returncode == 0:
             self.n_games += self.games_per_batch
@@ -37,9 +41,9 @@ class DataGenerator:
     
 
 
-def main(pawn_path, games_per_batch, depth, output_dir, num_threads, num_batches, init_seed):
+def main(pawn_path, games_per_batch, depth, output_dir, num_threads, num_batches, init_seed, syzygy_path):
     # Build command line generator
-    gen = DataGenerator(pawn_path, games_per_batch, depth, output_dir)
+    gen = DataGenerator(pawn_path, games_per_batch, depth, output_dir, syzygy_path)
     # Try to fetch last used seed from the output directory
     seeds = [get_seed(a) for a in os.listdir(output_dir) if a.startswith('output-') and a.endswith('.dat')]
     seed = max(seeds) + 1 if len(seeds) > 0 else init_seed
@@ -60,6 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_threads', default=1, type=int)
     parser.add_argument('--num_batches', default=10000, type=int)
     parser.add_argument('--init_seed', default=0, type=int)
+    parser.add_argument('--syzygy', default='/tmp/tablebases', type=str)
 
     args = parser.parse_args()
-    main(args.pawn_path, args.games_per_batch, args.depth, args.output_dir, args.num_threads, args.num_batches, args.init_seed)
+    main(args.pawn_path, args.games_per_batch, args.depth, args.output_dir, args.num_threads, args.num_batches, args.init_seed, args.syzygy)
