@@ -2,7 +2,7 @@
 #include "Types.hpp"
 
 
-#define NNUE_Default_File "nnue-11f0a62946d5.dat"
+#define NNUE_Default_File "nnue-a4d91d7e8e4c.dat"
 
 
 namespace NNUE
@@ -12,7 +12,7 @@ namespace NNUE
     using Feature = uint16_t;
     constexpr int16_t SCALE_FACTOR = 1024;
     constexpr std::size_t NUM_FEATURES = 20480;
-    constexpr std::size_t NUM_ACCUMULATORS = 128;
+    constexpr std::size_t NUM_ACCUMULATORS = 256;
     constexpr std::size_t NUM_MAX_ACTIVE_FEATURES = 30;
     constexpr std::size_t NUM_BUCKETS = 4;
 
