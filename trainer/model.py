@@ -6,7 +6,7 @@ from utils import map_features
 
 
 NUM_FEATURES = 20480
-NUM_ACCUMULATORS = 128
+NUM_ACCUMULATORS = 256
 NUM_BUCKETS = 4
 
 
