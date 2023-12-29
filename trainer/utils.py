@@ -34,10 +34,19 @@ def map_features(p, s, ks, t):
 def build_features(fen: str):
     board = chess.Board(fen)
     kings = [board.pieces(chess.KING, a).pop() for a in (chess.WHITE, chess.BLACK)]
-    features = [torch.zeros((1, 20480), dtype=torch.float32), torch.zeros((1, 20480), dtype=torch.float32)]
+    features = [[], []]
+    pieces = 0
     for p in (chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN):
-        features[0][:,[map_features(p,    s ,    kings[0] , chess.WHITE) for s in board.pieces(p, chess.WHITE)]] = 1
-        features[0][:,[map_features(p,    s ,    kings[0] , chess.BLACK) for s in board.pieces(p, chess.BLACK)]] = 1
-        features[1][:,[map_features(p, vm(s), vm(kings[1]), chess.WHITE) for s in board.pieces(p, chess.BLACK)]] = 1
-        features[1][:,[map_features(p, vm(s), vm(kings[1]), chess.BLACK) for s in board.pieces(p, chess.WHITE)]] = 1
-    return features
+        pieces += len(board.pieces(p, chess.WHITE)) + len(board.pieces(p, chess.BLACK))
+        features[0] += [map_features(p,    s ,    kings[0] , chess.WHITE) for s in board.pieces(p, chess.WHITE)]
+        features[0] += [map_features(p,    s ,    kings[0] , chess.BLACK) for s in board.pieces(p, chess.BLACK)]
+        features[1] += [map_features(p, vm(s), vm(kings[1]), chess.WHITE) for s in board.pieces(p, chess.BLACK)]
+        features[1] += [map_features(p, vm(s), vm(kings[1]), chess.BLACK) for s in board.pieces(p, chess.WHITE)]
+    return (
+        torch.LongTensor([0]),
+        torch.LongTensor(features[0]),
+        torch.LongTensor([0]),
+        torch.LongTensor(features[1]),
+        torch.LongTensor([(pieces - 1) // 8]),
+        torch.LongTensor([0 if board.turn == chess.WHITE else 1]),
+    )
