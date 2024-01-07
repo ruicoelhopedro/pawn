@@ -53,7 +53,6 @@ namespace Search
     {
         m_timer = timer;
         m_managed = true;
-        m_movetime_ms = movetime_ms;
         m_optimum = std::numeric_limits<double>::infinity();
         m_pondering.store(ponder);
         m_end_time.store(m_timer.begin() + std::chrono::milliseconds(movetime_ms));
@@ -63,7 +62,6 @@ namespace Search
     {
         m_timer = timer;
         m_managed = true;
-        m_movetime_ms = movetime_ms;
         m_optimum = optimum_ms / 1000.0;
         m_pondering.store(ponder);
         m_end_time.store(m_timer.begin() + std::chrono::milliseconds(movetime_ms));
@@ -72,8 +70,6 @@ namespace Search
     void SearchTime::ponderhit()
     {
         m_pondering.store(false);
-        if (m_managed)
-            m_end_time.store(std::chrono::steady_clock::now() + std::chrono::milliseconds(m_movetime_ms));
     }
 
     bool SearchTime::pondering() const

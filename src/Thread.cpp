@@ -504,6 +504,16 @@ void Thread::search()
         Move bestmove = *best_pv;
         Move pondermove = *(best_pv + 1);
 
+        // If we get no pondermove from the PV, use the TT to try to guess a move to ponder
+        if (pondermove == MOVE_NULL)
+        {
+            m_position.make_move(bestmove);
+            TranspositionEntry* entry = nullptr;
+            if (ttable.query(m_position.hash(), &entry) && m_position.board().legal(entry->hash_move()))
+                pondermove = entry->hash_move();
+            m_position.unmake_move();
+        }
+
         // Mandatory output to the GUI
         std::cout << "bestmove " << m_position.board().to_uci(bestmove);
         if (pondermove != MOVE_NULL)
