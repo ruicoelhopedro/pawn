@@ -229,12 +229,23 @@ namespace GamePlayer
         if (!file.is_open())
             return false;
 
+        // Fetch eof
+        file.seekg(0, std::ios_base::end);
+        auto eof = file.tellg();
+        file.seekg(0, std::ios_base::beg);
+
         BinaryGame game;
         std::size_t game_number = 0;
-        while(BinaryGame::read(file, game))
+        while(file.tellg() < eof)
         {
             game_number++;
             std::size_t move_number = 0;
+
+            if (!BinaryGame::read(file, game))
+            {
+                std::cerr << "Bad game " << game_number << std::endl;
+                return false;
+            }
 
             // Loop over all moves ensuring they are legal
             Board board(game.starting_pos);
@@ -262,13 +273,6 @@ namespace GamePlayer
                     return false;
                 }
             }
-        }
-
-        // Ensure the file at the end
-        if (!file.eof())
-        {
-            std::cerr << "Bad EOF" << std::endl;
-            return false;
         }
 
         return true;
