@@ -475,6 +475,9 @@ public:
     void generate_moves(MoveList& list, MoveGenType type) const;
 
 
+    Hash hash_after(Move move) const;
+
+
     inline void set_piece(PieceType piece, Turn turn, Square square)
     {
         m_pieces[piece][turn].set(square);
@@ -756,6 +759,9 @@ public:
 
 
     Move last_move(std::size_t offset = 0) const;
+
+
+    const Board& last_board() const;
 };
 
 

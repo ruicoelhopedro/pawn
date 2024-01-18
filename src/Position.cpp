@@ -404,6 +404,69 @@ Board Board::make_move(Move move) const
 }
 
 
+Hash Board::hash_after(Move move) const
+{
+    Hash result = hash() ^ Zobrist::get_black_move();
+
+    // Moved piece (and handle promotions)
+    PieceType piece = get_piece_at(move.from());
+    PieceType target_piece = move.is_promotion() ? move.promo_piece() : piece;
+    result ^= Zobrist::get_piece_turn_square(piece, turn(), move.from());
+    result ^= Zobrist::get_piece_turn_square(target_piece, turn(), move.to());
+
+    // Handle special moves
+    if (move.is_capture())
+    {
+        // Remove captured piece, if any
+        Square target = move.is_ep_capture() ? move.to() - (turn() == WHITE ? 8 : -8) : move.to();
+        PieceType captured = get_piece_at(target);
+        result ^= Zobrist::get_piece_turn_square(captured, ~turn(), target);
+
+        // Castling: check if any rook has been captured
+        if (captured == ROOK)
+            for (auto side : { KINGSIDE, QUEENSIDE })
+                if (castling_rights(side, ~turn()) && move.to() == get_rook_square(m_castling_rights[side][~turn()], ~turn()))
+                    result ^= Zobrist::get_castle_side_turn(side, ~turn());
+    }
+    else if (move.is_double_pawn_push())
+    {
+        // Update ep square
+        result ^= Zobrist::get_ep_file(file(move.to()));
+    }
+    else if (move.is_castle())
+    {
+        // Castling: update the hash of the rook
+        CastleSide side = file(move.to()) >= 4 ? KINGSIDE : QUEENSIDE;
+        Square iS = get_rook_square(m_castling_rights[side][turn()], turn());
+        Square iE = move.to() + (side == KINGSIDE ? -1 : +1);
+        result ^= Zobrist::get_piece_turn_square(ROOK, turn(), iS);
+        result ^= Zobrist::get_piece_turn_square(ROOK, turn(), iE);
+    }
+
+    // Reset castling rights after a king or rook move
+    if (piece == KING)
+    {
+        // Unset all castling rights after a king move
+        for (auto side : { KINGSIDE, QUEENSIDE })
+            if (castling_rights(side, turn()))
+                result ^= Zobrist::get_castle_side_turn(side, turn());
+    }
+    else if (piece == ROOK)
+    {
+        // Unset castling rights for a certain side if a rook moves
+        for (auto side : { KINGSIDE, QUEENSIDE })
+            if (castling_rights(side, turn()) && move.from() == get_rook_square(m_castling_rights[side][turn()], turn()))
+                result ^= Zobrist::get_castle_side_turn(side, turn());
+    }
+
+    // Reset previous en-passant hash
+    if (m_enpassant_square != SQUARE_NULL)
+        result ^= Zobrist::get_ep_file(file(m_enpassant_square));
+
+    return result;
+}
+
+
 bool Board::is_valid() const
 {
     // Side not to move in check?
@@ -912,6 +975,12 @@ bool Position::reduced() const
 Move Position::last_move(std::size_t offset) const
 {
     return m_moves.size() > offset ? m_moves[m_moves.size() - offset - 1].move : MOVE_NULL;
+}
+
+
+const Board& Position::last_board() const
+{
+    return m_boards[m_boards.size() - 2];
 }
 
 

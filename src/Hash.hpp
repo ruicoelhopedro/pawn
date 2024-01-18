@@ -189,6 +189,11 @@ public:
     {
         return m_full * 1000 / m_table.size();
     }
+
+    void prefetch(Hash hash)
+    {
+        __builtin_prefetch(&m_table[index(hash)]);
+    }
 };
 
 

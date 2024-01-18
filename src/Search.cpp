@@ -595,6 +595,8 @@ namespace Search
                 }
             }
 
+            ttable.prefetch(position.board().hash_after(move));
+
             // Make the move
             Score score = -SCORE_INFINITE;
             bool captureOrPromotion = move.is_capture() || move.is_promotion();
@@ -824,6 +826,8 @@ namespace Search
             // Only search captures with positive SEE
             if (!InCheck && position.board().see(move) < 0)
                 continue;
+
+            ttable.prefetch(position.board().hash_after(move));
 
             // PVS
             Score score;

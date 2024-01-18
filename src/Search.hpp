@@ -197,6 +197,10 @@ namespace Search
         int64_t n_nodes = 0;
         auto move_list = position.generate_moves(MoveGenType::LEGAL);
 
+        // Hash update
+        if (VALIDITY && position.last_move() != MOVE_NULL && position.last_board().hash_after(position.last_move()) != position.hash())
+            return 0;
+
         // Move counting
         if (USE_ORDER)
         {
