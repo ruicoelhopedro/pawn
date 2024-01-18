@@ -28,6 +28,16 @@ else
 	LDFLAGS += -pthread
 endif
 
+# If available, pass git tag information to the binary
+HAS_GIT := $(shell command -v git 2> /dev/null)
+ifdef HAS_GIT
+  IS_REPO := $(shell git rev-parse 2> /dev/null; if [ $$? -eq "0" ]; then echo true; fi)
+  ifdef IS_REPO
+    GIT_VERSION := $(shell git describe --dirty --tags)
+	CXXFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
+  endif
+endif
+
 SRC_FILES := $(shell find $(SRC_DIR) -name *.cpp) src/syzygy/Fathom/src/tbprobe.c
 OBJ_FILES := $(SRC_FILES:%.cpp=$(BUILD_DIR)/%.o)
 OBJ_FILES := $(OBJ_FILES:%.c=$(BUILD_DIR)/%.o)
