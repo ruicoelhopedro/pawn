@@ -29,7 +29,11 @@ def sigmoid_loss(output, scores, results, buckets):
     y = output.gather(1, buckets.view(-1, 1)).squeeze(-1)
     y_wdl = torch.sigmoid(SCALE_FACTOR / K * y)
     scores_wdl = (1 - mix) * torch.sigmoid(scores / K) + mix * results
-    return torch.mean(torch.pow(torch.abs(y_wdl - scores_wdl), 2.5))
+    loss = (
+        torch.abs(y_wdl - scores_wdl) +
+        0.1 * torch.abs(torch.sigmoid((y - scores) / K) - 0.5)
+    )
+    return torch.mean(torch.pow(loss, 2.5))
 
 
 class CReLU(nn.Module):
@@ -68,9 +72,9 @@ class NNUE(nn.Module):
         psqt = self.psqt(w_cols, w_offset) - self.psqt(b_cols, b_offset)
         white_acc = self.crelu(self.accumulator_emb(w_cols, w_offset) + self.accumulator_bias)
         black_acc = self.crelu(self.accumulator_emb(b_cols, b_offset) + self.accumulator_bias)
-        w_acc = torch.cat([white_acc, black_acc], dim=1)
-        b_acc = torch.cat([black_acc, white_acc], dim=1)
-        positional = self.layer(self.perspective(w_acc, b_acc, stms))
+        stm_acc = self.perspective(white_acc, black_acc, stms)
+        ntm_acc = self.perspective(black_acc, white_acc, stms)
+        positional = self.layer(torch.cat([stm_acc, ntm_acc], dim=1))
         return psqt + self.perspective(positional, -positional, stms)
 
 
