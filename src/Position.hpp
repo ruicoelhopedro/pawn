@@ -689,7 +689,6 @@ struct MoveInfo
 {
     Move move;
     bool extended;
-    bool reduced;
 };
 
 

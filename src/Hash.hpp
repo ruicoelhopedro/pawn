@@ -91,7 +91,7 @@ public:
     inline bool query(Age age, Hash hash, TranspositionEntry** entry)
     {
         *entry = this;
-        if (hash == this->hash())
+        if (!empty() && hash == this->hash())
         {
             // Bump up the age of this entry
             m_type = gen_type(age, type());
@@ -132,7 +132,6 @@ template<typename Entry>
 class HashTable
 {
     std::vector<Entry> m_table;
-    std::size_t m_full;
     Age m_age;
 
     static std::size_t size_from_mb(std::size_t mb)   { return mb * 1024 / sizeof(Entry) * 1024 + 1; }
@@ -147,7 +146,6 @@ public:
 
     HashTable(std::size_t size, bool size_in_mb = true)
         : m_table(size_in_mb ? size_from_mb(size) : size),
-          m_full(0),
           m_age(0)
     {}
 
@@ -160,14 +158,11 @@ public:
     template<typename... Args>
     void store(Hash hash, Args... args)
     {
-        auto& entry = m_table[index(hash)];
-        m_full += entry.empty();
-        entry.store(m_age, hash, args...);
+        m_table[index(hash)].store(m_age, hash, args...);
     }
 
     void clear()
     {
-        m_full = 0;
         m_age = 0;
         std::fill(m_table.begin(), m_table.end(), Entry());
     }
@@ -182,12 +177,14 @@ public:
     void resize(std::size_t size_mb)
     {
         m_table = std::vector<Entry>(size_from_mb(size_mb));
-        m_full = 0;
     }
 
     int hashfull() const
     {
-        return m_full * 1000 / m_table.size();
+        int count = 0;
+        for (int i = 0; i < 1000; i++)
+            count += !m_table[index(i)].empty();
+        return count;
     }
 
     void prefetch(Hash hash)

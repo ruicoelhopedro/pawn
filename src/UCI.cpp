@@ -147,23 +147,23 @@ namespace UCI
 
             // Switch on the received token
             if (token == "quit")
-                quit(stream);
+                quit();
             else if (token == "stop")
-                stop(stream);
+                stop();
             else if (token == "uci")
-                uci(stream);
+                uci();
             else if (token == "setoption")
                 setoption(stream);
             else if (token == "isready")
-                isready(stream);
+                isready();
             else if (token == "ucinewgame")
-                ucinewgame(stream);
+                ucinewgame();
             else if (token == "go")
                 go(stream);
             else if (token == "position")
                 position(stream);
             else if (token == "ponderhit")
-                ponderhit(stream);
+                ponderhit();
 
             // Non-UCI commands
             else if (token == "board")
@@ -209,7 +209,7 @@ namespace UCI
 
 
 
-    void uci(Stream& stream)
+    void uci()
     {
         std::cout << "id name " << VERSION << std::endl;
         std::cout << "id author ruicoelhopedro" << std::endl;
@@ -300,14 +300,14 @@ namespace UCI
 
 
 
-    void stop(Stream& stream)
+    void stop()
     {
         pool->stop();
     }
 
 
 
-    void quit(Stream& stream)
+    void quit()
     {
         pool->stop();
     }
@@ -352,14 +352,14 @@ namespace UCI
 
 
 
-    void ponderhit(Stream& stream)
+    void ponderhit()
     {
         pool->ponderhit();
     }
 
 
 
-    void ucinewgame(Stream& stream)
+    void ucinewgame()
     {
         ttable.clear();
         pool->clear();
@@ -367,7 +367,7 @@ namespace UCI
 
 
 
-    void isready(Stream& stream)
+    void isready()
     {
         // Mandatory readyok output when all set
         std::cout << "readyok" << std::endl;

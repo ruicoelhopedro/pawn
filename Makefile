@@ -5,11 +5,33 @@ SRC_DIR=src
 # Default arch
 ARCH = native
 
-# Compiler flags
-COMMON = -Wall -Isrc/syzygy/Fathom/src -O3 -flto -march=$(ARCH)
-CFLAGS = $(COMMON)
-CXXFLAGS = $(COMMON) -std=c++17
-LDFLAGS = -flto -march=$(ARCH)
+# Base compiler flags
+COMMON := -Wall -Isrc/syzygy/Fathom/src -march=$(ARCH)
+LDFLAGS := -march=$(ARCH)
+
+# Debug or release build
+# DEBUG=1: Build with debug symbols and no optimisations
+# DEBUG=2: Build with debug symbols and some optimisations
+# Anything else: Build with full optimisations
+ifeq ($(DEBUG), 1)
+	COMMON += -g
+else ifeq ($(DEBUG), 2)
+	COMMON += -g -O1 -fno-inline -fno-omit-frame-pointer
+else
+	COMMON += -O3 -flto
+	LDFLAGS += -flto
+endif
+
+# Sanitisers
+ifdef SANITIZE
+	COMMON += -fsanitize=$(SANITIZE)
+	LDFLAGS += -fsanitize=$(SANITIZE)
+endif
+
+# Update compiler flags
+# Fathom has warnings that are raised with -Wextra, so we ignore them for C files
+CFLAGS := $(COMMON)
+CXXFLAGS := $(COMMON) -std=c++17 -Wextra
 
 # Windows-specific stuff
 ifeq ($(OS), Windows_NT)

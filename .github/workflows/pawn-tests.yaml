@@ -79,9 +79,11 @@ jobs:
           msystem: ${{matrix.config.sys}}
           install: make git diffutils ${{matrix.config.packages}}
       - name: Fetch bench signature
-        run: "git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}' > bench.sig_ref"
+        run: |
+          git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}' > bench.sig_ref
       - name: Build pawn
-        run: "make"
+        run: |
+          make -j4
       - name: Run bench
         run: |
           build/pawn bench > bench.out 2>&1
@@ -90,7 +92,30 @@ jobs:
         run: |
           cat bench.out | grep 'Nodes searched:' | awk '{print $3}' > bench.sig
           cmp bench.sig bench.sig_ref
-      - name: Run tests
+      - name: Run bench - debug build
+        run: |
+          make -B -j4 DEBUG=1
+          build/pawn bench
+      - name: Run bench - AddressSanitizer
+        run: |
+          make -B -j4 DEBUG=2 SANITIZER=address
+          build/pawn bench
+      - name: Run bench - UndefinedBehaviorSanitizer
+        run: |
+          make -B -j4 DEBUG=2 SANITIZER=undefined
+          build/pawn bench
+      - name: Run bench - ThreadSanitizer
+        run: |
+          make -B -j4 DEBUG=2 SANITIZER=thread
+          TSAN_OPTIONS="suppressions=test/suppressions.tsan" build/pawn bench 13 4 16
+      - name: Run small bench - valgrind (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt update
+          sudo apt install valgrind
+          make -B -j4 DEBUG=2
+          valgrind --leak-check=full build/pawn bench 10
+      - name: Run internal tests
         run: |
           build/pawn test > test.out
           cat test.out
