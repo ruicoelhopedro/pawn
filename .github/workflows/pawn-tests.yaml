@@ -98,15 +98,15 @@ jobs:
           build/pawn bench
       - name: Run bench - AddressSanitizer
         run: |
-          make -B -j4 DEBUG=2 SANITIZER=address
+          make -B -j4 DEBUG=2 SANITIZE=address
           build/pawn bench
       - name: Run bench - UndefinedBehaviorSanitizer
         run: |
-          make -B -j4 DEBUG=2 SANITIZER=undefined
+          make -B -j4 DEBUG=2 SANITIZE=undefined
           build/pawn bench
       - name: Run bench - ThreadSanitizer
         run: |
-          make -B -j4 DEBUG=2 SANITIZER=thread
+          make -B -j4 DEBUG=2 SANITIZE=thread
           TSAN_OPTIONS="suppressions=test/suppressions.tsan" build/pawn bench 13 4 16
       - name: Run small bench - valgrind (Linux)
         if: runner.os == 'Linux'
