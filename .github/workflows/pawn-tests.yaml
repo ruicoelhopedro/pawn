@@ -92,6 +92,28 @@ jobs:
         run: |
           cat bench.out | grep 'Nodes searched:' | awk '{print $3}' > bench.sig
           cmp bench.sig bench.sig_ref
+      - name: Run tests
+        run: |
+          build/pawn test > test.out
+          cat test.out
+          grep -q 'All tests passed' test.out
+  sanitisers:
+    name: Sanitisers
+    runs-on: ubuntu-latest
+    env:
+      CC: gcc
+      CXX: g++
+      shell: bash
+    needs: build
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install valgrind
       - name: Run bench - debug build
         run: |
           make -B -j4 DEBUG=1
@@ -104,19 +126,13 @@ jobs:
         run: |
           make -B -j4 DEBUG=2 SANITIZE=undefined
           build/pawn bench
-      - name: Run bench - ThreadSanitizer
+      - name: Run small bench - ThreadSanitizer
         run: |
           make -B -j4 DEBUG=2 SANITIZE=thread
-          TSAN_OPTIONS="suppressions=test/suppressions.tsan" build/pawn bench 13 4 16
-      - name: Run small bench - valgrind (Linux)
-        if: runner.os == 'Linux'
+          TSAN_OPTIONS="suppressions=test/suppressions.tsan" build/pawn bench 11 4 64
+      - name: Run small bench - valgrind
         run: |
           sudo apt update
           sudo apt install valgrind
           make -B -j4 DEBUG=2
-          valgrind --leak-check=full build/pawn bench 10
-      - name: Run internal tests
-        run: |
-          build/pawn test > test.out
-          cat test.out
-          grep -q 'All tests passed' test.out
+          valgrind --leak-check=full build/pawn bench 11
