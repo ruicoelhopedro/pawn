@@ -85,13 +85,13 @@ class TranspositionEntry
 
 public:
     TranspositionEntry()
-        : m_type(gen_type(0, EntryType::EMPTY))
+        : m_hash(0), m_type(gen_type(0, EntryType::EMPTY))
     {}
 
     inline bool query(Age age, Hash hash, TranspositionEntry** entry)
     {
         *entry = this;
-        if (!empty() && hash == this->hash())
+        if (hash == this->hash())
         {
             // Bump up the age of this entry
             m_type = gen_type(age, type());
