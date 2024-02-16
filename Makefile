@@ -18,7 +18,7 @@ ifeq ($(DEBUG), 1)
 else ifeq ($(DEBUG), 2)
 	COMMON += -g -O1 -fno-inline -fno-omit-frame-pointer
 else
-	COMMON += -O3 -flto
+	COMMON += -O3 -DNDEBUG -flto
 	LDFLAGS += -flto
 endif
 
