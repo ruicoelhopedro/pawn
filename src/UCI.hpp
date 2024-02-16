@@ -100,14 +100,14 @@ namespace UCI
 
     void main_loop(std::string args);
     void setoption(Stream& stream);
-    void uci(Stream& stream);
+    void uci();
     void go(Stream& stream);
-    void stop(Stream& stream);
-    void quit(Stream& stream);
+    void stop();
+    void quit();
     void position(Stream& stream);
-    void ponderhit(Stream& stream);
-    void ucinewgame(Stream& stream);
-    void isready(Stream& stream);
+    void ponderhit();
+    void ucinewgame();
+    void isready();
 
     void bench(Stream& stream);
 
