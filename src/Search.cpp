@@ -511,7 +511,7 @@ namespace Search
         Move best_move = MOVE_NULL;
         Move quiet_list[NUM_MAX_MOVES];
         MoveList quiets_searched(quiet_list);
-        Move hash_move = (data.in_pv() && data.pv_move() != MOVE_NULL) ? data.pv_move() : tt_move;
+        Move hash_move = (RootSearch && data.pv_move() != MOVE_NULL) ? data.pv_move() : tt_move;
         MoveOrder orderer = MoveOrder(position, depth, hash_move, history);
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
