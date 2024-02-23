@@ -143,7 +143,7 @@ namespace Search
              :                                         BoundType::LOWER_BOUND; // Blessed loss
     }
 
-    void MultiPVData::write_pv(const Board& board, int index, uint64_t nodes, uint64_t tb_hits, double elapsed) const
+    void MultiPVData::write_pv(const Board& board, int index, int hashfull, uint64_t nodes, uint64_t tb_hits, double elapsed) const
     {
         // Don't write if PV line is incomplete
         if (search_bound == BoundType::NO_BOUND)
@@ -167,7 +167,7 @@ namespace Search
         // Nodes, nps, hashful and timing
         std::cout << " nodes "    << nodes;
         std::cout << " nps "      << static_cast<int>(nodes / elapsed);
-        std::cout << " hashfull " << ttable.hashfull();
+        std::cout << " hashfull " << hashfull;
         std::cout << " tbhits "   << tb_hits;
         std::cout << " time "     << std::max(1, static_cast<int>(elapsed * 1000));
 
@@ -344,6 +344,7 @@ namespace Search
         const Turn Turn = position.get_turn();
         const Depth Ply = data.ply();
         CurrentHistory history = data.histories.get(position);
+        TranspositionTable& ttable = data.thread().pool().tt();
 
         if (PvNode)
         {
@@ -740,6 +741,7 @@ namespace Search
         const bool InCheck = position.in_check();
         const Turn Turn = position.get_turn();
         const Depth Ply = data.ply();
+        TranspositionTable& ttable = data.thread().pool().tt();
 
         if (PvNode)
         {

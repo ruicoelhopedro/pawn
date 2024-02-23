@@ -7,6 +7,7 @@
 #include <string>
 #include <variant>
 #include "Move.hpp"
+#include "Thread.hpp"
 
 
 namespace UCI
@@ -77,6 +78,7 @@ namespace UCI
     };
 
 
+    extern std::unique_ptr<ThreadPool> pool;
     extern std::map<std::string, Option, OptionNameCompare> OptionsMap;
 
 
@@ -95,7 +97,7 @@ namespace UCI
     }
 
 
-    void init_options();
+    void init();
 
 
     void main_loop(std::string args);

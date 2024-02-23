@@ -156,11 +156,8 @@ namespace Tests
 
     void bench(Search::Limits limits, int threads, int hash)
     {
-        // Resize thread pool and hash
-        pool->resize(threads);
-        ttable.resize(hash);
-        pool->clear();
-        ttable.clear();
+        // Create a thread pool with the given options
+        ThreadPool pool(threads, hash);
 
         // Start master timer
         Search::Timer time;
@@ -171,7 +168,7 @@ namespace Tests
 
         // Loop over each position
         int i = 0;
-        Position& pos = pool->position();
+        Position& pos = pool.position();
         std::vector<std::string> fens = bench_suite();
         for (auto fen : fens)
         {
@@ -181,16 +178,16 @@ namespace Tests
             // Update position
             pos = Position(fen);
             pos.set_init_ply();
-            pool->update_position_threads();
+            pool.update_position_threads();
             std::cerr << "\nPosition " << (++i) << "/" << fens.size() << ": " << fen << std::endl;
 
             // Start searching and wait for completion
             Search::Timer pos_timer;
-            pool->search(pos_timer, limits);
-            pool->wait();
+            pool.search(pos_timer, limits);
+            pool.wait();
 
             // Update number of nodes
-            nodes += pool->nodes_searched();
+            nodes += pool.nodes_searched();
         }
 
         // Output bench stats
@@ -200,10 +197,8 @@ namespace Tests
         std::cerr << "Elapsed time (s): " << std::setw(7) << elapsed   << std::endl;
         std::cerr << "Nodes per second: " << uint64_t(nodes / elapsed) << std::endl;
 
-        // Restore initial options, thread pool and hash
+        // Restore initial options
         UCI::Options::UCI_Chess960 = Chess960;
-        pool->resize(UCI::Options::Threads);
-        ttable.resize(UCI::Options::Hash);
     }
 
 

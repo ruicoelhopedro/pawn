@@ -37,17 +37,13 @@ namespace Tests
     void bench(Search::Limits limits, int threads, int hash);
 
 
-    template<bool USE_ORDER, bool TT, bool LEGALITY, bool VALIDITY>
+    template<bool USE_ORDER, bool LEGALITY, bool VALIDITY>
     int perft_techniques_tests()
     {
         // Store initial state
         bool Chess960 = UCI::Options::UCI_Chess960;
 
         auto tests = test_suite();
-
-        // Allocate TT
-        if (TT)
-            perft_table.resize(16);
 
         int n_failed = 0;
         for (auto& test : tests)
@@ -59,7 +55,7 @@ namespace Tests
             auto hists = std::make_unique<Histories>();
             Depth depth = test.depth() - 1 - 2 * (LEGALITY || VALIDITY);
             auto result_base = Search::perft<false>(pos, depth, *hists);
-            auto result_test = Search::template perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(pos, depth, *hists);
+            auto result_test = Search::template perft<false, USE_ORDER, LEGALITY, VALIDITY>(pos, depth, *hists);
             if (result_base == result_test)
             {
                 std::cout << "[ OK ] " << test.fen() << " (" << result_test << ")" << std::endl;
@@ -70,10 +66,6 @@ namespace Tests
                 n_failed++;
             }
         }
-
-        // Deallocate TT
-        if (TT)
-            perft_table.resize(0);
 
         UCI::Options::UCI_Chess960 = Chess960;
         std::cout << "\nFailed/total tests: " << n_failed << "/" << tests.size() << std::endl;

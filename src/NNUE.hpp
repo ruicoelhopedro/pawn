@@ -35,7 +35,7 @@ namespace NNUE
 
         void clear();
 
-        Feature get_feature(PieceType p, Square s, Square ks, Turn pt, Turn kt) const;
+        static Feature get_feature(PieceType p, Square s, Square ks, Turn pt, Turn kt);
 
         void push(PieceType p, Square s, Square ks, Turn pt, Turn kt);
 
@@ -51,8 +51,6 @@ namespace NNUE
 
         bool operator!=(const Accumulator& other) const;
     };
-
-    extern const Net* nnue_net;
 
     void init();
 

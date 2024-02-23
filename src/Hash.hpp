@@ -193,6 +193,5 @@ public:
     }
 };
 
-
-extern HashTable<TranspositionEntry> ttable;
-extern HashTable<PerftEntry> perft_table;
+using TranspositionTable = HashTable<TranspositionEntry>;
+using PerftTable = HashTable<PerftEntry>;
