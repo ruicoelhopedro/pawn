@@ -38,7 +38,9 @@ Turn BinaryBoard::get_turn() const
 Square BinaryBoard::get_ep_square() const
 {
     uint8_t mask = (other >> 1) & 0b1111;
-    return (mask & 0x8) ? SQUARE_NULL : make_square((get_turn() == WHITE) ? 5 : 2, mask);
+    if (mask & 0x8)
+        return SQUARE_NULL;
+    return make_square((get_turn() == WHITE) ? 5 : 2, mask);
 }
 
 
