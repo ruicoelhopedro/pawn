@@ -135,4 +135,4 @@ jobs:
           sudo apt update
           sudo apt install valgrind
           make -B -j4 DEBUG=2
-          valgrind --leak-check=full build/pawn bench 11
+          valgrind --leak-check=full --error-exitcode=1 build/pawn bench 11
