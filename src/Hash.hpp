@@ -85,7 +85,8 @@ class TranspositionEntry
 
 public:
     TranspositionEntry()
-        : m_hash(0), m_type(gen_type(0, EntryType::EMPTY))
+        : m_hash(0), m_depth(0), m_type(gen_type(0, EntryType::EMPTY)),
+          m_score(SCORE_NONE), m_best_move(MOVE_NULL), m_static_eval(SCORE_NONE)
     {}
 
     inline bool query(Age age, Hash hash, TranspositionEntry** entry)
