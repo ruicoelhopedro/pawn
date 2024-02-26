@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Types.hpp"
 #include "Move.hpp"
 #include "Position.hpp"
@@ -91,6 +93,7 @@ public:
 class ThreadPool
 {
     Position m_position;
+    TranspositionTable m_tt;
     std::vector<std::unique_ptr<Thread>> m_threads;
 
     void send_signal(ThreadStatus signal);
@@ -102,7 +105,9 @@ protected:
     std::atomic<ThreadStatus> m_status;
 
 public:
-    ThreadPool();
+    ThreadPool(int n_threads, int hash_size_mb);
+
+    virtual ~ThreadPool();
 
     void resize(int n_threads);
 
@@ -139,7 +144,5 @@ public:
     Thread* get_best_thread() const;
 
     inline Thread& front() { return *(m_threads.front()); }
+    inline TranspositionTable& tt() { return m_tt; }
 };
-
-
-extern ThreadPool* pool;

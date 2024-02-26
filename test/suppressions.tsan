@@ -1,0 +1,10 @@
+race:TranspositionEntry::query
+race:TranspositionEntry::store
+race:TranspositionEntry::hash
+race:TranspositionEntry::depth
+race:TranspositionEntry::type
+race:TranspositionEntry::score
+race:TranspositionEntry::hash_move
+race:TranspositionEntry::static_eval
+race:HashTable<TranspositionEntry>::store
+race:HashTable<TranspositionEntry>::query

@@ -53,7 +53,6 @@ namespace Search
     {
         m_timer = timer;
         m_managed = true;
-        m_movetime_ms = movetime_ms;
         m_optimum = std::numeric_limits<double>::infinity();
         m_pondering.store(ponder);
         m_end_time.store(m_timer.begin() + std::chrono::milliseconds(movetime_ms));
@@ -63,7 +62,6 @@ namespace Search
     {
         m_timer = timer;
         m_managed = true;
-        m_movetime_ms = movetime_ms;
         m_optimum = optimum_ms / 1000.0;
         m_pondering.store(ponder);
         m_end_time.store(m_timer.begin() + std::chrono::milliseconds(movetime_ms));
@@ -72,8 +70,6 @@ namespace Search
     void SearchTime::ponderhit()
     {
         m_pondering.store(false);
-        if (m_managed)
-            m_end_time.store(std::chrono::steady_clock::now() + std::chrono::milliseconds(m_movetime_ms));
     }
 
     bool SearchTime::pondering() const
@@ -147,7 +143,7 @@ namespace Search
              :                                         BoundType::LOWER_BOUND; // Blessed loss
     }
 
-    void MultiPVData::write_pv(const Board& board, int index, uint64_t nodes, uint64_t tb_hits, double elapsed) const
+    void MultiPVData::write_pv(const Board& board, int index, int hashfull, uint64_t nodes, uint64_t tb_hits, double elapsed) const
     {
         // Don't write if PV line is incomplete
         if (search_bound == BoundType::NO_BOUND)
@@ -171,7 +167,7 @@ namespace Search
         // Nodes, nps, hashful and timing
         std::cout << " nodes "    << nodes;
         std::cout << " nps "      << static_cast<int>(nodes / elapsed);
-        std::cout << " hashfull " << ttable.hashfull();
+        std::cout << " hashfull " << hashfull;
         std::cout << " tbhits "   << tb_hits;
         std::cout << " time "     << std::max(1, static_cast<int>(elapsed * 1000));
 
@@ -348,6 +344,7 @@ namespace Search
         const Turn Turn = position.get_turn();
         const Depth Ply = data.ply();
         CurrentHistory history = data.histories.get(position);
+        TranspositionTable& ttable = data.thread().pool().tt();
 
         if (PvNode)
         {
@@ -515,7 +512,7 @@ namespace Search
         Move best_move = MOVE_NULL;
         Move quiet_list[NUM_MAX_MOVES];
         MoveList quiets_searched(quiet_list);
-        Move hash_move = (data.in_pv() && data.pv_move() != MOVE_NULL) ? data.pv_move() : tt_move;
+        Move hash_move = (RootSearch && data.pv_move() != MOVE_NULL) ? data.pv_move() : tt_move;
         MoveOrder orderer = MoveOrder(position, depth, hash_move, history);
         while ((move = orderer.next_move()) != MOVE_NULL)
         {
@@ -599,6 +596,8 @@ namespace Search
                     return singularBeta;
                 }
             }
+
+            ttable.prefetch(position.board().hash_after(move));
 
             // Make the move
             Score score = -SCORE_INFINITE;
@@ -743,6 +742,7 @@ namespace Search
         const bool InCheck = position.in_check();
         const Turn Turn = position.get_turn();
         const Depth Ply = data.ply();
+        TranspositionTable& ttable = data.thread().pool().tt();
 
         if (PvNode)
         {
@@ -829,6 +829,8 @@ namespace Search
             // Only search captures with positive SEE
             if (!InCheck && position.board().see(move) < 0)
                 continue;
+
+            ttable.prefetch(position.board().hash_after(move));
 
             // PVS
             Score score;

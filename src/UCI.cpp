@@ -21,9 +21,14 @@
 
 namespace UCI
 {
-    constexpr std::string_view VERSION = "pawn 2.0-dev";
+#ifdef GIT_VERSION
+    const std::string VERSION = "pawn " + std::string(GIT_VERSION);
+#else
+    const std::string VERSION = "pawn v3.0";
+#endif
 
 
+    std::unique_ptr<ThreadPool> pool;
     std::map<std::string, Option, OptionNameCompare> OptionsMap;
 
 
@@ -109,13 +114,21 @@ namespace UCI
 
 
 
-    void init_options()
+    void init()
     {
-        OptionsMap.emplace("Clear Hash",    Option(OnChange<>([]() { ttable.clear(); })));
-        OptionsMap.emplace("Hash",          Option(&Options::Hash, 16, 1, ttable.max_size(),
-                                                   [](int v) { ttable.resize(v); }));
+        // Default values
+        constexpr std::size_t n_threads = 1;
+        constexpr std::size_t hash_size = 16;
+
+        // Create thread pool
+        pool = std::make_unique<ThreadPool>(n_threads, hash_size);
+
+        // Initialise options
+        OptionsMap.emplace("Clear Hash",    Option(OnChange<>([]() { pool->tt().clear(); })));
+        OptionsMap.emplace("Hash",          Option(&Options::Hash, hash_size, 1, pool->tt().max_size(),
+                                                   [](int v) { pool->tt().resize(v); }));
         OptionsMap.emplace("MultiPV",       Option(&Options::MultiPV, 1, 1, 255));
-        OptionsMap.emplace("Threads",       Option(&Options::Threads, 1, 1, 512,
+        OptionsMap.emplace("Threads",       Option(&Options::Threads, n_threads, 1, 512,
                                                    [](int v) { pool->resize(v); }));
         OptionsMap.emplace("Move Overhead", Option(&Options::MoveOverhead, 0, 0, 5000));
         OptionsMap.emplace("Ponder",        Option(&Options::Ponder, false));
@@ -149,23 +162,23 @@ namespace UCI
 
             // Switch on the received token
             if (token == "quit")
-                quit(stream);
+                quit();
             else if (token == "stop")
-                stop(stream);
+                stop();
             else if (token == "uci")
-                uci(stream);
+                uci();
             else if (token == "setoption")
                 setoption(stream);
             else if (token == "isready")
-                isready(stream);
+                isready();
             else if (token == "ucinewgame")
-                ucinewgame(stream);
+                ucinewgame();
             else if (token == "go")
                 go(stream);
             else if (token == "position")
                 position(stream);
             else if (token == "ponderhit")
-                ponderhit(stream);
+                ponderhit();
 
             // Non-UCI commands
             else if (token == "board")
@@ -191,21 +204,17 @@ namespace UCI
             else if (token == "test")
             {
                 int t1 = Tests::perft_tests();
-                int t2 = Tests::perft_techniques_tests<false, true, false, false>();
-                int t3 = Tests::perft_techniques_tests<true, false, false, false>();
-                int t4 = Tests::perft_techniques_tests<true,  true, false, false>();
-                int t5 = Tests::perft_techniques_tests<false, false, true, false>();
-                int t6 = Tests::perft_techniques_tests<false, false, true,  true>();
+                int t2 = Tests::perft_techniques_tests<true, false, false>();
+                int t3 = Tests::perft_techniques_tests<false, true, false>();
+                int t4 = Tests::perft_techniques_tests<false, true,  true>();
 
                 std::cout << "\nTest summary" << std::endl;
                 std::cout << "  Perft:        " << t1 << " failed cases" << std::endl;
-                std::cout << "  TT:           " << t2 << " failed cases" << std::endl;
-                std::cout << "  Orderer:      " << t3 << " failed cases" << std::endl;
-                std::cout << "  TT + Orderer: " << t4 << " failed cases" << std::endl;
-                std::cout << "  Legality:     " << t5 << " failed cases" << std::endl;
-                std::cout << "  Validity:     " << t6 << " failed cases" << std::endl;
+                std::cout << "  Orderer:      " << t2 << " failed cases" << std::endl;
+                std::cout << "  Legality:     " << t3 << " failed cases" << std::endl;
+                std::cout << "  Validity:     " << t4 << " failed cases" << std::endl;
 
-                if (t1 + t2 + t3 + t4 + t5 + t6 == 0)
+                if (t1 + t2 + t3 + t4 == 0)
                     std::cout << "\nAll tests passed" << std::endl;
             }
 
@@ -225,7 +234,7 @@ namespace UCI
 
 
 
-    void uci(Stream& stream)
+    void uci()
     {
         std::cout << "id name " << VERSION << std::endl;
         std::cout << "id author ruicoelhopedro" << std::endl;
@@ -316,14 +325,14 @@ namespace UCI
 
 
 
-    void stop(Stream& stream)
+    void stop()
     {
         pool->stop();
     }
 
 
 
-    void quit(Stream& stream)
+    void quit()
     {
         pool->stop();
     }
@@ -368,22 +377,21 @@ namespace UCI
 
 
 
-    void ponderhit(Stream& stream)
+    void ponderhit()
     {
         pool->ponderhit();
     }
 
 
 
-    void ucinewgame(Stream& stream)
+    void ucinewgame()
     {
-        ttable.clear();
         pool->clear();
     }
 
 
 
-    void isready(Stream& stream)
+    void isready()
     {
         // Mandatory readyok output when all set
         std::cout << "readyok" << std::endl;

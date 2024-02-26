@@ -16,8 +16,7 @@ extern "C"
         Bitboards::init_bitboards();
         Zobrist::build_rnd_hashes();
         NNUE::init();
-        UCI::init_options();
-        pool = new ThreadPool();
+        UCI::init();
     }
 
 

@@ -2,7 +2,7 @@
 #include "Types.hpp"
 
 
-#define NNUE_Default_File "nnue-e04a4f84c87d.dat"
+#define NNUE_Default_File "nnue-605ba0a75039.dat"
 
 
 namespace NNUE
@@ -12,7 +12,7 @@ namespace NNUE
     using Feature = uint16_t;
     constexpr int16_t SCALE_FACTOR = 1024;
     constexpr std::size_t NUM_FEATURES = 20480;
-    constexpr std::size_t NUM_ACCUMULATORS = 128;
+    constexpr std::size_t NUM_ACCUMULATORS = 256;
     constexpr std::size_t NUM_MAX_ACTIVE_FEATURES = 30;
     constexpr std::size_t NUM_BUCKETS = 4;
 
@@ -35,7 +35,7 @@ namespace NNUE
 
         void clear();
 
-        Feature get_feature(PieceType p, Square s, Square ks, Turn pt, Turn kt) const;
+        static Feature get_feature(PieceType p, Square s, Square ks, Turn pt, Turn kt);
 
         void push(PieceType p, Square s, Square ks, Turn pt, Turn kt);
 
@@ -51,8 +51,6 @@ namespace NNUE
 
         bool operator!=(const Accumulator& other) const;
     };
-
-    extern const Net* nnue_net;
 
     void init();
 

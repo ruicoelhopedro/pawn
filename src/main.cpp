@@ -9,6 +9,7 @@
 #include "syzygy/syzygy.hpp"
 #include <chrono>
 #include <sstream>
+#include <memory>
 
 int main(int argc, char** argv)
 {
@@ -16,9 +17,7 @@ int main(int argc, char** argv)
     Zobrist::build_rnd_hashes();
     NNUE::init();
     Syzygy::init();
-    UCI::init_options();
-    ttable = HashTable<TranspositionEntry>(16);
-    pool = new ThreadPool();
+    UCI::init();
 
     // Handle passed arguments
     std::stringstream ss;
@@ -28,6 +27,5 @@ int main(int argc, char** argv)
 
     UCI::main_loop(ss.str());
 
-    pool->kill_threads();
     NNUE::clean();
 }

@@ -27,7 +27,6 @@ public:
 
     // Constructors
     constexpr Bitboard() : m_data(0) {}
-    constexpr Bitboard(const Bitboard&) = default;
     constexpr Bitboard(uint64_t data) : m_data(data) {}
 
 
@@ -398,7 +397,7 @@ namespace Bitboards
     extern Bitboard between_squares[NUM_SQUARES][NUM_SQUARES];
 
     template <PieceType PIECE_TYPE>
-    Bitboard get_attacks(Square square, Bitboard occupancy)
+    Bitboard get_attacks(Square square, [[maybe_unused]] Bitboard occupancy)
     {
         return pseudo_attacks[PIECE_TYPE][square];
     }

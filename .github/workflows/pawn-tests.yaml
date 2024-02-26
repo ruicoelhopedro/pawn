@@ -69,7 +69,7 @@ jobs:
         shell: ${{ matrix.config.shell }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Prepare Windows with MSYS2
@@ -79,9 +79,11 @@ jobs:
           msystem: ${{matrix.config.sys}}
           install: make git diffutils ${{matrix.config.packages}}
       - name: Fetch bench signature
-        run: "git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}' > bench.sig_ref"
+        run: |
+          git log HEAD | grep 'Bench: ' | head -n 1 | awk '{print $2}' > bench.sig_ref
       - name: Build pawn
-        run: "make"
+        run: |
+          make -j4
       - name: Run bench
         run: |
           build/pawn bench > bench.out 2>&1
@@ -95,3 +97,42 @@ jobs:
           build/pawn test > test.out
           cat test.out
           grep -q 'All tests passed' test.out
+  sanitisers:
+    name: Sanitisers
+    runs-on: ubuntu-latest
+    env:
+      CC: gcc
+      CXX: g++
+      shell: bash
+    needs: build
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install valgrind
+      - name: Run bench - debug build
+        run: |
+          make -B -j4 DEBUG=1
+          build/pawn bench
+      - name: Run bench - AddressSanitizer
+        run: |
+          make -B -j4 DEBUG=2 SANITIZE=address
+          build/pawn bench
+      - name: Run bench - UndefinedBehaviorSanitizer
+        run: |
+          make -B -j4 DEBUG=2 SANITIZE=undefined
+          build/pawn bench
+      - name: Run small bench - ThreadSanitizer
+        run: |
+          make -B -j4 DEBUG=2 SANITIZE=thread
+          TSAN_OPTIONS="suppressions=test/suppressions.tsan" build/pawn bench 11 4 64
+      - name: Run small bench - valgrind
+        run: |
+          sudo apt update
+          sudo apt install valgrind
+          make -B -j4 DEBUG=2
+          valgrind --leak-check=full --error-exitcode=1 build/pawn bench 11

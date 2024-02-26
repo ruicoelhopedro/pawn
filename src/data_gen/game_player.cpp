@@ -91,7 +91,8 @@ namespace GamePlayer
         // Prepare search data
         Search::Limits limits;
         limits.depth = depth;
-        Thread& thread = pool->front();
+        ThreadPool pool(1, 16);
+        Thread& thread = pool.front();
 
         // Store and reset shallow depth pruning
         bool sdp = UCI::Options::ShallowDepthPruning;
@@ -108,7 +109,7 @@ namespace GamePlayer
                 // Initialise position and clear search data
                 Position pos(fen);
                 pos.set_init_ply();
-                UCI::ucinewgame(stream);
+                UCI::ucinewgame();
 
                 // Position warmup stage: the initial position for the game is obtained by a
                 // mix of search-based and random moves from the list of given FEN positions

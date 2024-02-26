@@ -7,6 +7,7 @@
 #include <string>
 #include <variant>
 #include "Move.hpp"
+#include "Thread.hpp"
 
 
 namespace UCI
@@ -77,6 +78,7 @@ namespace UCI
     };
 
 
+    extern std::unique_ptr<ThreadPool> pool;
     extern std::map<std::string, Option, OptionNameCompare> OptionsMap;
 
 
@@ -96,19 +98,19 @@ namespace UCI
     }
 
 
-    void init_options();
+    void init();
 
 
     void main_loop(std::string args);
     void setoption(Stream& stream);
-    void uci(Stream& stream);
+    void uci();
     void go(Stream& stream);
-    void stop(Stream& stream);
-    void quit(Stream& stream);
+    void stop();
+    void quit();
     void position(Stream& stream);
-    void ponderhit(Stream& stream);
-    void ucinewgame(Stream& stream);
-    void isready(Stream& stream);
+    void ponderhit();
+    void ucinewgame();
+    void isready();
 
     void bench(Stream& stream);
     void gen_data_psqt(Stream& stream);

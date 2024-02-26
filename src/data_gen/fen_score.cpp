@@ -25,7 +25,7 @@ namespace FEN_Scores
     }
 
 
-    void FENFileFormat::write(const Position& pos, const std::string& fen,  Score s)
+    void FENFileFormat::write([[maybe_unused]] const Position& pos, const std::string& fen,  Score s)
     {
         file << fen << " " << s << "\n";
     }
@@ -51,7 +51,7 @@ namespace FEN_Scores
     }
 
 
-    void BinaryFileFormat::write(const Position& pos, const std::string& fen, Score s)
+    void BinaryFileFormat::write(const Position& pos, [[maybe_unused]] const std::string& fen, Score s)
     {
         BinaryBoard bb(pos.board());
         file.write(reinterpret_cast<const char*>(&bb), sizeof(BinaryBoard));
@@ -59,7 +59,7 @@ namespace FEN_Scores
     }
 
 
-    void BinaryFileFormat::write(const Position& pos, const std::string& fen, Move m, Score s)
+    void BinaryFileFormat::write(const Position& pos, [[maybe_unused]] const std::string& fen, Move m, Score s)
     {
         BinaryBoard bb(pos.board());
         file.write(reinterpret_cast<const char*>(&bb), sizeof(BinaryBoard));
@@ -92,9 +92,10 @@ namespace FEN_Scores
         // Read book
         auto fens = read_fens(file_name);
 
-        // Initialise limits
+        // Initialise limits and threads
         Search::Limits limits;
         limits.depth = depth;
+        ThreadPool pool(1, 16);
 
         // Disable shallow depth pruning
         bool sdp = UCI::Options::ShallowDepthPruning;
@@ -104,11 +105,11 @@ namespace FEN_Scores
         for (auto fen : fens)
         {
             // Clear data
-            UCI::ucinewgame(stream);
+            UCI::ucinewgame();
             
             // Search the position
             Position pos(fen);
-            SearchResult result = pool->front().simple_search(pos, limits);
+            SearchResult result = pool.front().simple_search(pos, limits);
 
             // Parse output
             Move m = result.bestmove;

@@ -5,16 +5,40 @@ SRC_DIR=src
 # Default arch
 ARCH = native
 
-# Compiler flags
-COMMON = -Wall -Isrc/syzygy/Fathom/src -O3 -flto -march=$(ARCH) -Isrc
-LDFLAGS = -flto -march=$(ARCH)
+# Base compiler flags
+COMMON := -Wall -Isrc/syzygy/Fathom/src -Isrc -march=$(ARCH)
+LDFLAGS := -march=$(ARCH)
+
+# Debug or release build
+# DEBUG=1: Build with debug symbols and no optimisations
+# DEBUG=2: Build with debug symbols and some optimisations
+# Anything else: Build with full optimisations
+ifeq ($(DEBUG), 1)
+	COMMON += -g
+else ifeq ($(DEBUG), 2)
+	COMMON += -g -O1 -fno-inline -fno-omit-frame-pointer
+else
+	COMMON += -O3 -flto
+	LDFLAGS += -flto
+endif
+
+# Sanitisers
+ifdef SANITIZE
+	COMMON += -fsanitize=$(SANITIZE)
+	LDFLAGS += -fsanitize=$(SANITIZE)
+endif
+
+# Library build
 ifeq ($(findstring library, $(MAKECMDGOALS)), library)
 	COMMON += -fPIC -g
     LDFLAGS += -fPIC -shared
 	BIN_NAME=pawn.so
 endif
-CFLAGS = $(COMMON)
-CXXFLAGS = $(COMMON) -std=c++17
+
+# Update compiler flags
+# Fathom has warnings that are raised with -Wextra, so we ignore them for C files
+CFLAGS := $(COMMON)
+CXXFLAGS := $(COMMON) -std=c++17 -Wextra
 
 # Windows-specific stuff
 ifeq ($(OS), Windows_NT)
@@ -31,6 +55,16 @@ ifeq ($(OS), Windows_NT)
 	endif
 else
 	LDFLAGS += -pthread
+endif
+
+# If available, pass git tag information to the binary
+HAS_GIT := $(shell command -v git 2> /dev/null)
+ifdef HAS_GIT
+  IS_REPO := $(shell git rev-parse 2> /dev/null; if [ $$? -eq "0" ]; then echo true; fi)
+  ifdef IS_REPO
+    GIT_VERSION := $(shell git describe --dirty --tags)
+	CXXFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
+  endif
 endif
 
 SRC_FILES := $(shell find $(SRC_DIR) -name *.cpp) src/syzygy/Fathom/src/tbprobe.c

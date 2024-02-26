@@ -487,6 +487,9 @@ public:
     void generate_moves(MoveList& list, MoveGenType type) const;
 
 
+    Hash hash_after(Move move) const;
+
+
     inline void set_piece(PieceType piece, Turn turn, Square square)
     {
         m_pieces[piece][turn].set(square);
@@ -721,7 +724,6 @@ struct MoveInfo
 {
     Move move;
     bool extended;
-    bool reduced;
 };
 
 
@@ -794,6 +796,9 @@ public:
 
 
     inline int game_ply() const { return m_boards.size(); }
+
+
+    const Board& last_board() const;
 };
 
 

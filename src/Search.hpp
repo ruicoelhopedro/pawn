@@ -70,7 +70,6 @@ namespace Search
         Timer m_timer;
         bool m_managed;
         double m_optimum;
-        uint64_t m_movetime_ms;
         std::atomic_bool m_pondering;
         std::atomic<std::chrono::steady_clock::time_point> m_end_time;
 
@@ -117,7 +116,7 @@ namespace Search
 
         Score score() const;
         BoundType bound() const;
-        void write_pv(const Board& board, int index, uint64_t nodes, uint64_t tb_hits, double elapsed) const;
+        void write_pv(const Board& board, int index, int hashfull, uint64_t nodes, uint64_t tb_hits, double elapsed) const;
     };
 
 
@@ -186,17 +185,16 @@ namespace Search
     bool legality_tests(Position& position, MoveList& move_list);
 
 
-    template<bool OUTPUT, bool USE_ORDER = false, bool TT = false, bool LEGALITY = false, bool VALIDITY = false>
+    template<bool OUTPUT, bool USE_ORDER = false, bool LEGALITY = false, bool VALIDITY = false>
     int64_t perft(Position& position, Depth depth, Histories& hists)
     {
-        // TT lookup
-        PerftEntry* entry = nullptr;
-        if (TT && perft_table.query(position.hash(), &entry) && entry->depth() == depth)
-            return entry->n_nodes();
-
         // Move generation
         int64_t n_nodes = 0;
         auto move_list = position.generate_moves(MoveGenType::LEGAL);
+
+        // Hash update
+        if (VALIDITY && position.last_move() != MOVE_NULL && position.last_board().hash_after(position.last_move()) != position.hash())
+            return 0;
 
         // Move counting
         if (USE_ORDER)
@@ -217,7 +215,7 @@ namespace Search
                 if (depth > 1)
                 {
                     position.make_move(move);
-                    count = perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(position, depth - 1, hists);
+                    count = perft<false, USE_ORDER, LEGALITY, VALIDITY>(position, depth - 1, hists);
                     position.unmake_move();
                 }
                 n_nodes += count;
@@ -241,7 +239,7 @@ namespace Search
                         return 0;
 
                     position.make_move(move);
-                    count = perft<false, USE_ORDER, TT, LEGALITY, VALIDITY>(position, depth - 1, hists);
+                    count = perft<false, USE_ORDER, LEGALITY, VALIDITY>(position, depth - 1, hists);
                     position.unmake_move();
 
                     n_nodes += count;
@@ -258,10 +256,6 @@ namespace Search
                         std::cout << position.board().to_uci(move) << ": " << 1 << std::endl;
             }
         }
-
-        // TT storing
-        if (TT)
-            perft_table.store(position.hash(), depth, n_nodes);
 
         return n_nodes;
     }

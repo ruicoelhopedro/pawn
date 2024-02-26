@@ -15,8 +15,6 @@
 #include <condition_variable>
 
 
-ThreadPool* pool;
-
 
 Thread::Thread(int id, ThreadPool& pool)
     : m_id(id),
@@ -83,13 +81,14 @@ bool Thread::is_root_move(Move move) const
 
 void Thread::output_pvs()
 {
+    int hashfull = m_pool.tt().hashfull();
     double elapsed = m_pool.m_time.elapsed();
     uint64_t nodes = m_pool.nodes_searched();
     uint64_t tb_hits = m_pool.tb_hits();
 
     // Output information
     for (int iPV = 0; iPV < UCI::Options::MultiPV; iPV++)
-        m_multiPV[iPV].write_pv(m_position.board(), iPV, nodes, tb_hits, elapsed);
+        m_multiPV[iPV].write_pv(m_position.board(), iPV, hashfull, nodes, tb_hits, elapsed);
 }
 
 
@@ -105,11 +104,19 @@ void Thread::tb_hit() { m_tb_hits.fetch_add(1, std::memory_order_relaxed); }
 
 
 
-ThreadPool::ThreadPool()
-    : m_threads(0),
+ThreadPool::ThreadPool(int n_threads, int hash_size_mb)
+    : m_tt(hash_size_mb),
+      m_threads(0),
       m_status(ThreadStatus::WAITING)
 {
-    m_threads.push_back(std::make_unique<Thread>(0, *this));
+    for (int i = 0; i < n_threads; i++)
+        m_threads.push_back(std::make_unique<Thread>(i, *this));
+}
+
+
+ThreadPool::~ThreadPool()
+{
+    kill_threads();
 }
 
 
@@ -157,7 +164,7 @@ void ThreadPool::search(const Search::Timer& timer, const Search::Limits& limits
     this->wait();
 
     // Set the search data before waking the threads
-    ttable.new_search();
+    m_tt.new_search();
     m_status = ThreadStatus::SEARCHING;
     m_limits = limits;
 
@@ -199,6 +206,7 @@ void ThreadPool::wait(Thread* skip)
 
 void ThreadPool::clear()
 {
+    m_tt.clear();
     for (auto& thread : m_threads)
         thread->clear();
 }
@@ -513,6 +521,16 @@ void Thread::search()
         Move* best_pv = best_thread->m_multiPV.front().pv;
         Move bestmove = *best_pv;
         Move pondermove = *(best_pv + 1);
+
+        // If we get no pondermove from the PV, use the TT to try to guess a move to ponder
+        if (pondermove == MOVE_NULL)
+        {
+            m_position.make_move(bestmove);
+            TranspositionEntry* entry = nullptr;
+            if (m_pool.tt().query(m_position.hash(), &entry) && m_position.board().legal(entry->hash_move()))
+                pondermove = entry->hash_move();
+            m_position.unmake_move();
+        }
 
         // Mandatory output to the GUI
         std::cout << "bestmove " << m_position.board().to_uci(bestmove);
