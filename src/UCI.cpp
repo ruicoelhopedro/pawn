@@ -24,6 +24,7 @@ namespace UCI
 #endif
 
 
+    std::unique_ptr<ThreadPool> pool;
     std::map<std::string, Option, OptionNameCompare> OptionsMap;
 
 
@@ -108,13 +109,21 @@ namespace UCI
 
 
 
-    void init_options()
+    void init()
     {
-        OptionsMap.emplace("Clear Hash",    Option(OnChange<>([]() { ttable.clear(); })));
-        OptionsMap.emplace("Hash",          Option(&Options::Hash, 16, 1, ttable.max_size(),
-                                                   [](int v) { ttable.resize(v); }));
+        // Default values
+        constexpr std::size_t n_threads = 1;
+        constexpr std::size_t hash_size = 16;
+
+        // Create thread pool
+        pool = std::make_unique<ThreadPool>(n_threads, hash_size);
+
+        // Initialise options
+        OptionsMap.emplace("Clear Hash",    Option(OnChange<>([]() { pool->tt().clear(); })));
+        OptionsMap.emplace("Hash",          Option(&Options::Hash, hash_size, 1, pool->tt().max_size(),
+                                                   [](int v) { pool->tt().resize(v); }));
         OptionsMap.emplace("MultiPV",       Option(&Options::MultiPV, 1, 1, 255));
-        OptionsMap.emplace("Threads",       Option(&Options::Threads, 1, 1, 512,
+        OptionsMap.emplace("Threads",       Option(&Options::Threads, n_threads, 1, 512,
                                                    [](int v) { pool->resize(v); }));
         OptionsMap.emplace("Move Overhead", Option(&Options::MoveOverhead, 0, 0, 5000));
         OptionsMap.emplace("Ponder",        Option(&Options::Ponder, false));
@@ -175,21 +184,17 @@ namespace UCI
             else if (token == "test")
             {
                 int t1 = Tests::perft_tests();
-                int t2 = Tests::perft_techniques_tests<false, true, false, false>();
-                int t3 = Tests::perft_techniques_tests<true, false, false, false>();
-                int t4 = Tests::perft_techniques_tests<true,  true, false, false>();
-                int t5 = Tests::perft_techniques_tests<false, false, true, false>();
-                int t6 = Tests::perft_techniques_tests<false, false, true,  true>();
+                int t2 = Tests::perft_techniques_tests<true, false, false>();
+                int t3 = Tests::perft_techniques_tests<false, true, false>();
+                int t4 = Tests::perft_techniques_tests<false, true,  true>();
 
                 std::cout << "\nTest summary" << std::endl;
                 std::cout << "  Perft:        " << t1 << " failed cases" << std::endl;
-                std::cout << "  TT:           " << t2 << " failed cases" << std::endl;
-                std::cout << "  Orderer:      " << t3 << " failed cases" << std::endl;
-                std::cout << "  TT + Orderer: " << t4 << " failed cases" << std::endl;
-                std::cout << "  Legality:     " << t5 << " failed cases" << std::endl;
-                std::cout << "  Validity:     " << t6 << " failed cases" << std::endl;
+                std::cout << "  Orderer:      " << t2 << " failed cases" << std::endl;
+                std::cout << "  Legality:     " << t3 << " failed cases" << std::endl;
+                std::cout << "  Validity:     " << t4 << " failed cases" << std::endl;
 
-                if (t1 + t2 + t3 + t4 + t5 + t6 == 0)
+                if (t1 + t2 + t3 + t4 == 0)
                     std::cout << "\nAll tests passed" << std::endl;
             }
 
@@ -361,7 +366,6 @@ namespace UCI
 
     void ucinewgame()
     {
-        ttable.clear();
         pool->clear();
     }
 

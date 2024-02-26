@@ -67,7 +67,7 @@ namespace NNUE
 
     
 
-    Feature Accumulator::get_feature(PieceType p, Square s, Square ks, Turn pt, Turn kt) const
+    Feature Accumulator::get_feature(PieceType p, Square s, Square ks, Turn pt, Turn kt)
     {
         // Vertical mirror for black kings
         if (kt == BLACK)
