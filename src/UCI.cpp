@@ -197,6 +197,8 @@ namespace UCI
                 GamePlayer::games_to_epd(stream);
             else if (token == "check_data")
                 GamePlayer::check_games(stream);
+            else if (token == "repair_data")
+                GamePlayer::repair_games(stream);
             else if (token == "score_texel")
                 Texel::score_texel(stream);
             else if (token == "score_eval_error")

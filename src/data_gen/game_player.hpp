@@ -15,5 +15,7 @@ namespace GamePlayer
 
     void check_games(std::istringstream& stream);
 
+    void repair_games(std::istringstream& stream);
+
     bool file_valid(std::string filename);
 }

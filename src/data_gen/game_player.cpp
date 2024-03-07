@@ -5,6 +5,8 @@
 #include "syzygy/syzygy.hpp"
 #include "data_gen/data_gen.hpp"
 #include "data_gen/fen_score.hpp"
+#include <mutex>
+#include <thread>
 #include <string>
 
 
@@ -21,6 +23,8 @@ namespace GamePlayer
         int random_probability = 100;
         int store_min_ply = 15;
         int seed = 0;
+        int threads = 1;
+        int hash = 1;
         int accept_threshold = 300;
         bool shallow_depth_pruning = false;
         std::string syzygy_path = "";
@@ -45,6 +49,10 @@ namespace GamePlayer
                 stream >> store_min_ply;
             else if (token == "seed")
                 stream >> seed;
+            else if (token == "threads")
+                stream >> threads;
+            else if (token == "hash")
+                stream >> hash;
             else if (token == "accept_threshold")
                 stream >> accept_threshold;
             else if (token == "shallow_depth_pruning")
@@ -77,111 +85,129 @@ namespace GamePlayer
         else
             fens = read_fens(book);
 
-        // Init PRNG
-        PseudoRandom random(seed);
-
         // Open output file
         std::ofstream output(output_file);
         assert(output.is_open() && "Failed to open output file!");
 
-        // Current and total number of games to run
+        // Current number of games
         std::size_t n_games_completed = 0;
-        std::size_t n_total_games = fens.size() * runs_per_fen;
 
         // Prepare search data
         Search::Limits limits;
         limits.depth = depth;
-        ThreadPool pool(1, 16);
-        Thread& thread = pool.front();
+        std::mutex output_mutex;
 
         // Store and reset shallow depth pruning
         bool sdp = UCI::Options::ShallowDepthPruning;
         UCI::Options::ShallowDepthPruning = shallow_depth_pruning;
 
-        // Loop over each FEN
-        for (std::size_t i_fen = 0; i_fen < fens.size(); i_fen++)
+        auto thread_loop = [=, &output_mutex, &output, &n_games_completed](std::size_t id)
         {
-            const std::string& fen = fens[i_fen];
+            // Init PRNG
+            PseudoRandom random(seed + id);
 
-            // Runs loop
-            for (std::size_t i_run = 0; i_run < runs_per_fen; i_run++)
+            // Prepare search thread
+            ThreadPool pool(1, hash);
+            Thread& thread = pool.front();
+
+            // Loop over each FEN
+            for (std::size_t i_fen = 0; i_fen < fens.size(); i_fen++)
             {
-                // Initialise position and clear search data
-                Position pos(fen);
-                pos.set_init_ply();
-                UCI::ucinewgame();
+                const std::string& fen = fens[i_fen];
 
-                // Position warmup stage: the initial position for the game is obtained by a
-                // mix of search-based and random moves from the list of given FEN positions
-                bool valid_game = true;
-                for (int ply = 0; ply < store_min_ply; ply++)
+                // Runs loop
+                for (std::size_t i_run = 0; i_run < runs_per_fen; i_run++)
                 {
-                    // Search or pick a random move?
-                    Move move;
-                    int ply_factor = random_probability * ply * ply
-                                   / (store_min_ply * store_min_ply + 1);
-                    if (int(random.next(100)) < random_probability - ply_factor)
-                    {
-                        // Random mover: generate legal moves for this position
-                        Move moves[NUM_MAX_MOVES];
-                        MoveList move_list(moves);
-                        pos.board().generate_moves(move_list, MoveGenType::LEGAL);
-
-                        // Pick a move
-                        int num_moves = move_list.length();
-                        move = num_moves > 0 ? moves[random.next(num_moves)] : MOVE_NULL;
-                    }
-                    else
-                    {
-                        // Search-based: pick the bestmove for this position
-                        move = thread.simple_search(pos, limits).bestmove;
-                    }
-
-                    // Check if the game ended
-                    valid_game = move != MOVE_NULL;
-                    if (!valid_game)
-                        break;
-
-                    // Prepare next iteration
-                    pos.make_move(move);
+                    // Initialise position and clear search data
+                    Position pos(fen);
                     pos.set_init_ply();
+                    pool.clear();
+
+                    // Position warmup stage: the initial position for the game is obtained by a
+                    // mix of search-based and random moves from the list of given FEN positions
+                    bool valid_game = true;
+                    for (int ply = 0; ply < store_min_ply; ply++)
+                    {
+                        // Search or pick a random move?
+                        Move move;
+                        int ply_factor = random_probability * ply * ply
+                                    / (store_min_ply * store_min_ply + 1);
+                        if (int(random.next(100)) < random_probability - ply_factor)
+                        {
+                            // Random mover: generate legal moves for this position
+                            Move moves[NUM_MAX_MOVES];
+                            MoveList move_list(moves);
+                            pos.board().generate_moves(move_list, MoveGenType::LEGAL);
+
+                            // Pick a move
+                            int num_moves = move_list.length();
+                            move = num_moves > 0 ? moves[random.next(num_moves)] : MOVE_NULL;
+                        }
+                        else
+                        {
+                            // Search-based: pick the bestmove for this position
+                            move = thread.simple_search(pos, limits, threads > 1).bestmove;
+                        }
+
+                        // Check if the game ended
+                        valid_game = move != MOVE_NULL;
+                        if (!valid_game)
+                            break;
+
+                        // Prepare next iteration
+                        pos.make_move(move);
+                        pos.set_init_ply();
+                    }
+
+                    // Is the reached position usable?
+                    SearchResult result = thread.simple_search(pos, limits, threads > 1);
+                    if (!valid_game || result.bestmove == MOVE_NULL)
+                        continue;
+
+                    // Determine if we keep using this position or discard it based on the score
+                    int prob = 50 * (1 + accept_threshold) / (1 + abs(result.score));
+                    if (int(random.next(100)) > prob)
+                        continue;
+
+                    // Register a new game
+                    BinaryGame game;
+                    game.begin(pos.board());
+
+                    // Game loop
+                    while (result.bestmove != MOVE_NULL)
+                    {
+                        game.push(result.bestmove, result.score);
+                        pos.make_move(result.bestmove);
+                        pos.set_init_ply();
+                        result = thread.simple_search(pos, limits, threads > 1);
+                    }
+
+                    // Add termination node
+                    game.push(MOVE_NULL, result.score > 0 ? WHITE_COLOR : result.score < 0 ? BLACK_COLOR : NO_COLOR);
+
+                    // IO operations in a thread-safe manner
+                    {
+                        std::scoped_lock lock(output_mutex);
+
+                        // Game is completed, write to the output file
+                        game.write(output);
+
+                        // Report progress
+                        n_games_completed++;
+                        std::cout << "\rGames: " << n_games_completed << std::flush;
+                    }
                 }
-
-                // Is the reached position usable?
-                SearchResult result = thread.simple_search(pos, limits);
-                if (!valid_game || result.bestmove == MOVE_NULL)
-                    continue;
-
-                // Determine if we keep using this position or discard it based on the score
-                int prob = 50 * (1 + accept_threshold) / (1 + abs(result.score));
-                if (int(random.next(100)) > prob)
-                    continue;
-
-                // Register a new game
-                BinaryGame game;
-                game.begin(pos.board());
-
-                // Game loop
-                while (result.bestmove != MOVE_NULL)
-                {
-                    game.push(result.bestmove, result.score);
-                    pos.make_move(result.bestmove);
-                    pos.set_init_ply();
-                    result = thread.simple_search(pos, limits);
-                }
-
-                // Game is completed, write to the output file
-                game.write(output);
-
-                // Report progress
-                n_games_completed++;
-                std::cout << "\r"
-                          << "Games: " << n_games_completed << "/" << n_total_games << " "
-                          << "FENs: "  << (i_fen + 1) << "/" << fens.size()         << " "
-                          << "Runs: "  << (i_run + 1) << "/" << runs_per_fen
-                          << std::flush;
             }
-        }
+        };
+
+        // Start threads
+        std::vector<std::thread> threads_list;
+        for (int i = 0; i < threads; i++)
+            threads_list.push_back(std::thread(thread_loop, i));
+        
+        // Wait for threads to finish
+        for (std::thread& t : threads_list)
+            t.join();
         std::cout << std::endl;
 
         // Restore options
@@ -224,11 +250,14 @@ namespace GamePlayer
     }
 
 
-    bool file_valid(std::string filename)
+    bool file_valid(std::string filename, bool stats)
     {
         std::ifstream file(filename);
         if (!file.is_open())
+        {
+            std::cerr << "Failed to open file" << std::endl;
             return false;
+        }
 
         // Fetch eof
         file.seekg(0, std::ios_base::end);
@@ -237,6 +266,14 @@ namespace GamePlayer
 
         BinaryGame game;
         std::size_t game_number = 0;
+        std::size_t move_number_total = 0;
+        int64_t score_sum = 0;
+        int64_t init_score_sum = 0;
+        std::size_t abs_score_sum = 0;
+        std::size_t abs_init_score_sum = 0;
+        std::size_t draws = 0;
+        std::size_t results = 0;
+        std::size_t king_squares[NUM_SQUARES] = {0};
         while(file.tellg() < eof)
         {
             game_number++;
@@ -248,13 +285,31 @@ namespace GamePlayer
                 return false;
             }
 
-            // Loop over all moves ensuring they are legal
+            // Stats
+            init_score_sum += game.nodes.front().score;
+            abs_init_score_sum += abs(game.nodes.front().score);
+            results += game.nodes.back().score + 1;
+            if (game.nodes.back().score == 0)
+                draws++;
+
+            // Invalid initial position
             Board board(game.starting_pos);
+            if (!board.valid())
+            {
+                std::cerr << "Game " << game_number << ": Invalid initial position " << std::endl;
+                return false;
+            }
+
+            // Loop over all moves ensuring they are legal
             for (BinaryNode node : game.nodes)
             {
                 move_number++;
                 if (node.move != MOVE_NULL)
                 {
+                    score_sum += node.score;
+                    abs_score_sum += abs(node.score);
+                    king_squares[board.get_pieces(WHITE, KING).bitscan_forward()]++;
+                    king_squares[vertical_mirror(board.get_pieces(BLACK, KING).bitscan_forward())]++;
                     if(!board.legal(node.move))
                     {
                         std::cerr << "Game " << game_number << " (move " << move_number << "): "
@@ -274,6 +329,40 @@ namespace GamePlayer
                     return false;
                 }
             }
+            move_number_total += move_number;
+        }
+
+        if (stats)
+        {
+            std::cout << filename << std::endl;
+            std::cout << "  - Games: " << game_number << std::endl;
+            std::cout << "  - Avg Moves: " << move_number_total / game_number << std::endl;
+            std::cout << "  - Avg Score: " << score_sum / int64_t(move_number_total) << std::endl;
+            std::cout << "  - Avg Init Score: " << init_score_sum / int64_t(game_number) << std::endl;
+            std::cout << "  - Avg Score (abs): " << abs_score_sum / move_number_total << std::endl;
+            std::cout << "  - Avg Init Score (abs): " << abs_init_score_sum / game_number << std::endl;
+            std::cout << "  - Draw Ratio (%): " << 100.0 * draws / game_number << std::endl;
+            std::cout << "  - Expected score: " << 0.5 * results / game_number << std::endl;
+            std::cout << "  - King squares" << std::endl;
+            std::cout << "  +---------+---------+---------+---------+---------+---------+---------+---------+" << std::endl;
+            char file_labels[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'};
+            char rank_labels[] = {'1', '2', '3', '4', '5', '6', '7', '8'};
+            for (int rank = 7; rank >= 0; rank--)
+            {
+                for (int file = 0; file < 8; file++)
+                    std::cout << "  |    "
+                              << file_labels[file] << rank_labels[rank] << " ";
+                std::cout << "  |  " << std::endl;
+                for (int file = 0; file < 8; file++)
+                    std::cout << "  |  "
+                              << std::setw(5)
+                              << std::fixed
+                              << std::setprecision(2)
+                              << 50.0 * king_squares[make_square(rank, file)] / move_number_total;
+                std::cout << "  |"  << std::endl
+                          << "  |    %    |    %    |    %    |    %    |    %    |    %    |    %    |    %    |" << std::endl
+                          << "  +---------+---------+---------+---------+---------+---------+---------+---------+" << std::endl;
+            }
         }
 
         return true;
@@ -283,16 +372,104 @@ namespace GamePlayer
     void check_games(std::istringstream& stream)
     {
         // Files to parse
+        bool stats = false;
         std::string token;
         std::vector<std::string> files;
         while (stream >> token)
-            files.push_back(token);
+        {
+            if (token == "--stats")
+                stats = true;
+            else
+                files.push_back(token);
+        }
         assert(files.size() > 0 && "No input files have been passed!");
 
         // Parse each file
         for (auto filename : files)
-            std::cout << (file_valid(filename) ? " [ OK ] " : " [FAIL] ")
+            std::cout << (file_valid(filename, stats) ? " [ OK ] " : " [FAIL] ")
                       << filename
                       << std::endl;
+    }
+
+
+    void repair_games(std::istringstream& stream)
+    {
+        // Parameters
+        std::string input_file_path;
+        std::string output_file_path;
+
+        // Parameter reading
+        assert((stream >> input_file_path) && "Input file path required!");
+        assert((stream >> output_file_path) && "Output file path required!");
+
+        // Open files
+        std::ifstream ifile(input_file_path);
+        std::ofstream ofile(output_file_path);
+        assert(ifile.is_open() && "Failed to open input file!");
+        assert(ofile.is_open() && "Failed to open output file!");
+
+        // Fetch eof
+        ifile.seekg(0, std::ios_base::end);
+        auto eof = ifile.tellg();
+        ifile.seekg(0, std::ios_base::beg);
+
+        // Read entire file
+        BinaryGame game;
+        std::size_t bad_games = 0;
+        std::size_t game_number = 0;
+        while(ifile.tellg() < eof)
+        {
+            // Read game
+            game_number++;
+            if (!BinaryGame::read(ifile, game))
+            {
+                bad_games++;
+                std::cout << "Bad game " << game_number << std::endl;
+                continue;
+            }
+
+            // Invalid initial position
+            Board board(game.starting_pos);
+            if (!board.valid())
+            {
+                bad_games++;
+                std::cerr << "Invalid initial position in game " << game_number << std::endl;
+                continue;
+            }
+
+            // Loop over all moves ensuring they are legal
+            bool good_game = true;
+            for (BinaryNode node : game.nodes)
+            {
+                if (node.move != MOVE_NULL)
+                {
+                    if(!board.legal(node.move))
+                    {
+                        good_game = false;
+                        std::cout << "Illegal move in game " << game_number << std::endl;
+                        break;
+                    }
+                    board = board.make_move(node.move);
+                }
+                // Ensure the last score is the game outcome (-1, 0 or 1)
+                else if (abs(node.score) > 1)
+                {
+                    good_game = false;
+                    std::cout << "Bad termination in game " << game_number << std::endl;
+                    break;
+                }
+            }
+
+            // Write the game if it is good
+            if (good_game)
+                game.write(ofile);
+            else
+                bad_games++;
+        }
+        std::cout << "Written " << game_number - bad_games
+                  << " games to " << output_file_path
+                  << " and discarded " << bad_games
+                  << " bad games" << std::endl;
+        ofile.close();
     }
 }

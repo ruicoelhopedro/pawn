@@ -237,6 +237,43 @@ Board::Board(const BinaryBoard& bb, bool accumulator_frozen)
 }
 
 
+bool Board::valid() const
+{
+    // Side not to move in check?
+    Square king_square = m_pieces[KING][~m_turn].bitscan_forward();
+    if (attackers(king_square, get_pieces(), m_turn))
+        return false;
+    
+    // Bitboard consistency
+    for (Square s = 0; s < NUM_SQUARES; s++)
+    {
+        // Invalid pieces
+        if (get_piece_at(s) == INVALID_PIECE)
+            return false;
+        
+        // Pawns on the first/last rank
+        if (get_piece_at(s) == PAWN && (rank(s) == 0 || rank(s) == 7))
+            return false;
+    }
+
+    // Half-move clock
+    if (m_half_move_clock > 100 || m_half_move_clock < 0)
+        return false;
+
+    // Ep square
+    Direction up = (m_turn == WHITE) ? 8 : -8;
+    if (m_enpassant_square != SQUARE_NULL)
+    {
+        if (rank(m_enpassant_square) != (m_turn == WHITE ? 5 : 2))
+            return false;
+        if (get_piece_at(m_enpassant_square - up) != PAWN)
+            return false;
+    }
+
+    return true;
+}
+
+
 std::string Board::to_fen() const
 {
     std::ostringstream ss;

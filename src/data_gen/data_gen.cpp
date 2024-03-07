@@ -182,10 +182,6 @@ void BinaryGame::write(std::ofstream& stream)
     // Loop over moves
     for (BinaryNode node : nodes)
         stream.write(reinterpret_cast<const char*>(&node), sizeof(BinaryNode));
-    // Write game termination and infer result from last score
-    BinaryNode& last = nodes.back();
-    BinaryNode term(MOVE_NULL, last.score > 0 ? WHITE_COLOR : last.score < 0 ? BLACK_COLOR : NO_COLOR);
-    stream.write(reinterpret_cast<const char*>(&term), sizeof(BinaryNode));
     // Flush the output file
     stream.flush();
 }

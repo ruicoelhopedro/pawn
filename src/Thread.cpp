@@ -545,7 +545,7 @@ void Thread::search()
 }
 
 
-SearchResult Thread::simple_search(Position& pos, const Search::Limits& limits)
+SearchResult Thread::simple_search(Position& pos, const Search::Limits& limits, bool skip_tb)
 {
     // For depth 0, return the quiescence score
     if (limits.depth == 0)
@@ -567,12 +567,15 @@ SearchResult Thread::simple_search(Position& pos, const Search::Limits& limits)
                             MOVE_NULL);
 
     // Probe tablebases and only select the top TB-scored moves
-    Syzygy::Root = Syzygy::RootPos(pos);
-    if (Syzygy::Root.in_tb())
+    if (!skip_tb)
     {
-        m_root_moves.clear();
-        for (int idx = 0; idx < Syzygy::Root.num_preserving_moves(); idx++)
-            m_root_moves.push(Syzygy::Root.ordered_moves(idx));
+        Syzygy::Root = Syzygy::RootPos(pos);
+        if (Syzygy::Root.in_tb())
+        {
+            m_root_moves.clear();
+            for (int idx = 0; idx < Syzygy::Root.num_preserving_moves(); idx++)
+                m_root_moves.push(Syzygy::Root.ordered_moves(idx));
+        }
     }
 
     // Clear data

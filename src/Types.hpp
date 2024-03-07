@@ -50,6 +50,7 @@ enum PieceType : int8_t
     ROOK = 3,
     QUEEN = 4,
     KING = 5,
+    INVALID_PIECE = 6,
     PIECE_NONE = 7
 };
 

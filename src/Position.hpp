@@ -469,6 +469,9 @@ public:
     Board(const BinaryBoard& bb, bool simplified = false);
 
 
+    bool valid() const;
+
+
     friend std::ostream& operator<<(std::ostream& out, const Board& board);
 
 

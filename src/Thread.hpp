@@ -74,7 +74,7 @@ public:
 
     bool data_gen() const;
 
-    SearchResult simple_search(Position& pos, const Search::Limits& limits);
+    SearchResult simple_search(Position& pos, const Search::Limits& limits, bool skip_tb = false);
 
     GameResult play_game(std::string fen, Depth depth, Score adjudication);
 
