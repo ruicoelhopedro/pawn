@@ -474,7 +474,7 @@ namespace Search
         bool improving = !InCheck && Ply >= 2 && data.previous(2) && (data.static_eval > data.previous(2)->static_eval);
 
         // Futility pruning
-        if (!PvNode && depth < 9 && !InCheck && abs(static_eval) < SCORE_TB_WIN_FOUND)
+        if (!PvNode && depth < 9 && !InCheck && !HasExcludedMove && abs(static_eval) < SCORE_TB_WIN_FOUND)
         {
             Score margin = 150 * (depth - improving);
             if (static_eval - margin >= beta)
@@ -565,7 +565,7 @@ namespace Search
             // If all moves fail low then we extend the TT move
             if (!RootSearch && 
                 tt_hit &&
-                depth > 8 &&
+                depth > 4 &&
                 !HasExcludedMove &&
                 move == tt_move &&
                 tt_depth >= depth - 3 &&
