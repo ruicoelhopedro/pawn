@@ -550,7 +550,7 @@ namespace Search
                     if (depth < 7 && n_moves > 3 + depth * depth)
                         continue;
 
-                    if (move_score < -100 * (depth - 1) - 50 * int(depth) * depth * depth)
+                    if (move_score < -600 * depth * depth)
                         continue;
 
                     if (!InCheck && depth < 12 && data.static_eval + 100 + 150 * depth + move_score / 75 < alpha)
