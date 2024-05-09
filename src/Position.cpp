@@ -500,13 +500,11 @@ bool Board::is_valid() const
 
     // Material and phase evaluation
     uint8_t phase = Phases::Total;
-    MixedScore material(0, 0);
     NNUE::Accumulator acc[2];
     for (PieceType piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
         for (Turn turn : { WHITE, BLACK })
         {
             Bitboard bb = get_pieces(turn, piece);
-            material += piece_value[piece] * bb.count() * turn_to_color(turn);
             phase -= bb.count() * Phases::Pieces[piece];
             while (bb)
             {
@@ -515,10 +513,7 @@ bool Board::is_valid() const
                 acc[BLACK].push(piece, s, m_king_sq[BLACK], turn, BLACK);
             }
         }
-    MixedScore total_material = m_material[WHITE] - m_material[BLACK];
     if (phase != m_phase)
-        return false;
-    if (material.middlegame() != total_material.middlegame() || material.endgame() != total_material.endgame())
         return false;
     if (acc[WHITE] != m_acc[WHITE] || acc[BLACK] != m_acc[BLACK])
         return false;
@@ -631,7 +626,7 @@ Score Board::see(Move move, Score threshold) const
 
     // Make the initial capture
     PieceType last_attacker = get_piece_at(move.from());
-    Score gain = piece_value_mg[move.is_ep_capture() ? PAWN : get_piece_at(target)] - threshold;
+    Score gain = piece_value[move.is_ep_capture() ? PAWN : get_piece_at(target)] - threshold;
     Bitboard from_bb = Bitboard::from_square(move.from());
     Bitboard occupancy = get_pieces() ^ from_bb;
     Turn side_to_move = ~m_turn;
@@ -651,7 +646,7 @@ Score Board::see(Move move, Score threshold) const
         Bitboard attacker_bb = Bitboard::from_square(attacker);
 
         // Make the capture
-        gain += color * piece_value_mg[last_attacker];
+        gain += color * piece_value[last_attacker];
         last_attacker = get_piece_at(attacker);
         occupancy ^= attacker_bb;
         side_to_move = ~side_to_move;
@@ -662,18 +657,6 @@ Score Board::see(Move move, Score threshold) const
     }
 
     return gain;
-}
-
-
-MixedScore Board::material() const
-{
-    return m_material[WHITE] - m_material[BLACK];
-}
-
-
-MixedScore Board::material(Turn turn) const
-{
-    return m_material[turn] - KingValue;
 }
 
 

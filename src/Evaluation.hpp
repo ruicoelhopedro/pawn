@@ -28,7 +28,7 @@ namespace Evaluation
             : m_score(score)
         {}
 
-        static inline double adjust(Score s) { return double(s) / PawnValue.endgame(); }
+        static inline double adjust(Score s) { return double(s) / ScoreToCp; }
 
         friend std::ostream& operator<<(std::ostream& out, const Term& term);
     };

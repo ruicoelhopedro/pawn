@@ -158,7 +158,7 @@ namespace Search
         if (is_mate(this->score()))
             std::cout << " score mate " << mate_in(this->score());
         else
-            std::cout << " score cp " << 100 * int(this->score()) / PawnValue.endgame();
+            std::cout << " score cp " << 100 * int(this->score()) / ScoreToCp;
 
         // Score bound (if any)
         if (this->bound() != BoundType::EXACT)

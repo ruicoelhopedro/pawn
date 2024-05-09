@@ -103,7 +103,7 @@ int MoveOrder::capture_score(Move move) const
 {
     // MVV
     PieceType to = move.is_ep_capture() ? PAWN : m_position.board().get_piece_at(move.to());
-    return piece_value_mg[to];
+    return piece_value[to];
 }
 
 
