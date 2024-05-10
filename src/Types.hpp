@@ -140,22 +140,6 @@ enum ScoreType : Score
     SCORE_NONE = 32002
 };
 
-
-namespace Phases
-{
-    constexpr int Pawn = 0;
-    constexpr int Knight = 1;
-    constexpr int Bishop = 1;
-    constexpr int Rook = 2;
-    constexpr int Queen = 4;
-    constexpr int King = 0;
-    constexpr int Pieces[NUM_PIECE_TYPES] = { Pawn, Knight, Bishop, Rook, Queen, King };
-    constexpr int Total = 16 * Pawn + 4 * Knight + 4 * Bishop + 4 * Rook + 2 * Queen + 2 * King;
-
-    constexpr int MgLimit = 4;
-    constexpr int EgLimit = 19;
-}
-
 constexpr Score ScoreToCp = 200;
 
 constexpr Score   PawnValue(  125);

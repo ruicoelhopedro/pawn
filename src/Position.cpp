@@ -85,8 +85,7 @@ Board::Board()
 
 
 Board::Board(std::string fen)
-    : m_hash(0),
-      m_phase(Phases::Total)
+    : m_hash(0)
 {
     auto c = fen.cbegin();
 
@@ -499,13 +498,11 @@ bool Board::is_valid() const
         return false;
 
     // Material and phase evaluation
-    uint8_t phase = Phases::Total;
     NNUE::Accumulator acc[2];
     for (PieceType piece : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
         for (Turn turn : { WHITE, BLACK })
         {
             Bitboard bb = get_pieces(turn, piece);
-            phase -= bb.count() * Phases::Pieces[piece];
             while (bb)
             {
                 Square s = bb.bitscan_forward_reset();
@@ -513,8 +510,6 @@ bool Board::is_valid() const
                 acc[BLACK].push(piece, s, m_king_sq[BLACK], turn, BLACK);
             }
         }
-    if (phase != m_phase)
-        return false;
     if (acc[WHITE] != m_acc[WHITE] || acc[BLACK] != m_acc[BLACK])
         return false;
 
@@ -657,12 +652,6 @@ Score Board::see(Move move, Score threshold) const
     }
 
     return gain;
-}
-
-
-uint8_t Board::phase() const
-{
-    return m_phase;
 }
 
 
