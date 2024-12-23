@@ -80,7 +80,7 @@ class NNUE(nn.Module):
 
     @staticmethod
     def __dump(tensor, dtype, scale, file, transpose=False):
-        weights = tensor.detach().numpy()
+        weights = tensor.detach().to('cpu').numpy()
         quant_weights = np.array(np.round(scale * weights), dtype=dtype)
         if transpose:
             quant_weights = quant_weights.T
