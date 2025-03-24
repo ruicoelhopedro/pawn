@@ -203,7 +203,7 @@ def main(pawn_path: str, dataset_path: str, output_dir: str, epochs: int, batch_
 
     # Loss and optimiser
     loss_func = sigmoid_loss
-    optimiser = torch.optim.Adam(model.parameters(), lr=2e-3)
+    optimiser = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     # Training time
     os.makedirs(output_dir, exist_ok=True)
