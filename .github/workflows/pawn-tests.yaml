@@ -40,10 +40,10 @@ jobs:
             cc: clang
             cxx: clang++
             shell: bash
-          - name: "MacOS - GCC 11"
+          - name: "MacOS - GCC"
             os: macos-latest
-            cc: gcc-11
-            cxx: g++-11
+            cc: gcc
+            cxx: g++
             shell: bash
           - name: "MacOS - Clang"
             os: macos-latest
