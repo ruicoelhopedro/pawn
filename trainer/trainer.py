@@ -1,6 +1,7 @@
 import os
 import ctypes
 import argparse
+from multiprocessing.dummy import Pool as ThreadPool
 import numpy as np
 from numpy.ctypeslib import ndpointer
 import torch
@@ -16,23 +17,48 @@ from model import NNUE, NUM_MAX_FEATURES, sigmoid_loss
 
 class BatchedDataLoader:
 
-    def __init__(self, dataset, batch_size):
+    def __init__(self, dataset, batch_size, num_threads):
         self.dataset = dataset
         self.batch_size = batch_size
+        self.num_threads = num_threads
         self.sampler = BatchSampler(RandomSampler(dataset), batch_size=batch_size, drop_last=False)
 
     def __iter__(self):
         return self.sampler.__iter__()
 
     def load(self, indices):
-        return self.dataset[indices]
+        # If no workers, just load the data sequentially
+        if self.num_threads == 0:
+            return self.dataset[indices]
+        # Otherwise, load the data in parallel
+        split_indices = np.array_split(indices, self.num_threads)
+        with ThreadPool(self.num_threads) as pool:
+            results = list(pool.map(self.dataset.__getitem__, split_indices))
+        # Join the results
+        # Most fields only require concatenation, but offsets need to be adjusted
+        # based on the length of the previous results
+        w_offset = results[0][0]
+        b_offset = results[0][2]
+        w_num = results[0][1].shape[0]
+        b_num = results[0][3].shape[0]
+        for i in range(1, self.num_threads):
+            w_offset = torch.cat([w_offset, results[i][0] + w_num], dim=0)
+            b_offset = torch.cat([b_offset, results[i][2] + b_num], dim=0)
+            w_num += results[i][1].shape[0]
+            b_num += results[i][3].shape[0]
+        w_cols = torch.cat([r[1] for r in results], dim=0)
+        b_cols = torch.cat([r[3] for r in results], dim=0)
+        scores_array = torch.cat([r[4] for r in results], dim=0)
+        results_array = torch.cat([r[5] for r in results], dim=0)
+        buckets_array = torch.cat([r[6] for r in results], dim=0)
+        stms_array = torch.cat([r[7] for r in results], dim=0)
+        return w_offset, w_cols, b_offset, b_cols, scores_array, results_array, buckets_array, stms_array
 
     def set_train(self):
         self.dataset.set_train()
 
     def set_test(self):
         self.dataset.set_test()
-
 
 
 class PawnDataset(Dataset):
@@ -184,7 +210,7 @@ def test(dataloader, model, loss_fn, device, epoch, output_file):
 
 
 
-def main(pawn_path: str, dataset_path: str, output_dir: str, epochs: int, batch_size: int, random_skip: int, test_size: float, load_model=None):
+def main(pawn_path: str, dataset_path: str, output_dir: str, epochs: int, batch_size: int, random_skip: int, test_size: float, num_threads: int, load_model=None):
     # Get cpu or gpu device for training
     device = "cuda" if torch.cuda.is_available() else "cpu"
     torch.set_num_threads(1)
@@ -192,7 +218,7 @@ def main(pawn_path: str, dataset_path: str, output_dir: str, epochs: int, batch_
 
     # Build dataset and dataloaders
     dataset = PawnDataset(pawn_path, dataset_path, random_skip, test_size)
-    dataloader = BatchedDataLoader(dataset, batch_size)
+    dataloader = BatchedDataLoader(dataset, batch_size, num_threads)
 
     # Define model
     if load_model is None:
@@ -229,5 +255,6 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=14000, help='Number of games per batch')
     parser.add_argument('--random_skip', type=int, default=15, help='On average, skip every x positions')
     parser.add_argument('--test_size', type=float, default=0.1, help='Test dataset size')
+    parser.add_argument('--num_threads', type=int, default=1, help='Test dataset size')
     args = parser.parse_args()
-    main(args.pawn, args.dataset, args.output, args.epochs, args.batch_size, args.random_skip, args.test_size, args.load)
+    main(args.pawn, args.dataset, args.output, args.epochs, args.batch_size, args.random_skip, args.test_size, args.num_threads, args.load)
