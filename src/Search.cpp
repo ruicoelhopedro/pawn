@@ -158,7 +158,7 @@ namespace Search
         if (is_mate(this->score()))
             std::cout << " score mate " << mate_in(this->score());
         else
-            std::cout << " score cp " << 100 * int(this->score()) / PawnValue.endgame();
+            std::cout << " score cp " << 100 * int(this->score()) / ScoreToCp;
 
         // Score bound (if any)
         if (this->bound() != BoundType::EXACT)
@@ -474,7 +474,7 @@ namespace Search
         bool improving = !InCheck && Ply >= 2 && data.previous(2) && (data.static_eval > data.previous(2)->static_eval);
 
         // Futility pruning
-        if (!PvNode && depth < 9 && !InCheck && abs(static_eval) < SCORE_TB_WIN_FOUND)
+        if (!PvNode && depth < 9 && !InCheck && !HasExcludedMove && abs(static_eval) < SCORE_TB_WIN_FOUND)
         {
             Score margin = 150 * (depth - improving);
             if (static_eval - margin >= beta)
@@ -551,7 +551,7 @@ namespace Search
                     if (depth < 7 && n_moves > 3 + depth * depth)
                         continue;
 
-                    if (move_score < -100 * (depth - 1) - 50 * int(depth) * depth * depth)
+                    if (move_score < -600 * depth * depth)
                         continue;
 
                     if (!InCheck && depth < 12 && data.static_eval + 100 + 150 * depth + move_score / 75 < alpha)
@@ -566,7 +566,7 @@ namespace Search
             // If all moves fail low then we extend the TT move
             if (!RootSearch && 
                 tt_hit &&
-                depth > 8 &&
+                depth > 4 &&
                 !HasExcludedMove &&
                 move == tt_move &&
                 tt_depth >= depth - 3 &&

@@ -141,102 +141,25 @@ enum ScoreType : Score
     SCORE_NONE = 32002
 };
 
+constexpr Score ScoreToCp = 200;
 
-namespace Phases
-{
-    constexpr int Pawn = 0;
-    constexpr int Knight = 1;
-    constexpr int Bishop = 1;
-    constexpr int Rook = 2;
-    constexpr int Queen = 4;
-    constexpr int King = 0;
-    constexpr int Pieces[NUM_PIECE_TYPES] = { Pawn, Knight, Bishop, Rook, Queen, King };
-    constexpr int Total = 16 * Pawn + 4 * Knight + 4 * Bishop + 4 * Rook + 2 * Queen + 2 * King;
+constexpr Score   PawnValue(  125);
+constexpr Score KnightValue(  750);
+constexpr Score BishopValue(  800);
+constexpr Score   RookValue( 1200);
+constexpr Score  QueenValue( 2500);
+constexpr Score   KingValue(10000); // Needed for SEE and MVV-LVA
 
-    constexpr int MgLimit = 4;
-    constexpr int EgLimit = 19;
-}
-
-
-class MixedScore
-{
-    Score mg;
-    Score eg;
-
-public:
-    inline constexpr MixedScore() : mg(0), eg(0) {}
-    inline constexpr MixedScore(Score smg, Score seg) : mg(smg), eg(seg) {}
-
-    inline constexpr Score middlegame() const { return mg; }
-    inline constexpr Score endgame() const { return eg; }
-
-    inline constexpr Score tapered(int phase_entry) const
-    {
-        int phase = std::clamp(256 * (phase_entry - Phases::MgLimit) / (Phases::EgLimit - Phases::MgLimit), 0, 256);
-        return ((mg * (256 - phase)) + (eg * phase)) / 256;
-    }
-
-    inline constexpr MixedScore& operator+=(const MixedScore& other) { mg += other.mg; eg += other.eg; return *this; }
-    inline constexpr MixedScore& operator-=(const MixedScore& other) { mg -= other.mg; eg -= other.eg; return *this; }
-    inline constexpr MixedScore& operator*=(const MixedScore& other) { mg *= other.mg; eg *= other.eg; return *this; }
-    inline constexpr MixedScore& operator/=(const MixedScore& other) { mg /= other.mg; eg /= other.eg; return *this; }
-
-    inline constexpr MixedScore& operator+=(int other) { mg += other; eg += other; return *this; }
-    inline constexpr MixedScore& operator-=(int other) { mg -= other; eg -= other; return *this; }
-    inline constexpr MixedScore& operator*=(int other) { mg *= other; eg *= other; return *this; }
-    inline constexpr MixedScore& operator/=(int other) { mg /= other; eg /= other; return *this; }
-
-    inline constexpr MixedScore operator+(const MixedScore& other) const { return MixedScore(mg + other.mg, eg + other.eg); }
-    inline constexpr MixedScore operator-(const MixedScore& other) const { return MixedScore(mg - other.mg, eg - other.eg); }
-    inline constexpr MixedScore operator*(const MixedScore& other) const { return MixedScore(mg * other.mg, eg * other.eg); }
-    inline constexpr MixedScore operator/(const MixedScore& other) const { return MixedScore(mg / other.mg, eg / other.eg); }
-
-    inline constexpr MixedScore operator+(int other) const { return MixedScore(mg + other, eg + other); }
-    inline constexpr MixedScore operator-(int other) const { return MixedScore(mg - other, eg - other); }
-    inline constexpr MixedScore operator*(int other) const { return MixedScore(mg * other, eg * other); }
-    inline constexpr MixedScore operator/(int other) const { return MixedScore(mg / other, eg / other); }
-};
-
-
-constexpr MixedScore   PawnValue(  125,   200);
-constexpr MixedScore KnightValue(  750,   850);
-constexpr MixedScore BishopValue(  800,   900);
-constexpr MixedScore   RookValue( 1200,  1400);
-constexpr MixedScore  QueenValue( 2500,  2600);
-constexpr MixedScore   KingValue(10000, 10000); // Needed for SEE and MVV-LVA
-
-constexpr MixedScore piece_value[] = {
+constexpr Score piece_value[] = {
     PawnValue,
     KnightValue,
     BishopValue,
     RookValue,
     QueenValue,
     KingValue,
-    MixedScore(0, 0), // Empty
-    MixedScore(0, 0)  // PIECE_NONE
+    Score(0), // Empty
+    Score(0)  // PIECE_NONE
 }; 
-
-constexpr Score piece_value_mg[] = {
-    PawnValue.middlegame(),
-    KnightValue.middlegame(),
-    BishopValue.middlegame(),
-    RookValue.middlegame(),
-    QueenValue.middlegame(),
-    KingValue.middlegame(),
-    0, // Empty
-    0  // PIECE_NONE
-};
-
-constexpr Score piece_value_eg[] = {
-    PawnValue.endgame(),
-    KnightValue.endgame(),
-    BishopValue.endgame(),
-    RookValue.endgame(),
-    QueenValue.endgame(),
-    KingValue.endgame(),
-    0, // Empty
-    0  // PIECE_NONE
-};
 
 
 constexpr uint64_t uint64(int i) { return static_cast<uint64_t>(i); }

@@ -31,9 +31,7 @@ class Board
     Square m_king_sq[NUM_COLORS];
     Hash m_hash;
     Bitboard m_checkers;
-    MixedScore m_material[NUM_COLORS];
     NNUE::Accumulator m_acc[NUM_COLORS];
-    uint8_t m_phase;
     Piece m_board_pieces[NUM_SQUARES];
     bool m_simplified;
 
@@ -503,8 +501,6 @@ public:
             m_acc[WHITE].push(piece, square, m_king_sq[WHITE], turn, WHITE);
             m_acc[BLACK].push(piece, square, m_king_sq[BLACK], turn, BLACK);
         }
-        m_material[turn] += piece_value[piece];
-        m_phase -= Phases::Pieces[piece];
     }
 
 
@@ -518,8 +514,6 @@ public:
             m_acc[WHITE].pop(piece, square, m_king_sq[WHITE], turn, WHITE);
             m_acc[BLACK].pop(piece, square, m_king_sq[BLACK], turn, BLACK);
         }
-        m_material[turn] -= piece_value[piece];
-        m_phase += Phases::Pieces[piece];
     }
 
 
@@ -693,15 +687,6 @@ public:
 
 
     Score see(Move move, Score threshold = 0) const;
-
-
-    MixedScore material() const;
-
-
-    MixedScore material(Turn turn) const;
-
-
-    uint8_t phase() const;
 
 
     bool legal(Move move) const;

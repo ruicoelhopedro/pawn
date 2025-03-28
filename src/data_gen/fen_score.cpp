@@ -113,7 +113,7 @@ namespace FEN_Scores
 
             // Parse output
             Move m = result.bestmove;
-            Score s = 100 * result.score / PawnValue.endgame();
+            Score s = 100 * result.score / ScoreToCp;
 
             // Write to the output file
             std::visit([pos, fen, m, s] (auto& output) { output.write(pos, fen, m, s); },
@@ -152,7 +152,7 @@ namespace FEN_Scores
         {            
             // Evaluate the position
             Position pos(fen);
-            Score s = 100 * Evaluation::evaluation(pos.board()) / PawnValue.endgame();
+            Score s = 100 * Evaluation::evaluation(pos.board()) / ScoreToCp;
 
             // Write to the output file
             std::visit([pos, fen, s] (auto& output) { output.write(pos, fen, s); },

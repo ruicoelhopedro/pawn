@@ -107,7 +107,7 @@ void eval_table(const Board& board)
                   << std::endl;
     }
     std::cout << "--------------------------------------"             << std::endl;
-    std::cout << "Final evaluation: " <<  100 * nnue / PawnValue.endgame() << " cp (White)" << std::endl;
+    std::cout << "Final evaluation: " <<  100 * nnue / ScoreToCp << " cp (White)" << std::endl;
     std::cout << std::endl;
 }
     
