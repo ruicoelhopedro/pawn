@@ -86,8 +86,7 @@ extern "C"
         unsigned short* b_cols,
         short* scores,
         char* results,
-        char* buckets,
-        char* stms
+        char* buckets
     )
     {
         // Open files
@@ -151,34 +150,45 @@ extern "C"
                         w_idx[count+1] = w_idx[count];
                         b_idx[count+1] = b_idx[count];
 
-                        Square king[] = { board.get_pieces<WHITE, KING>().bitscan_forward(),
-                                            board.get_pieces<BLACK, KING>().bitscan_forward() };
-                        Bitboard pieces[] = { board.get_pieces<WHITE>(),
-                                                board.get_pieces<BLACK>() };
+                        // Set the pointers based on the side to move
+                        unsigned short* w_cols_ptr = board.turn() == WHITE ? w_cols : b_cols;
+                        unsigned short* b_cols_ptr = board.turn() == WHITE ? b_cols : w_cols;
+                        Size* w_idx_ptr = board.turn() == WHITE ? w_idx : b_idx;
+                        Size* b_idx_ptr = board.turn() == WHITE ? b_idx : w_idx;
+
+                        // Get the kings and pieces
+                        Square king[] = {
+                            board.get_pieces<WHITE, KING>().bitscan_forward(),
+                            vertical_mirror(board.get_pieces<BLACK, KING>().bitscan_forward())
+                        };
+                        Bitboard pieces[] = {
+                            board.get_pieces<WHITE>(),
+                            board.get_pieces<BLACK>()
+                        };
 
                         for (Square s = 0; s < NUM_SQUARES; s++)
                         {
+                            Square vm = vertical_mirror(s);
                             PieceType piece = board.get_piece_at(s);
                             if (piece != PIECE_NONE && piece != KING)
                             {
                                 if (pieces[WHITE].test(s))
                                 {
-                                    w_cols[w_idx[count+1]++] = index(WHITE, piece, s, king[WHITE]);
-                                    b_cols[b_idx[count+1]++] = index(BLACK, piece, vertical_mirror(s), vertical_mirror(king[BLACK]));
+                                    w_cols_ptr[w_idx_ptr[count+1]++] = index(WHITE, piece, s, king[WHITE]);
+                                    b_cols_ptr[b_idx_ptr[count+1]++] = index(BLACK, piece, vm, king[BLACK]);
                                 }
                                 else
                                 {
-                                    w_cols[w_idx[count+1]++] = index(BLACK, piece, s, king[WHITE]);
-                                    b_cols[b_idx[count+1]++] = index(WHITE, piece, vertical_mirror(s), vertical_mirror(king[BLACK]));
+                                    w_cols_ptr[w_idx_ptr[count+1]++] = index(BLACK, piece, s, king[WHITE]);
+                                    b_cols_ptr[b_idx_ptr[count+1]++] = index(WHITE, piece, vm, king[BLACK]);
                                 }
                             }
                         }
 
                         // Store eval and phase
-                        scores[count] = node.score;
+                        scores[count] = node.score * turn_to_color(board.turn());
                         buckets[count] = (board.get_pieces().count() - 1) / 8;
-                        results[count] = result;
-                        stms[count] = board.turn();
+                        results[count] = result * turn_to_color(board.turn());
                         count++;
                         num_pos++;
                     }

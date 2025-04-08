@@ -23,10 +23,9 @@ PIECE_VALUES = {
 }
 
 
-def sigmoid_loss(output, scores, results, buckets):
+def sigmoid_loss(y, scores, results):
     K = 400
     mix = 0.3
-    y = output.gather(1, buckets.view(-1, 1)).squeeze(-1)
     y_wdl = torch.sigmoid(SCALE_FACTOR / K * y)
     scores_wdl = (1 - mix) * torch.sigmoid(scores / K) + mix * results
     loss = (
@@ -64,19 +63,13 @@ class NNUE(nn.Module):
                 for piece, (_, eg) in PIECE_VALUES.items():
                     self.psqt.weight.data[map_features(piece, square, king, True), :] = eg / SCALE_FACTOR
 
-    @staticmethod
-    def perspective(w_values, b_values, stms):
-        return (1 - stms[:,None]) * w_values + stms[:,None] * b_values
-
-    def forward(self, w_offset, w_cols, b_offset, b_cols, stms):
+    def forward(self, w_offset, w_cols, b_offset, b_cols, buckets):
         psqt = self.psqt(w_cols, w_offset) - self.psqt(b_cols, b_offset)
-        white_acc = self.crelu(self.accumulator_emb(w_cols, w_offset) + self.accumulator_bias)
-        black_acc = self.crelu(self.accumulator_emb(b_cols, b_offset) + self.accumulator_bias)
-        stm_acc = self.perspective(white_acc, black_acc, stms)
-        ntm_acc = self.perspective(black_acc, white_acc, stms)
+        stm_acc = self.crelu(self.accumulator_emb(w_cols, w_offset) + self.accumulator_bias)
+        ntm_acc = self.crelu(self.accumulator_emb(b_cols, b_offset) + self.accumulator_bias)
         positional = self.layer(torch.cat([stm_acc, ntm_acc], dim=1))
-        return psqt + self.perspective(positional, -positional, stms)
-
+        bucketed_output = psqt + positional
+        return bucketed_output.gather(-1, buckets.unsqueeze(-1)).squeeze(-1)
 
     @staticmethod
     def __dump(tensor, dtype, scale, file, transpose=False):
@@ -85,7 +78,6 @@ class NNUE(nn.Module):
         if transpose:
             quant_weights = quant_weights.T
         quant_weights.tofile(file)
-
 
     def export(self, filename):
         # Export each layer to the output NNUE file
