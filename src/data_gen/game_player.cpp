@@ -3,6 +3,7 @@
 #include "Thread.hpp"
 #include "UCI.hpp"
 #include "syzygy/syzygy.hpp"
+#include "data_gen/game_player.hpp"
 #include "data_gen/data_gen.hpp"
 #include "data_gen/fen_score.hpp"
 #include <mutex>
@@ -16,7 +17,8 @@ namespace GamePlayer
     {
         // Parameters and their default values
         int depth = 9;
-        std::size_t runs_per_fen = 1000000;
+        std::size_t runs_per_fen = 10000000;
+        std::size_t max_num_games = 0;
         int adjudication = SCORE_MATE_FOUND;
         std::string book = "";
         std::string output_file = "output.dat";
@@ -37,6 +39,8 @@ namespace GamePlayer
                 stream >> depth;
             else if (token == "runs_per_fen")
                 stream >> runs_per_fen;
+            else if (token == "max_num_games")
+                stream >> max_num_games;
             else if (token == "adjudication")
                 stream >> adjudication;
             else if (token == "book")
@@ -95,16 +99,19 @@ namespace GamePlayer
         // Prepare search data
         Search::Limits limits;
         limits.depth = depth;
-        std::mutex output_mutex;
+        std::atomic_bool stop = false;
+        ThreadSafeQueue<BinaryGame> queue;
+        std::atomic_int n_active_threads = threads;
+        auto start = std::chrono::steady_clock::now();
 
         // Store and reset shallow depth pruning
         bool sdp = UCI::Options::ShallowDepthPruning;
         UCI::Options::ShallowDepthPruning = shallow_depth_pruning;
 
-        auto thread_loop = [=, &output_mutex, &output, &n_games_completed](std::size_t id)
+        auto thread_loop = [=, &queue, &n_active_threads, &stop](std::size_t id)
         {
             // Init PRNG
-            PseudoRandom random(seed + id);
+            PseudoRandom random(seed + (1 << id));
 
             // Prepare search thread
             ThreadPool pool(1, hash);
@@ -118,6 +125,10 @@ namespace GamePlayer
                 // Runs loop
                 for (std::size_t i_run = 0; i_run < runs_per_fen; i_run++)
                 {
+                    // Check if we should stop
+                    if (stop.load(std::memory_order_relaxed))
+                        break;
+
                     // Initialise position and clear search data
                     Position pos(fen);
                     pos.set_init_ply();
@@ -126,12 +137,12 @@ namespace GamePlayer
                     // Position warmup stage: the initial position for the game is obtained by a
                     // mix of search-based and random moves from the list of given FEN positions
                     bool valid_game = true;
-                    for (int ply = 0; ply < store_min_ply; ply++)
+                    int num_plies = store_min_ply + random.next(2);
+                    for (int ply = 0; ply < num_plies; ply++)
                     {
                         // Search or pick a random move?
                         Move move;
-                        int ply_factor = random_probability * ply * ply
-                                    / (store_min_ply * store_min_ply + 1);
+                        int ply_factor = random_probability * ply * ply / (num_plies * num_plies + 1);
                         if (int(random.next(100)) < random_probability - ply_factor)
                         {
                             // Random mover: generate legal moves for this position
@@ -184,26 +195,41 @@ namespace GamePlayer
 
                     // Add termination node
                     game.push(MOVE_NULL, result.score > 0 ? WHITE_COLOR : result.score < 0 ? BLACK_COLOR : NO_COLOR);
-
-                    // IO operations in a thread-safe manner
-                    {
-                        std::scoped_lock lock(output_mutex);
-
-                        // Game is completed, write to the output file
-                        game.write(output);
-
-                        // Report progress
-                        n_games_completed++;
-                        std::cout << "\rGames: " << n_games_completed << std::flush;
-                    }
+                    queue.push(std::move(game));
                 }
+
+                // Check if we should stop
+                if (stop.load(std::memory_order_relaxed))
+                    break;
             }
+            n_active_threads--;
         };
 
         // Start threads
         std::vector<std::thread> threads_list;
         for (int i = 0; i < threads; i++)
             threads_list.push_back(std::thread(thread_loop, i));
+
+        // Write games to file
+        while (n_active_threads > 0 || !queue.empty())
+        {
+            queue.pop().write(output);
+            n_games_completed++;
+            int64_t elapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start).count();
+            int games_per_hour = 3600.0 * n_games_completed / (elapsed + 1);
+            std::cout << "\r"
+                      << n_games_completed << " games completed in "
+                      << elapsed << " s ("
+                      << games_per_hour << " games/h)"
+                      << std::flush;
+
+            // Have we reached the maximum number of games?
+            if (max_num_games > 0 && n_games_completed >= max_num_games)
+            {
+                stop.store(true, std::memory_order_relaxed);
+                break;
+            }
+        }
         
         // Wait for threads to finish
         for (std::thread& t : threads_list)
