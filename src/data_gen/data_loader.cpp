@@ -143,7 +143,6 @@ extern "C"
                     // iii) Best move not a promotion
                     if (!board.checkers() &&
                         !node.move.is_capture() &&
-                        !node.move.is_promotion() &&
                         (prng.next(prob) < 1 || num_pos == 0))
                     {
                         // Update features
