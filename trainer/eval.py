@@ -8,7 +8,7 @@ from model import NNUE, SCALE_FACTOR
 def main(net_file: str, fen: str):
     model = torch.load(net_file, map_location='cpu')
     w_offset, w_cols, b_offset, b_cols, buckets, stms = build_features(fen)
-    print(model(w_offset, w_cols, b_offset, b_cols, buckets, stms) * SCALE_FACTOR / 2)
+    print(model(w_offset, w_cols, b_offset, b_cols, buckets) * SCALE_FACTOR / 2)
 
 
 
