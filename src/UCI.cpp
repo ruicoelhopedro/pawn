@@ -20,7 +20,7 @@ namespace UCI
 #ifdef GIT_VERSION
     const std::string VERSION = "pawn " + std::string(GIT_VERSION);
 #else
-    const std::string VERSION = "pawn v3.0";
+    const std::string VERSION = "pawn v4.0";
 #endif
 
 
