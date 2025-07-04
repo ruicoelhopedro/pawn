@@ -670,22 +670,13 @@ public:
 };
 
 
-struct MoveInfo
-{
-    Move move;
-    bool extended;
-};
-
-
 
 class Position
 {
     std::vector<Board> m_boards;
     MoveStack m_stack;
     int m_pos;
-    int m_extensions;
-    std::vector<MoveInfo> m_moves;
-    bool m_reduced;
+    std::vector<Move> m_moves;
 
 public:
     Position();
@@ -706,7 +697,7 @@ public:
     MoveList generate_moves(MoveGenType type);
 
 
-    void make_move(Move move, bool extension = false);
+    void make_move(Move move);
 
 
     void unmake_move();
@@ -730,16 +721,10 @@ public:
     MoveList move_list() const;
 
 
-    int num_extensions() const;
-
-
     void set_init_ply();
 
 
     Depth ply() const;
-
-
-    bool reduced() const;
 
 
     Move last_move(std::size_t offset = 0) const;

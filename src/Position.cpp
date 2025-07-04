@@ -784,7 +784,7 @@ std::string Board::to_uci(Move m) const
 
 
 Position::Position()
-    : m_boards(1), m_stack(NUM_MAX_DEPTH), m_pos(0), m_extensions(0), m_moves(0), m_reduced(false)
+    : m_boards(1), m_stack(NUM_MAX_DEPTH), m_pos(0), m_moves(0)
 {}
 
 
@@ -851,29 +851,21 @@ MoveList Position::generate_moves(MoveGenType type)
 }
 
 
-void Position::make_move(Move move, bool extension)
+void Position::make_move(Move move)
 {
     ++m_stack;
     ++m_pos;
     m_boards.push_back(board().make_move(move));
-    m_moves.push_back(MoveInfo{ move, extension });
-
-    if (extension)
-        m_extensions++;
+    m_moves.push_back(move);
 }
 
 
 void Position::unmake_move()
 {
     m_boards.pop_back();
+    m_moves.pop_back();
     --m_stack;
     --m_pos;
-
-    auto info = m_moves.back();
-    if (info.extended)
-        m_extensions--;
-
-    m_moves.pop_back();
 }
 
 
@@ -882,16 +874,16 @@ void Position::make_null_move()
     ++m_stack;
     ++m_pos;
     m_boards.push_back(board().make_null_move());
-    m_moves.push_back(MoveInfo{ MOVE_NULL, false });
+    m_moves.push_back(MOVE_NULL);
 }
 
 
 void Position::unmake_null_move()
 {
     m_boards.pop_back();
+    m_moves.pop_back();
     --m_stack;
     --m_pos;
-    m_moves.pop_back();
 }
 
 
@@ -919,16 +911,13 @@ MoveList Position::move_list() const
 }
 
 
-int Position::num_extensions() const
-{
-    return m_extensions;
-}
-
-
 void Position::set_init_ply()
 {
     m_pos = 0;
     m_stack.reset_pos();
+    std::size_t new_size = 256 * (m_boards.size() / 256 + 1);
+    m_boards.reserve(new_size);
+    m_moves.reserve(new_size);
 }
 
 
@@ -938,15 +927,9 @@ Depth Position::ply() const
 }
 
 
-bool Position::reduced() const
-{
-    return m_reduced;
-}
-
-
 Move Position::last_move(std::size_t offset) const
 {
-    return m_moves.size() > offset ? m_moves[m_moves.size() - offset - 1].move : MOVE_NULL;
+    return m_moves.size() > offset ? m_moves[m_moves.size() - offset - 1] : MOVE_NULL;
 }
 
 
