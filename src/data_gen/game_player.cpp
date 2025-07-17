@@ -16,14 +16,14 @@ namespace GamePlayer
     void play_games(std::istringstream& stream)
     {
         // Parameters and their default values
-        int depth = 9;
-        std::size_t runs_per_fen = 10000000;
+        int depth = 8;
+        std::size_t runs_per_fen = 100000000;
         std::size_t max_num_games = 0;
         int adjudication = SCORE_MATE_FOUND;
         std::string book = "";
-        std::string output_file = "output.dat";
+        std::string output_file = "output.bin";
         int random_probability = 100;
-        int store_min_ply = 15;
+        int store_min_ply = 12;
         int seed = 0;
         int threads = 1;
         int hash = 1;
@@ -140,25 +140,14 @@ namespace GamePlayer
                     int num_plies = store_min_ply + random.next(2);
                     for (int ply = 0; ply < num_plies; ply++)
                     {
-                        // Search or pick a random move?
-                        Move move;
-                        int ply_factor = random_probability * ply * ply / (num_plies * num_plies + 1);
-                        if (int(random.next(100)) < random_probability - ply_factor)
-                        {
-                            // Random mover: generate legal moves for this position
-                            Move moves[NUM_MAX_MOVES];
-                            MoveList move_list(moves);
-                            pos.board().generate_moves(move_list, MoveGenType::LEGAL);
+                        // Random mover: generate legal moves for this position
+                        Move moves[NUM_MAX_MOVES];
+                        MoveList move_list(moves);
+                        pos.board().generate_moves(move_list, MoveGenType::LEGAL);
 
-                            // Pick a move
-                            int num_moves = move_list.length();
-                            move = num_moves > 0 ? moves[random.next(num_moves)] : MOVE_NULL;
-                        }
-                        else
-                        {
-                            // Search-based: pick the bestmove for this position
-                            move = thread.simple_search(pos, limits, threads > 1).bestmove;
-                        }
+                        // Pick a move
+                        int num_moves = move_list.length();
+                        Move move = num_moves > 0 ? moves[random.next(num_moves)] : MOVE_NULL;
 
                         // Check if the game ended
                         valid_game = move != MOVE_NULL;
@@ -176,7 +165,7 @@ namespace GamePlayer
                         continue;
 
                     // Determine if we keep using this position or discard it based on the score
-                    int prob = 50 * (1 + accept_threshold) / (1 + abs(result.score));
+                    int prob = 200 * (1 + accept_threshold) / (1 + abs(result.score));
                     if (int(random.next(100)) > prob)
                         continue;
 
