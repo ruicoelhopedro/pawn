@@ -19,14 +19,14 @@ jobs:
       matrix:
         config:
           - name: ubuntu
-            os: ubuntu-20.04
+            os: ubuntu-latest
             cc: gcc
             cxx: g++
             shell: bash
           - name: macos
             os: macos-latest
-            cc: gcc-11
-            cxx: g++-11
+            cc: gcc
+            cxx: g++
             shell: bash
           - name: windows
             os: windows-2022

@@ -622,10 +622,11 @@ namespace Search
             {
                 didLMR = true;
                 int reduction = ilog2(n_moves) / 2
+                              + ilog2(depth) / 2
                               - (captureOrPromotion || PvNode)
                               - (move_score + 15000) / 30000
                               + 2 * cut_node
-                              + 2;
+                              + 1;
 
                 // Reduced depth search
                 Depth new_depth = std::clamp(curr_depth - reduction - 1, 0, curr_depth - 1);

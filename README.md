@@ -40,30 +40,31 @@ The ratings are computed with `ordo` (anchored at zero for the first commit and 
 
 | Date     | Commit  |   Elo   | Error(+/-) |
 |----------|---------|---------|------------|
-| 24/01/12 | [3.0](https://github.com/ruicoelhopedro/pawn/tree/v3.0)                                             |   349.8 |       19.8 |
-| 23/11/30 | [`e276c44`](https://github.com/ruicoelhopedro/pawn/commit/e276c441d62ea08995ba03df3b54bd1ee95882fe) |   296.8 |       19.7 |
-| 23/10/31 | [`795d3c0`](https://github.com/ruicoelhopedro/pawn/commit/795d3c08066449789ab28f10c48c8c057210ef85) |   288.2 |       19.5 |
-| 23/10/06 | [2.0](https://github.com/ruicoelhopedro/pawn/tree/v2.0)                                             |   235.2 |       15.2 |
-| 23/08/31 | [`5a5ea8a`](https://github.com/ruicoelhopedro/pawn/commit/5a5ea8a6d999208831f9d12521a0d379450611ae) |   169.9 |       15.8 |
-| 23/06/30 | [`b68c1df`](https://github.com/ruicoelhopedro/pawn/commit/b68c1dfbae0a5346401dff5655a87ff5f7555862) |   163.4 |       15.7 |
-| 23/04/24 | [`c777eef`](https://github.com/ruicoelhopedro/pawn/commit/c777eef3af07889de88d51d830eb1e6f3c8423ba) |   121.7 |       14.6 |
-| 23/03/12 | [1.0](https://github.com/ruicoelhopedro/pawn/tree/v1.0)                                             |     0.0 |       14.0 |
-| 23/02/11 | [`527fe63`](https://github.com/ruicoelhopedro/pawn/commit/527fe63b24f58b1230278c1f4dfc4541d0472f99) |   -17.5 |       15.0 |
-| 23/01/31 | [`d7b26dc`](https://github.com/ruicoelhopedro/pawn/commit/d7b26dcab6ba7ff8bc451c17423a0cec31dd8d6a) |   -36.5 |       15.0 |
-| 22/12/20 | [`ecf549f`](https://github.com/ruicoelhopedro/pawn/commit/ecf549f4d3c988fcf44b34402cdb534c71881056) |  -226.0 |       14.2 |
-| 22/11/18 | [`c22a7e5`](https://github.com/ruicoelhopedro/pawn/commit/c22a7e526826ad10565cbddb49a907351f8e27ba) |  -240.1 |       13.8 |
-| 22/10/06 | [`567797f`](https://github.com/ruicoelhopedro/pawn/commit/567797f0fbe1df386444df12e07462dc2305bb60) |  -360.4 |       14.3 |
-| 22/09/23 | [`132140b`](https://github.com/ruicoelhopedro/pawn/commit/132140b23e018c82259061b46d8b4569ac429666) |  -370.2 |       16.9 |
-| 22/08/30 | [`25607d9`](https://github.com/ruicoelhopedro/pawn/commit/25607d9b1d1357164d49438f95a81a78109930e2) |  -404.3 |       17.1 |
-| 22/07/30 | [`638dc4c`](https://github.com/ruicoelhopedro/pawn/commit/638dc4cfe2b2b9d15832d5be6811d17989535185) |  -463.1 |       17.5 |
-| 22/06/27 | [`069e93a`](https://github.com/ruicoelhopedro/pawn/commit/069e93aedd915f2826b06e838e727c915249591d) |  -562.0 |       18.4 |
-| 22/05/27 | [`78c2f15`](https://github.com/ruicoelhopedro/pawn/commit/78c2f15ab191cb5ffc9e40244e6ec9bc807a0622) |  -755.4 |       19.6 |
-| 22/04/27 | [`5fd6e1d`](https://github.com/ruicoelhopedro/pawn/commit/5fd6e1d74b4efdaf7c86044db5f6fd5c52dbcbb5) | -1004.7 |       22.6 |
-| 22/03/18 | [`fa8e828`](https://github.com/ruicoelhopedro/pawn/commit/fa8e8281278eaad998446b8137db4a1708b05411) | -1040.8 |       22.6 |
-| 22/02/28 | [`0a131bd`](https://github.com/ruicoelhopedro/pawn/commit/0a131bdb01c8d5cbfa1f68de349e5ca4bcb9dec8) | -1062.2 |       22.7 |
-| 21/10/29 | [`61edb2a`](https://github.com/ruicoelhopedro/pawn/commit/61edb2a9417ed3b03ddfb8a667c883d55c44036d) | -1073.7 |       22.6 |
-| 21/09/28 | [`cadf61b`](https://github.com/ruicoelhopedro/pawn/commit/cadf61b0049c37b06c14ef64b43b0eaa8cea0610) | -1193.2 |       24.8 |
-| 21/08/31 | [`056c448`](https://github.com/ruicoelhopedro/pawn/commit/056c44850f6d74a993b1c1eee10a2809cd99c889) | -1387.1 |       30.4 |
+| 25/05/05 | [4.0](https://github.com/ruicoelhopedro/pawn/tree/v4.0)                                             |   389.6 |       16.7 |
+| 24/01/12 | [3.0](https://github.com/ruicoelhopedro/pawn/tree/v3.0)                                             |   349.3 |       15.4 |
+| 23/11/30 | [`e276c44`](https://github.com/ruicoelhopedro/pawn/commit/e276c441d62ea08995ba03df3b54bd1ee95882fe) |   292.0 |       15.5 |
+| 23/10/31 | [`795d3c0`](https://github.com/ruicoelhopedro/pawn/commit/795d3c08066449789ab28f10c48c8c057210ef85) |   285.7 |       17.8 |
+| 23/10/06 | [2.0](https://github.com/ruicoelhopedro/pawn/tree/v2.0)                                             |   235.9 |       14.0 |
+| 23/08/31 | [`5a5ea8a`](https://github.com/ruicoelhopedro/pawn/commit/5a5ea8a6d999208831f9d12521a0d379450611ae) |   170.2 |       14.7 |
+| 23/06/30 | [`b68c1df`](https://github.com/ruicoelhopedro/pawn/commit/b68c1dfbae0a5346401dff5655a87ff5f7555862) |   163.7 |       14.7 |
+| 23/04/24 | [`c777eef`](https://github.com/ruicoelhopedro/pawn/commit/c777eef3af07889de88d51d830eb1e6f3c8423ba) |   122.0 |       13.7 |
+| 23/03/12 | [1.0](https://github.com/ruicoelhopedro/pawn/tree/v1.0)                                             |     0.0 |       13.0 |
+| 23/02/11 | [`527fe63`](https://github.com/ruicoelhopedro/pawn/commit/527fe63b24f58b1230278c1f4dfc4541d0472f99) |   -17.3 |       14.7 |
+| 23/01/31 | [`d7b26dc`](https://github.com/ruicoelhopedro/pawn/commit/d7b26dcab6ba7ff8bc451c17423a0cec31dd8d6a) |   -36.4 |       14.6 |
+| 22/12/20 | [`ecf549f`](https://github.com/ruicoelhopedro/pawn/commit/ecf549f4d3c988fcf44b34402cdb534c71881056) |  -225.9 |       13.8 |
+| 22/11/18 | [`c22a7e5`](https://github.com/ruicoelhopedro/pawn/commit/c22a7e526826ad10565cbddb49a907351f8e27ba) |  -240.0 |       13.6 |
+| 22/10/06 | [`567797f`](https://github.com/ruicoelhopedro/pawn/commit/567797f0fbe1df386444df12e07462dc2305bb60) |  -360.3 |       14.1 |
+| 22/09/23 | [`132140b`](https://github.com/ruicoelhopedro/pawn/commit/132140b23e018c82259061b46d8b4569ac429666) |  -370.1 |       16.7 |
+| 22/08/30 | [`25607d9`](https://github.com/ruicoelhopedro/pawn/commit/25607d9b1d1357164d49438f95a81a78109930e2) |  -404.2 |       16.6 |
+| 22/07/30 | [`638dc4c`](https://github.com/ruicoelhopedro/pawn/commit/638dc4cfe2b2b9d15832d5be6811d17989535185) |  -462.9 |       16.8 |
+| 22/06/27 | [`069e93a`](https://github.com/ruicoelhopedro/pawn/commit/069e93aedd915f2826b06e838e727c915249591d) |  -561.9 |       17.6 |
+| 22/05/27 | [`78c2f15`](https://github.com/ruicoelhopedro/pawn/commit/78c2f15ab191cb5ffc9e40244e6ec9bc807a0622) |  -755.2 |       20.1 |
+| 22/04/27 | [`5fd6e1d`](https://github.com/ruicoelhopedro/pawn/commit/5fd6e1d74b4efdaf7c86044db5f6fd5c52dbcbb5) | -1004.6 |       22.1 |
+| 22/03/18 | [`fa8e828`](https://github.com/ruicoelhopedro/pawn/commit/fa8e8281278eaad998446b8137db4a1708b05411) | -1040.7 |       22.3 |
+| 22/02/28 | [`0a131bd`](https://github.com/ruicoelhopedro/pawn/commit/0a131bdb01c8d5cbfa1f68de349e5ca4bcb9dec8) | -1062.0 |       22.8 |
+| 21/10/29 | [`61edb2a`](https://github.com/ruicoelhopedro/pawn/commit/61edb2a9417ed3b03ddfb8a667c883d55c44036d) | -1073.6 |       22.8 |
+| 21/09/28 | [`cadf61b`](https://github.com/ruicoelhopedro/pawn/commit/cadf61b0049c37b06c14ef64b43b0eaa8cea0610) | -1193.0 |       24.3 |
+| 21/08/31 | [`056c448`](https://github.com/ruicoelhopedro/pawn/commit/056c44850f6d74a993b1c1eee10a2809cd99c889) | -1387.0 |       30.0 |
 
 ## UCI Options
 The following UCI options are supported:
