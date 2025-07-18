@@ -22,6 +22,10 @@ struct SearchResult
     Score score;
     Move bestmove;
 
+    inline SearchResult()
+        : score(0), bestmove(MOVE_NULL)
+    {}
+
     inline SearchResult(Score s, Move m)
         : score(s), bestmove(m)
     {}

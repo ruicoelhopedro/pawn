@@ -17,12 +17,9 @@ namespace GamePlayer
     {
         // Parameters and their default values
         int depth = 8;
-        std::size_t runs_per_fen = 100000000;
         std::size_t max_num_games = 0;
-        int adjudication = SCORE_MATE_FOUND;
         std::string book = "";
         std::string output_file = "output.bin";
-        int random_probability = 100;
         int store_min_ply = 12;
         int seed = 0;
         int threads = 1;
@@ -37,18 +34,12 @@ namespace GamePlayer
         while (stream >> token)
             if (token == "depth")
                 stream >> depth;
-            else if (token == "runs_per_fen")
-                stream >> runs_per_fen;
             else if (token == "max_num_games")
                 stream >> max_num_games;
-            else if (token == "adjudication")
-                stream >> adjudication;
             else if (token == "book")
                 stream >> book;
             else if (token == "output_file")
                 stream >> output_file;
-            else if (token == "random_probability")
-                stream >> random_probability;
             else if (token == "store_min_ply")
                 stream >> store_min_ply;
             else if (token == "seed")
@@ -111,31 +102,30 @@ namespace GamePlayer
         auto thread_loop = [=, &queue, &n_active_threads, &stop](std::size_t id)
         {
             // Init PRNG
-            PseudoRandom random(seed + (1 << id));
+            PseudoRandom random(seed + PseudoRandom::get(id));
 
             // Prepare search thread
             ThreadPool pool(1, hash);
             Thread& thread = pool.front();
 
-            // Loop over each FEN
-            for (std::size_t i_fen = 0; i_fen < fens.size(); i_fen++)
+            // Data generation loop
+            while (!stop.load(std::memory_order_relaxed))
             {
-                const std::string& fen = fens[i_fen];
+                // Pick a random FEN
+                const std::string& fen = fens[random.next(fens.size())];
+                Position pos(fen);
+                SearchResult result;
 
-                // Runs loop
-                for (std::size_t i_run = 0; i_run < runs_per_fen; i_run++)
+                // Initial position generation
+                while (true)
                 {
-                    // Check if we should stop
-                    if (stop.load(std::memory_order_relaxed))
-                        break;
-
                     // Initialise position and clear search data
-                    Position pos(fen);
+                    pos = Position(fen);
                     pos.set_init_ply();
                     pool.clear();
 
                     // Position warmup stage: the initial position for the game is obtained by a
-                    // mix of search-based and random moves from the list of given FEN positions
+                    // set of random moves from the list of given FEN positions
                     bool valid_game = true;
                     int num_plies = store_min_ply + random.next(2);
                     for (int ply = 0; ply < num_plies; ply++)
@@ -160,36 +150,32 @@ namespace GamePlayer
                     }
 
                     // Is the reached position usable?
-                    SearchResult result = thread.simple_search(pos, limits, threads > 1);
-                    if (!valid_game || result.bestmove == MOVE_NULL)
+                    if (!valid_game)
                         continue;
 
                     // Determine if we keep using this position or discard it based on the score
+                    result = thread.simple_search(pos, limits, threads > 1);
                     int prob = 200 * (1 + accept_threshold) / (1 + abs(result.score));
-                    if (int(random.next(100)) > prob)
-                        continue;
-
-                    // Register a new game
-                    BinaryGame game;
-                    game.begin(pos.board());
-
-                    // Game loop
-                    while (result.bestmove != MOVE_NULL)
-                    {
-                        game.push(result.bestmove, result.score);
-                        pos.make_move(result.bestmove);
-                        pos.set_init_ply();
-                        result = thread.simple_search(pos, limits, threads > 1);
-                    }
-
-                    // Add termination node
-                    game.push(MOVE_NULL, result.score > 0 ? WHITE_COLOR : result.score < 0 ? BLACK_COLOR : NO_COLOR);
-                    queue.push(std::move(game));
+                    if (result.bestmove != MOVE_NULL && int(random.next(100)) <= prob)
+                        break;
                 }
 
-                // Check if we should stop
-                if (stop.load(std::memory_order_relaxed))
-                    break;
+                // Register a new game
+                BinaryGame game;
+                game.begin(pos.board());
+
+                // Game loop
+                while (result.bestmove != MOVE_NULL)
+                {
+                    game.push(result.bestmove, result.score);
+                    pos.make_move(result.bestmove);
+                    pos.set_init_ply();
+                    result = thread.simple_search(pos, limits, threads > 1);
+                }
+
+                // Add termination node
+                game.push(MOVE_NULL, result.score > 0 ? WHITE_COLOR : result.score < 0 ? BLACK_COLOR : NO_COLOR);
+                queue.push(game);
             }
             n_active_threads--;
         };
