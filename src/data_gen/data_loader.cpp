@@ -17,6 +17,7 @@ extern "C"
         Zobrist::build_rnd_hashes();
         NNUE::init();
         UCI::init();
+        UCI::Options::UCI_Chess960 = true;
     }
 
 

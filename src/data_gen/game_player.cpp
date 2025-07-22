@@ -385,11 +385,18 @@ namespace GamePlayer
         }
         assert(files.size() > 0 && "No input files have been passed!");
 
+        // Store Chess960 status
+        bool init_chess960 = UCI::Options::UCI_Chess960;
+        UCI::Options::UCI_Chess960 = true;
+
         // Parse each file
         for (auto filename : files)
             std::cout << (file_valid(filename, stats) ? " [ OK ] " : " [FAIL] ")
                       << filename
                       << std::endl;
+        
+        // Restore Chess960 status
+        UCI::Options::UCI_Chess960 = init_chess960;
     }
 
 
@@ -413,6 +420,10 @@ namespace GamePlayer
         ifile.seekg(0, std::ios_base::end);
         auto eof = ifile.tellg();
         ifile.seekg(0, std::ios_base::beg);
+
+        // Store Chess960 status
+        bool init_chess960 = UCI::Options::UCI_Chess960;
+        UCI::Options::UCI_Chess960 = true;
 
         // Read entire file
         BinaryGame game;
@@ -471,6 +482,9 @@ namespace GamePlayer
                   << " games to " << output_file_path
                   << " and discarded " << bad_games
                   << " bad games" << std::endl;
-        ofile.close();
+        ofile.close();    
+    
+        // Restore Chess960 status
+        UCI::Options::UCI_Chess960 = init_chess960;
     }
 }
