@@ -588,6 +588,9 @@ SearchResult Thread::simple_search(Position& pos, const Search::Limits& limits, 
     {
         Search::SearchData data(*this);
         aspiration_search(pos, pv, iDepth, data);
+
+        if (m_nodes_searched.load(std::memory_order_relaxed) > limits.nodes / m_pool.size())
+            break;
     }
     m_data_gen = false;
 

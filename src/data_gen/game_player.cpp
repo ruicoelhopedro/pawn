@@ -17,6 +17,7 @@ namespace GamePlayer
     {
         // Parameters and their default values
         int depth = 8;
+        int nodes = 0;
         std::size_t max_num_games = 0;
         std::string book = "";
         std::string output_file = "output.bin";
@@ -34,6 +35,8 @@ namespace GamePlayer
         while (stream >> token)
             if (token == "depth")
                 stream >> depth;
+            else if (token == "nodes")
+                stream >> nodes;
             else if (token == "max_num_games")
                 stream >> max_num_games;
             else if (token == "book")
@@ -89,7 +92,10 @@ namespace GamePlayer
 
         // Prepare search data
         Search::Limits limits;
-        limits.depth = depth;
+        if (depth > 0)
+            limits.depth = depth;
+        if (nodes > 0)
+            limits.nodes = nodes;
         std::atomic_bool stop = false;
         ThreadSafeQueue<BinaryGame> queue;
         std::atomic_int n_active_threads = threads;
