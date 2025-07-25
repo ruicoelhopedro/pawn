@@ -457,7 +457,8 @@ namespace GamePlayer
 
             // Loop over all moves ensuring they are legal
             bool good_game = true;
-            for (BinaryNode node : game.nodes)
+            Score last_score = game.nodes.back().score;
+            for (BinaryNode& node : game.nodes)
             {
                 if (node.move != MOVE_NULL)
                 {
@@ -468,13 +469,32 @@ namespace GamePlayer
                         break;
                     }
                     board = board.make_move(node.move);
+                    last_score = node.score;
                 }
-                // Ensure the last score is the game outcome (-1, 0 or 1)
-                else if (abs(node.score) > 1)
+                // Sanity checks for the end node
+                else
                 {
-                    good_game = false;
-                    std::cout << "Bad termination in game " << game_number << std::endl;
-                    break;
+                    // Ensure the last score is the game outcome (-1, 0 or 1)
+                    if (abs(node.score) > 1)
+                    {
+                        good_game = false;
+                        std::cout << "Bad termination in game " << game_number << std::endl;
+                        break;
+                    }
+
+                    // Check if the last score matches the game outcome
+                    if ((last_score == 0 && node.score != 0) ||
+                        (last_score > 0 && node.score != WHITE_COLOR) ||
+                        (last_score < 0 && node.score != BLACK_COLOR))
+                    {
+                        std::cout << "Fixing bad game termination in game " << game_number
+                                  << " with score " << last_score
+                                  << " and result " << node.score
+                                  << std::endl;
+                        node.score = last_score > 0 ? WHITE_COLOR
+                                   : last_score < 0 ? BLACK_COLOR
+                                   : NO_COLOR;
+                    }
                 }
             }
 
