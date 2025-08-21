@@ -560,8 +560,12 @@ SearchResult Thread::simple_search(Position& pos, const Search::Limits& limits, 
     m_root_moves = MoveList(moves);
     pos.board().generate_moves(m_root_moves, MoveGenType::LEGAL);
 
-    // Check for aborted search if game has ended
-    if (m_root_moves.length() == 0 || pos.is_draw(false))
+    // Repetitions + 50-move rule
+    if (pos.is_draw(false))
+        return SearchResult(SCORE_DRAW, MOVE_NULL);
+    
+    // Checkmates and stalemates
+    if (m_root_moves.length() == 0)
         return SearchResult(pos.in_check() ? -SCORE_MATE * turn_to_color(pos.get_turn())
                                            : SCORE_DRAW,
                             MOVE_NULL);
