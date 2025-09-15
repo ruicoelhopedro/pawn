@@ -24,13 +24,14 @@ public:
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         m_queue.push(item);
+        m_size++;
         m_cvar.notify_one();
     }
 
     void push(T&& item)
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        m_queue.push(item);
+        m_queue.push(std::move(item));
         m_size++;
         m_cvar.notify_one();
     }
