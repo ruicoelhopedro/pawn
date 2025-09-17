@@ -25,7 +25,7 @@ namespace GamePlayer
         int seed = 0;
         int threads = 1;
         int hash = 1;
-        int accept_threshold = 300;
+        int accept_threshold = 50;
         bool shallow_depth_pruning = false;
         std::string syzygy_path = "";
         bool chess_960 = false;
@@ -196,11 +196,11 @@ namespace GamePlayer
         {
             queue.pop().write(output);
             n_games_completed++;
-            int64_t elapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start).count();
-            int games_per_hour = 3600.0 * n_games_completed / (elapsed + 1);
+            int64_t elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+            int games_per_hour = 3600000 * n_games_completed / (elapsed + 1);
             std::cout << "\r"
                       << n_games_completed << " games completed in "
-                      << elapsed << " s ("
+                      << elapsed / 1000 << " s ("
                       << games_per_hour << " games/h)"
                       << std::flush;
 
