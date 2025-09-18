@@ -21,7 +21,7 @@ namespace GamePlayer
         std::size_t max_num_games = 0;
         std::string book = "";
         std::string output_file = "output.bin";
-        int store_min_ply = 12;
+        int store_min_ply = 8;
         int seed = 0;
         int threads = 1;
         int hash = 1;
