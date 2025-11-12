@@ -276,7 +276,7 @@ void Board::regen_psqt(Turn turn)
 
     // Pack features to be pushed into the accumulator
     for (Turn t : { WHITE, BLACK })
-        for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN })
+        for (PieceType p : { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING })
         {
             Bitboard b = get_pieces(t, p);
             while (b)
