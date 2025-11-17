@@ -109,14 +109,12 @@ extern "C"
                 ks = horizontal_mirror(ks);
             }
 
-            int ki = 4 * rank(ks) + file(ks);
+            int bucket = 4 * rank(ks) + file(ks);
 
-            int index = s
-                      + p  * 64
-                      + ki * 64 * 5
-                      + t  * 64 * 5 * 32;
-
-            return index;
+            return s
+                 + p      * NUM_SQUARES
+                 + t      * NUM_SQUARES * NUM_PIECE_TYPES
+                 + bucket * NUM_SQUARES * NUM_PIECE_TYPES * NUM_COLORS;
         };
 
         Size count = 0;
@@ -170,7 +168,7 @@ extern "C"
                         {
                             Square vm = vertical_mirror(s);
                             PieceType piece = board.get_piece_at(s);
-                            if (piece != PIECE_NONE && piece != KING)
+                            if (piece != PIECE_NONE)
                             {
                                 if (pieces[WHITE].test(s))
                                 {
