@@ -2,16 +2,18 @@ import chess
 import torch
 import numpy as np
 from torch import nn
-from utils import map_features
 
-
-NUM_FEATURES = 20480
+NUM_SQUARES = 64
+NUM_PIECE_TYPES = 6
+NUM_COLORS = 2
+NUM_INPUT_BUCKETS = 32
+NUM_FEATURES = NUM_SQUARES * NUM_PIECE_TYPES * NUM_COLORS * NUM_INPUT_BUCKETS
 NUM_ACCUMULATORS = 512
-NUM_BUCKETS = 4
+NUM_OUTPUT_BUCKETS = 4
 
 
 SCALE_FACTOR = 1024
-NUM_MAX_FEATURES = 30
+NUM_MAX_FEATURES = 32
 
 
 PIECE_VALUES = {
@@ -49,24 +51,28 @@ class NNUE(nn.Module):
     def __init__(self):
         super().__init__()
         self.crelu = CReLU()
-        self.psqt = nn.EmbeddingBag(NUM_FEATURES, NUM_BUCKETS, mode='sum')
-        self.accumulator_emb = nn.EmbeddingBag(NUM_FEATURES, NUM_ACCUMULATORS, mode='sum')
-        self.accumulator_bias = nn.Parameter(torch.zeros(NUM_ACCUMULATORS))
-        self.layer = nn.Linear(2 * NUM_ACCUMULATORS, NUM_BUCKETS)
+        self.psqt = nn.EmbeddingBag(NUM_FEATURES, NUM_OUTPUT_BUCKETS, mode='sum')
+        self.accumulator = nn.EmbeddingBag(NUM_FEATURES, NUM_ACCUMULATORS, mode='sum')
+        self.layer = nn.Linear(2 * NUM_ACCUMULATORS, NUM_OUTPUT_BUCKETS)
         # Clear weights and biases for sparse input layer and PSQT
         self.psqt.weight.data.fill_(0.0)
-        self.accumulator_emb.weight.data.fill_(0.0)
-        self.accumulator_bias.data.fill_(0.0)
+        self.accumulator.weight.data.fill_(0.0)
         # Initialise PSQT weights using material balance
-        for square in range(64):
-            for king in range(64):
-                for piece, (_, eg) in PIECE_VALUES.items():
-                    self.psqt.weight.data[map_features(piece, square, king, True), :] = eg / SCALE_FACTOR
+        psqt_view = self.psqt.weight.data.view(
+            NUM_INPUT_BUCKETS,
+            NUM_COLORS,
+            NUM_PIECE_TYPES,
+            NUM_SQUARES,
+            NUM_OUTPUT_BUCKETS,
+        )
+        for piece, (_, eg) in PIECE_VALUES.items():
+            psqt_view[:, 0, piece - 1, :, :] = eg / (2 * SCALE_FACTOR)
+            psqt_view[:, 1, piece - 1, :, :] = -eg / (2 * SCALE_FACTOR)
 
     def forward(self, w_offset, w_cols, b_offset, b_cols, buckets):
         psqt = self.psqt(w_cols, w_offset) - self.psqt(b_cols, b_offset)
-        stm_acc = self.crelu(self.accumulator_emb(w_cols, w_offset) + self.accumulator_bias)
-        ntm_acc = self.crelu(self.accumulator_emb(b_cols, b_offset) + self.accumulator_bias)
+        stm_acc = self.crelu(self.accumulator(w_cols, w_offset))
+        ntm_acc = self.crelu(self.accumulator(b_cols, b_offset))
         positional = self.layer(torch.cat([stm_acc, ntm_acc], dim=1))
         bucketed_output = psqt + positional
         return bucketed_output.gather(-1, buckets.unsqueeze(-1)).squeeze(-1)
@@ -82,8 +88,7 @@ class NNUE(nn.Module):
     def export(self, filename):
         # Export each layer to the output NNUE file
         with open(filename, 'w') as output_file:
-            self.__dump(self.accumulator_emb.weight.data, np.short, SCALE_FACTOR, output_file)
+            self.__dump(self.accumulator.weight.data, np.short, SCALE_FACTOR, output_file)
             self.__dump(self.psqt.weight.data, np.short, SCALE_FACTOR, output_file)
-            self.__dump(self.accumulator_bias.data, np.short, SCALE_FACTOR, output_file)
             self.__dump(self.layer.weight.data, np.short, SCALE_FACTOR, output_file)
             self.__dump(self.layer.bias.data, np.short, SCALE_FACTOR, output_file)

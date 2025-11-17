@@ -1,68 +1,119 @@
+from typing import List, Optional, TextIO, Literal
 import os
 import ctypes
-import argparse
-from multiprocessing.dummy import Pool as ThreadPool
+from dataclasses import dataclass, field
+from tqdm import tqdm
 import numpy as np
 from numpy.ctypeslib import ndpointer
 import torch
-import torch.sparse
-from torch import nn
-from tqdm import tqdm
-from torch.utils.data import Dataset
-from torch.utils.data.sampler import BatchSampler, RandomSampler
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
+from torch.utils.data import Dataset, BatchSampler, RandomSampler
 from sklearn.model_selection import train_test_split
+from simple_parsing import ArgumentParser
 from model import NNUE, NUM_MAX_FEATURES, sigmoid_loss
+from pmap import ParallelMap
 
 
-class BatchedDataLoader:
+@dataclass
+class Options:
+    """Training options."""
+    # Output directory for model checkpoints
+    output_dir: str = 'models'
 
-    def __init__(self, dataset, batch_size, num_threads):
-        self.dataset = dataset
-        self.batch_size = batch_size
-        self.num_threads = num_threads
-        self.sampler = BatchSampler(RandomSampler(dataset), batch_size=batch_size, drop_last=False)
+    # Number of epochs to train
+    epochs: int = 300
 
-    def __iter__(self):
-        return self.sampler.__iter__()
+    # Batch size for training
+    batch_size: int = 16384
 
-    def load(self, indices):
-        # If no workers, just load the data sequentially
-        if self.num_threads == 0:
-            return self.dataset[indices]
-        # Otherwise, load the data in parallel
-        split_indices = np.array_split(indices, self.num_threads)
-        with ThreadPool(self.num_threads) as pool:
-            results = list(pool.map(self.dataset.__getitem__, split_indices))
-        # Join the results
-        # Most fields only require concatenation, but offsets need to be adjusted
-        # based on the length of the previous results
-        w_offset = results[0][0]
-        b_offset = results[0][2]
-        w_num = results[0][1].shape[0]
-        b_num = results[0][3].shape[0]
-        for i in range(1, self.num_threads):
-            w_offset = torch.cat([w_offset, results[i][0] + w_num], dim=0)
-            b_offset = torch.cat([b_offset, results[i][2] + b_num], dim=0)
-            w_num += results[i][1].shape[0]
-            b_num += results[i][3].shape[0]
-        w_cols = torch.cat([r[1] for r in results], dim=0)
-        b_cols = torch.cat([r[3] for r in results], dim=0)
-        scores_array = torch.cat([r[4] for r in results], dim=0)
-        results_array = torch.cat([r[5] for r in results], dim=0)
-        buckets_array = torch.cat([r[6] for r in results], dim=0)
-        return w_offset, w_cols, b_offset, b_cols, scores_array, results_array, buckets_array
+    # On average, accept 1 in every `random_skip` positions
+    random_skip: int = 8
 
-    def set_train(self):
-        self.dataset.set_train()
+    # Fraction of data to use for testing
+    test_size: float = 0.1
 
-    def set_test(self):
-        self.dataset.set_test()
+    # Number of threads for data loading
+    num_threads: int = 1
+
+    # Path to a model to load (if any)
+    load: Optional[str] = None
+
+    # Learning rate for the optimiser
+    lr: float = 1e-3
+
+    # Learning rate scheduler
+    lr_scheduler: Literal['step', 'cosine', 'none'] = 'step'
+
+    # Step LR scheduler parameters: gamma
+    lr_step_gamma: float = 0.65
+
+    # Step LR scheduler parameters: step size (in epochs)
+    lr_step_size: int = 30
+
+    # Cosine LR scheduler parameters: final learning rate
+    lr_cosine_eta_max: float = 1e-5
+
+    # Interval (in epochs) to save model checkpoints
+    save_interval: int = 10
+
+    # Device to use for training
+    device: str = field(
+        default_factory=lambda: "cuda" if torch.cuda.is_available() else "cpu"
+    )
+
+
+@dataclass
+class BatchedData:
+    """Container for a batch of data."""
+
+    w_offset: torch.LongTensor
+    w_cols: torch.LongTensor
+    b_offset: torch.LongTensor
+    b_cols: torch.LongTensor
+    scores: torch.Tensor
+    results: torch.Tensor
+    buckets: torch.Tensor
+
+    def model_inputs(self) -> List[torch.Tensor]:
+        """Return the model input tensors as a list."""
+        return [
+            self.w_offset,
+            self.w_cols,
+            self.b_offset,
+            self.b_cols,
+            self.buckets,
+        ]
+
+    def loss_targets(self) -> List[torch.Tensor]:
+        """Return the loss target tensors as a list."""
+        return [
+            self.scores,
+            self.results,
+        ]
+
+    def to(self, device: torch.device) -> 'BatchedData':
+        """Move data to the specified device."""
+        return BatchedData(
+            self.w_offset.to(device),
+            self.w_cols.to(device),
+            self.b_offset.to(device),
+            self.b_cols.to(device),
+            self.scores.to(device),
+            self.results.to(device),
+            self.buckets.to(device),
+        )
 
 
 class PawnDataset(Dataset):
+    """Dataset for loading pawn data using the provided shared library."""
 
-    def __init__(self, pawn_path: str, dataset_path: str, prob_skip, test_size):
+    def __init__(
+        self,
+        pawn_path: str,
+        dataset_path: str,
+        prob_skip: int,
+        test_size: float,
+    ) -> None:
         # Load and prepare the library
         self.lib = ctypes.CDLL(pawn_path)
         self.lib.init_pawn()
@@ -75,30 +126,36 @@ class PawnDataset(Dataset):
         self.get_num_games.argtypes = [ctypes.c_char_p]
 
         self.get_indices = self.lib.get_indices
-        self.get_indices.argtypes = [ctypes.c_char_p,
-                                     ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS")]
+        self.get_indices.argtypes = [
+            ctypes.c_char_p,
+            ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
+        ]
 
         self.get_num_positions = self.lib.get_num_positions
         self.get_num_positions.restype = ctypes.c_ulonglong
-        self.get_num_positions.argtypes = [ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
-                                           ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
-                                           ctypes.c_ulonglong]
+        self.get_num_positions.argtypes = [
+            ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
+            ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
+            ctypes.c_ulonglong
+        ]
 
         self.get_nnue_data = self.lib.get_nnue_data
         self.get_nnue_data.restype = ctypes.c_ulonglong
-        self.get_nnue_data.argtypes = [ctypes.c_char_p,
-                                       ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
-                                       ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
-                                       ctypes.c_ulonglong,
-                                       ctypes.c_ulonglong,
-                                       ctypes.c_ulonglong,
-                                       ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
-                                       ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
-                                       ndpointer(ctypes.c_ushort, flags="C_CONTIGUOUS"),
-                                       ndpointer(ctypes.c_ushort, flags="C_CONTIGUOUS"),
-                                       ndpointer(ctypes.c_short, flags="C_CONTIGUOUS"),
-                                       ndpointer(ctypes.c_byte, flags="C_CONTIGUOUS"),
-                                       ndpointer(ctypes.c_byte, flags="C_CONTIGUOUS")]
+        self.get_nnue_data.argtypes = [
+            ctypes.c_char_p,
+            ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
+            ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
+            ctypes.c_ulonglong,
+            ctypes.c_ulonglong,
+            ctypes.c_ulonglong,
+            ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
+            ndpointer(ctypes.c_ulonglong, flags="C_CONTIGUOUS"),
+            ndpointer(ctypes.c_ushort, flags="C_CONTIGUOUS"),
+            ndpointer(ctypes.c_ushort, flags="C_CONTIGUOUS"),
+            ndpointer(ctypes.c_short, flags="C_CONTIGUOUS"),
+            ndpointer(ctypes.c_byte, flags="C_CONTIGUOUS"),
+            ndpointer(ctypes.c_byte, flags="C_CONTIGUOUS"),
+        ]
 
         # Load total number of games in the dataset
         print('Counting games...')
@@ -113,24 +170,36 @@ class PawnDataset(Dataset):
         # Get number of positions
         games = np.arange(self.n_games, dtype=np.ulonglong)
         self.n_pos = self.get_num_positions(self.indices, games, len(games))
-        print(f'Found {self.n_games} games with a total of {self.n_pos} positions')
+        print(f'Found {self.n_games} games with {self.n_pos} positions')
 
         # Train-test split
-        self.train_indices, self.test_indices = train_test_split(np.arange(self.n_games), test_size=test_size)
+        self.train_indices, self.test_indices = train_test_split(
+            np.arange(self.n_games), test_size=test_size
+        )
         self.train_games = len(self.train_indices)
         self.test_games = len(self.test_indices)
         self.train = True
 
-    def set_train(self):
+    def set_train(self) -> None:
+        """Set the dataset to training mode."""
         self.train = True
 
-    def set_test(self):
+    def set_test(self) -> None:
+        """Set the dataset to testing mode."""
         self.train = False
 
-    def __len__(self):
+    def num_train_games(self) -> int:
+        """Return the number of training games."""
+        return self.train_games
+
+    def num_test_games(self) -> int:
+        """Return the number of testing games."""
+        return self.test_games
+
+    def __len__(self) -> int:
         return self.train_games if self.train else self.test_games
 
-    def __getitem__(self, index):
+    def __getitem__(self, index) -> BatchedData:
         mapper = self.train_indices if self.train else self.test_indices
         games = np.array(mapper[index], dtype=np.ulonglong)
         # Find maximum number of positions we can get from these games
@@ -145,112 +214,242 @@ class PawnDataset(Dataset):
         results = np.empty(n_max_pos, dtype=np.byte)
         buckets = np.empty(n_max_pos, dtype=np.byte)
         # Read the games and get the actual number of positions
-        n_pos = self.get_nnue_data(self.fname, self.indices, games, len(games), hash(str(index)), self.prob_skip,
-                                   w_idx, b_idx, w_cols, b_cols, scores, results, buckets)
+        n_pos = self.get_nnue_data(
+            self.fname,
+            self.indices,
+            games,
+            len(games),
+            hash(str(index)),
+            self.prob_skip,
+            w_idx,
+            b_idx,
+            w_cols,
+            b_cols,
+            scores,
+            results,
+            buckets,
+        )
         # Build reduced arrays
-        scores_array = torch.tensor(scores[0:n_pos], dtype=torch.float32)
-        buckets_array = torch.tensor(buckets[0:n_pos], dtype=torch.long)
-        results_array = (torch.tensor(results[0:n_pos], dtype=torch.float32) + 1) / 2
+        scores_array, results_array, buckets_array = (
+            torch.tensor(scores[:n_pos], dtype=torch.float32),
+            torch.tensor(results[:n_pos], dtype=torch.float32) / 2 + 0.5,
+            torch.tensor(buckets[:n_pos], dtype=torch.long),
+        )
         # Build the embedding tensors
-        w_cols =   torch.LongTensor(np.array(w_cols[:w_idx[n_pos]], dtype=np.int_))
-        b_cols =   torch.LongTensor(np.array(b_cols[:b_idx[n_pos]], dtype=np.int_))
-        w_offset = torch.LongTensor(np.array(w_idx[:n_pos], dtype=np.int_))
-        b_offset = torch.LongTensor(np.array(b_idx[:n_pos], dtype=np.int_))
-        return w_offset, w_cols, b_offset, b_cols, scores_array, results_array, buckets_array
+        w_offset, b_offset, w_cols, b_cols = (
+            torch.LongTensor(np.array(w_idx[:n_pos], dtype=np.int_)),
+            torch.LongTensor(np.array(b_idx[:n_pos], dtype=np.int_)),
+            torch.LongTensor(np.array(w_cols[:w_idx[n_pos]], dtype=np.int_)),
+            torch.LongTensor(np.array(b_cols[:b_idx[n_pos]], dtype=np.int_)),
+        )
+        return BatchedData(
+            w_offset,
+            w_cols,
+            b_offset,
+            b_cols,
+            scores_array,
+            results_array,
+            buckets_array,
+        )
 
 
+class BatchedDataLoader:
+    """Batched data loader for PawnDataset."""
 
-def train(dataloader, model, loss_fn, optimiser, device, epoch, output_file):
-    send = lambda x: x.to(device)
-    model.train()
-    dataloader.set_train()
-    size = len(dataloader.dataset)
-    n_batches = size // dataloader.batch_size + 1
-    pbar = tqdm(dataloader, desc=f'Epoch {epoch + 1}', total=n_batches, unit='batch')
-    for batch, indices in enumerate(dataloader):
-        w_offset, w_cols, b_offset, b_cols, scores, results, buckets = map(send, dataloader.load(indices))
+    def __init__(self, dataset: PawnDataset, batch_size: int) -> None:
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.sampler = BatchSampler(
+            RandomSampler(dataset), batch_size=batch_size, drop_last=False
+        )
 
-        # Compute prediction error
-        pred = model(w_offset, w_cols, b_offset, b_cols, buckets)
-        loss = loss_fn(pred, scores, results)
+    def __iter__(self):
+        return self.sampler.__iter__()
 
-        # Backpropagation
-        optimiser.zero_grad()
-        loss.backward()
-        optimiser.step()
+    def load(self, indices: List[int]) -> BatchedData:
+        """Load a batch of data given a list of indices."""
+        return self.dataset[indices]
+
+    def set_train(self) -> None:
+        """Set the dataset to training mode."""
+        self.dataset.set_train()
+
+    def set_test(self) -> None:
+        """Set the dataset to testing mode."""
+        self.dataset.set_test()
+
+
+class TrainingSession:
+    """Training session for the NNUE model."""
+
+    def __init__(
+        self, pawn_path: str, dataset_path: str, options: Options
+    ) -> None:
+        self.options = options
+        torch.set_num_threads(1)
+        print(f"Using {options.device} device")
+
+        # Define model
+        if options.load is None:
+            self.model = NNUE()
+            self.model = self.model.to(options.device)
+        else:
+            self.model = torch.load(options.load, map_location=options.device)
+
+        # Build dataset and dataloaders
+        self.dataset = PawnDataset(
+            pawn_path, dataset_path, options.random_skip, options.test_size
+        )
+        self.dataloader = BatchedDataLoader(
+            self.dataset, options.batch_size
+        )
+
+        # Set up other parameters
+        self.train_batches, self.test_batches = (
+            self.dataset.num_train_games() // options.batch_size + 1,
+            self.dataset.num_test_games() // options.batch_size + 1,
+        )
+
+        # Optimiser
+        self.optimiser = torch.optim.Adam(
+            self.model.parameters(), lr=options.lr
+        )
+
+        # Set up LR scheduler
+        self.scheduler = None
+        if options.lr_scheduler == 'step':
+            self.scheduler = StepLR(
+                self.optimiser,
+                step_size=options.lr_step_size,
+                gamma=options.lr_step_gamma,
+            )
+        elif options.lr_scheduler == 'cosine':
+            self.scheduler = CosineAnnealingLR(
+                self.optimiser,
+                T_max=options.epochs,
+                eta_min=options.lr_cosine_eta_max,
+            )
+
+    def train(self) -> None:
+        """Train the model."""
+
+        # Create output directory and history files
+        os.makedirs(self.options.output_dir, exist_ok=True)
+        with open('train.hist', 'w', encoding='utf-8') as train_file, \
+             open('test.hist', 'w', encoding='utf-8') as test_file:
+
+            # Main training loop
+            for epoch in range(self.options.epochs):
+                self._train_epoch(epoch, train_file)
+                self._test_epoch(epoch, test_file)
+
+                # Step the LR scheduler (if any)
+                if self.scheduler is not None:
+                    self.scheduler.step()
+
+                # Save latest model
+                base_path = os.path.join(self.options.output_dir, "model")
+                torch.save(self.model, f"{base_path}-latest")
+
+                # Save model every save_interval epochs
+                if (epoch + 1) % self.options.save_interval == 0:
+                    torch.save(self.model, f"{base_path}-epoch{epoch}")
+
+        # Save final model
+        torch.save(self.model, os.path.join(self.options.output_dir, "model"))
+
+    def _train_epoch(self, epoch: int, output_file: TextIO) -> None:
+        """Train the model for one epoch.
+
+        Parameters
+        ----------
+        epoch : int
+            The current epoch number.
+        output_file : TextIO
+            The file to write training history to.
+        """
+
+        # Set model and dataset to training mode
+        self.model.train()
+        self.dataloader.set_train()
+
+        # Build progress bar and parallel map
+        pbar = tqdm(
+            self.dataloader,
+            desc=f'Epoch {epoch + 1}',
+            total=self.train_batches,
+            unit='batch',
+        )
+        pmap = ParallelMap(
+            self.dataloader.load,
+            self.dataloader,
+            num_threads=self.options.num_threads,
+        )
+
+        # Loop over training batches
+        with pbar, pmap:
+            for batch, data in enumerate(pmap):
+                data = data.to(self.options.device)
+
+                # Compute prediction error
+                pred = self.model(*data.model_inputs())
+                loss = sigmoid_loss(pred, *data.loss_targets())
+
+                # Backpropagation
+                self.optimiser.zero_grad()
+                loss.backward()
+                self.optimiser.step()
+
+                # Update progress
+                output_file.write(f'{epoch}\t{batch}\t{loss.item()}\n')
+                output_file.flush()
+                pbar.set_postfix_str(f'Loss: {loss.item():>6.4e}')
+                pbar.update()
+
+    def _test_epoch(self, epoch, output_file) -> None:
+        """Evaluate the model on the test dataset.
+
+        Parameters
+        ----------
+        epoch : int
+            The current epoch number.
+        output_file : TextIO
+            The file to write test history to.
+        """
+        # Set eval mode and create parallel map
+        self.model.eval()
+        self.dataloader.set_test()
+        pmap = ParallelMap(
+            self.dataloader.load,
+            self.dataloader,
+            num_threads=self.options.num_threads,
+        )
+
+        # Loop over test batches
+        vals = []
+        with torch.no_grad(), pmap:
+            for data in pmap:
+                data = data.to(self.options.device)
+                pred = self.model(*data.model_inputs())
+                vals.append(sigmoid_loss(pred, *data.loss_targets()).item())
+        test_loss = sum(vals) / len(vals)
 
         # Update progress
-        output_file.write(f'{epoch}\t{batch}\t{loss.item()}\n')
+        output_file.write(f'{epoch}\t{test_loss}\n')
         output_file.flush()
-        pbar.set_postfix_str(f'Loss: {loss.item():>6.4e}')
-        pbar.update()
-    pbar.close()
+        print(f'Epoch {epoch + 1}: Test loss: {test_loss:>6.4e}')
 
 
-def test(dataloader, model, loss_fn, device, epoch, output_file):
-    send = lambda x: x.to(device)
-    test_loss = 0
-    num_batches = 0
-    dataloader.set_test()
-    with torch.no_grad():
-        for indices in dataloader:
-            w_offset, w_cols, b_offset, b_cols, scores, results, buckets = map(send, dataloader.load(indices))
-            pred = model(w_offset, w_cols, b_offset, b_cols, buckets)
-            test_loss += loss_fn(pred, scores, results).item()
-            num_batches += 1
-        test_loss /= num_batches
-    output_file.write(f'{epoch}\t{test_loss}\n')
-    output_file.flush()
-    print(f'Epoch {epoch + 1}: Test loss: {test_loss:>6.4e}')
-
-
-
-
-def main(pawn_path: str, dataset_path: str, output_dir: str, epochs: int, batch_size: int, random_skip: int, test_size: float, num_threads: int, load_model=None):
-    # Get cpu or gpu device for training
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    torch.set_num_threads(1)
-    print(f"Using {device} device")
-
-    # Build dataset and dataloaders
-    dataset = PawnDataset(pawn_path, dataset_path, random_skip, test_size)
-    dataloader = BatchedDataLoader(dataset, batch_size, num_threads)
-
-    # Define model
-    if load_model is None:
-        model = NNUE()
-        model = model.to(device)
-    else:
-        model = torch.load(load_model, map_location=device)
-
-    # Loss and optimiser
-    loss_func = sigmoid_loss
-    optimiser = torch.optim.Adam(model.parameters(), lr=1e-3)
-
-    # Training time
-    os.makedirs(output_dir, exist_ok=True)
-    scheduler = StepLR(optimiser, step_size=30, gamma=0.65)
-    with open('train.hist', 'w') as train_file, open('test.hist', 'w') as test_file:
-        for epoch in range(epochs):
-            train(dataloader, model, loss_func, optimiser, device, epoch, train_file)
-            test(dataloader, model, loss_func, device, epoch, test_file)
-            scheduler.step()
-            torch.save(model, os.path.join(output_dir, f"model-epoch{epoch}"))
-
-    # Save final model
-    torch.save(model, os.path.join(output_dir, "model"))
+def main() -> None:
+    """Entry point for the training script."""
+    parser = ArgumentParser(prog='NNUE trainer for pawn')
+    parser.add_argument('dataset', help='Dataset file', type=str)
+    parser.add_argument('pawn', help='Shared library of pawn', type=str)
+    parser.add_arguments(Options, dest='options')
+    args = parser.parse_args()
+    session = TrainingSession(args.pawn, args.dataset, args.options)
+    session.train()
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(prog='NNUE trainer for pawn')
-    parser.add_argument('dataset', help='Dataset file to use for training', type=str)
-    parser.add_argument('pawn', help='Shared library of pawn', type=str)
-    parser.add_argument('--epochs', type=int, default=300, help='Number of epochs')
-    parser.add_argument('--output', type=str, default='models', help='Output directory')
-    parser.add_argument('--load', type=str, default=None, help='Start from a given model')
-    parser.add_argument('--batch_size', type=int, default=16384, help='Number of games per batch')
-    parser.add_argument('--random_skip', type=int, default=8, help='On average, skip every x positions')
-    parser.add_argument('--test_size', type=float, default=0.1, help='Test dataset size')
-    parser.add_argument('--num_threads', type=int, default=1, help='Test dataset size')
-    args = parser.parse_args()
-    main(args.pawn, args.dataset, args.output, args.epochs, args.batch_size, args.random_skip, args.test_size, args.num_threads, args.load)
+    main()
