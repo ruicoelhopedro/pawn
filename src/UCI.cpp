@@ -193,6 +193,8 @@ namespace UCI
                 FEN_Scores::evaluate_fens(stream);
             else if (token == "play_games")
                 GamePlayer::play_games(stream);
+            else if (token == "rescore_games")
+                GamePlayer::rescore_games(stream);
             else if (token == "games_to_epd")
                 GamePlayer::games_to_epd(stream);
             else if (token == "check_data")

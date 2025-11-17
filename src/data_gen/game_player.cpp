@@ -513,4 +513,198 @@ namespace GamePlayer
         // Restore Chess960 status
         UCI::Options::UCI_Chess960 = init_chess960;
     }
+
+
+    void rescore_games(std::istringstream& stream)
+    {
+        // Parameters and their default values
+        std::string input_file_path;
+        std::string output_file_path;
+        int depth = 8;
+        int nodes = 0;
+        int threads = 1;
+        int hash = 1;
+        bool shallow_depth_pruning = false;
+        std::string syzygy_path = "";
+        bool chess_960 = false;
+
+        // Parameter reading
+        assert((stream >> input_file_path) && "Input file path required!");
+        assert((stream >> output_file_path) && "Output file path required!");
+
+        // Read passed parameters
+        std::string token;
+        while (stream >> token)
+            if (token == "depth")
+                stream >> depth;
+            else if (token == "nodes")
+                stream >> nodes;
+            else if (token == "threads")
+                stream >> threads;
+            else if (token == "hash")
+                stream >> hash;
+            else if (token == "shallow_depth_pruning")
+                shallow_depth_pruning = true;
+            else if (token == "syzygy_path")
+                stream >> syzygy_path;
+            else if (token == "chess_960")
+                chess_960 = true;
+            else
+            {
+                std::cout << "Unknown option " << token << std::endl;
+                return;
+            }
+
+        // Load Syzygy tablebases
+        if (syzygy_path != "")
+            Syzygy::load(syzygy_path);
+
+        // Update Chess960 status
+        bool init_chess960 = UCI::Options::UCI_Chess960;
+        UCI::Options::UCI_Chess960 = chess_960;
+
+        // Open files
+        std::ifstream ifile(input_file_path);
+        std::ofstream ofile(output_file_path);
+        assert(ifile.is_open() && "Failed to open input file!");
+        assert(ofile.is_open() && "Failed to open output file!");
+
+        // Current number of games
+        std::size_t n_games_completed = 0;
+
+        // Prepare search data
+        Search::Limits limits;
+        if (depth > 0)
+            limits.depth = depth;
+        if (nodes > 0)
+            limits.nodes = nodes;
+        std::atomic_bool stop = false;
+        ThreadSafeQueueWithCapacity<BinaryGame> input_queue(2 * threads);
+        ThreadSafeQueue<BinaryGame> output_queue;
+        std::atomic_int n_active_threads = threads;
+        auto start = std::chrono::steady_clock::now();
+
+        // Store and reset shallow depth pruning
+        bool sdp = UCI::Options::ShallowDepthPruning;
+        UCI::Options::ShallowDepthPruning = shallow_depth_pruning;
+
+        auto thread_scorer = [=, &input_queue, &output_queue, &n_active_threads, &stop]()
+        {
+            // Prepare search thread
+            ThreadPool pool(1, hash);
+            Thread& thread = pool.front();
+
+            // Data generation loop
+            while (!stop.load(std::memory_order_relaxed))
+            {
+                // Pick the next game
+                BinaryGame game;
+                if (!input_queue.pop(game))
+                    break;
+
+                // Game loop
+                pool.clear();
+                Position pos(game.starting_pos.fen());
+                for (BinaryNode& node : game.nodes)
+                {
+                    if (node.move == MOVE_NULL)
+                        break;
+
+                    pos.set_init_ply();
+                    SearchResult result = thread.simple_search(pos, limits, threads > 1);
+                    node.score = result.score;
+                    pos.make_move(node.move);
+                }
+                output_queue.push(game);
+            }
+            n_active_threads--;
+        };
+
+        auto thread_reader = [=, &ifile, &input_queue, &stop]()
+        {
+            // Fetch eof
+            ifile.seekg(0, std::ios_base::end);
+            auto eof = ifile.tellg();
+            ifile.seekg(0, std::ios_base::beg);
+
+            // Read entire file
+            BinaryGame game;
+            std::string line;
+            while(ifile.tellg() < eof)
+            {
+                // Read game: starting FEN
+                if (!std::getline(ifile, line))
+                    break;
+                
+                // Initialise position
+                Position pos(line);
+                game.begin(pos.board());
+
+                // Read moves until the termination node
+                bool valid_game = true;
+                while (std::getline(ifile, line))
+                {
+                    // Check if the line does not start with "game:"
+                    if (line.rfind("game:", 0) == 0)
+                        break;
+
+                    // Parse move
+                    Move move = UCI::move_from_uci(pos, line);
+                    if (!pos.board().legal(move))
+                    {
+                        std::cerr << "Illegal move " << pos.board().to_uci(move)
+                                  << " in position " << pos.board().to_fen()
+                                  << std::endl;
+                        valid_game = false;
+                    }
+                    if (valid_game)
+                    {
+                        pos.make_move(move);
+                        pos.set_init_ply();
+                        game.push(move, SCORE_NONE);
+                    }
+                }
+
+                // Read result, add termination node and push to the queue
+                if (!valid_game)
+                    continue;
+                game.push(MOVE_NULL, std::stoi(line.substr(6)));
+                input_queue.push(game);
+            }
+            input_queue.close();
+        };
+
+        // Start reader thread
+        std::thread reader_thread(thread_reader);
+
+        // Start threads
+        std::vector<std::thread> threads_list;
+        for (int i = 0; i < threads; i++)
+            threads_list.push_back(std::thread(thread_scorer));
+
+        // Write games to file
+        while (n_active_threads > 0 || !output_queue.empty())
+        {
+            // Pop last game from the threads
+            output_queue.pop().write(ofile);
+            n_games_completed++;
+            int64_t elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+            int games_per_hour = 3600000 * n_games_completed / (elapsed + 1);
+            std::cout << "\r"
+                      << n_games_completed << " games completed in "
+                      << elapsed / 1000 << " s ("
+                      << games_per_hour << " games/h)"
+                      << std::flush;
+        }
+        
+        // Wait for threads to finish
+        reader_thread.join();
+        for (std::thread& t : threads_list)
+            t.join();
+        std::cout << std::endl;
+
+        // Restore options
+        UCI::Options::ShallowDepthPruning = sdp;
+        UCI::Options::UCI_Chess960 = init_chess960;
+    }
 }
