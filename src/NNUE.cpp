@@ -89,9 +89,9 @@ namespace NNUE
 
         // Compute index
         return s
-             + p  *  NUM_SQUARES
-             + ki * (NUM_SQUARES * (NUM_PIECE_TYPES - 1))
-             + pt * (NUM_SQUARES * (NUM_PIECE_TYPES - 1) * NUM_SQUARES / 2);
+             + p  * NUM_SQUARES
+             + pt * NUM_SQUARES * NUM_PIECE_TYPES
+             + ki * NUM_SQUARES * NUM_PIECE_TYPES * NUM_COLORS;
     }
 
 
@@ -101,7 +101,7 @@ namespace NNUE
     void Accumulator::clear()
     {
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
-            m_net[i] = nnue_net->m_bias[i];
+            m_net[i] = 0;
         for (std::size_t bucket = 0; bucket < NUM_BUCKETS; bucket++)
             m_psqt[bucket] = 0;
     }
@@ -109,9 +109,6 @@ namespace NNUE
 
     void Accumulator::push(PieceType p, Square s, Square ks, Turn pt, Turn kt)
     {
-        if (p == KING)
-            return;
-
         Feature idx = get_feature(p, s, ks, pt, kt);
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
             m_net[i] += nnue_net->m_sparse_layer[idx][i];
@@ -122,9 +119,6 @@ namespace NNUE
 
     void Accumulator::pop(PieceType p, Square s, Square ks, Turn pt, Turn kt)
     {
-        if (p == KING)
-            return;
-
         Feature idx = get_feature(p, s, ks, pt, kt);
         for (std::size_t i = 0; i < NUM_ACCUMULATORS; i++)
             m_net[i] -= nnue_net->m_sparse_layer[idx][i];
