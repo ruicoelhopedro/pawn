@@ -50,8 +50,8 @@ class Options:
     # Step LR scheduler parameters: step size (in epochs)
     lr_step_size: int = 30
 
-    # Cosine LR scheduler parameters: final learning rate
-    lr_cosine_eta_max: float = 1e-5
+    # Cosine LR scheduler parameters: decay ratio
+    lr_cosine_final: float = 1e-2
 
     # Interval (in epochs) to save model checkpoints
     save_interval: int = 10
@@ -260,7 +260,7 @@ class BatchedDataLoader:
         self.dataset = dataset
         self.batch_size = batch_size
         self.sampler = BatchSampler(
-            RandomSampler(dataset), batch_size=batch_size, drop_last=False
+            RandomSampler(dataset), batch_size=batch_size, drop_last=True
         )
 
     def __iter__(self):
@@ -306,8 +306,8 @@ class TrainingSession:
 
         # Set up other parameters
         self.train_batches, self.test_batches = (
-            self.dataset.num_train_games() // options.batch_size + 1,
-            self.dataset.num_test_games() // options.batch_size + 1,
+            self.dataset.num_train_games() // options.batch_size,
+            self.dataset.num_test_games() // options.batch_size,
         )
 
         # Optimiser
@@ -327,7 +327,7 @@ class TrainingSession:
             self.scheduler = CosineAnnealingLR(
                 self.optimiser,
                 T_max=options.epochs,
-                eta_min=options.lr_cosine_eta_max,
+                eta_min=options.lr_cosine_final * options.lr,
             )
 
     def train(self) -> None:
@@ -353,7 +353,7 @@ class TrainingSession:
 
                 # Save model every save_interval epochs
                 if (epoch + 1) % self.options.save_interval == 0:
-                    torch.save(self.model, f"{base_path}-epoch{epoch}")
+                    torch.save(self.model, f"{base_path}-epoch{epoch + 1}")
 
         # Save final model
         torch.save(self.model, os.path.join(self.options.output_dir, "model"))
