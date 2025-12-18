@@ -1,3 +1,6 @@
+"""NNUE model definition for chess evaluation."""
+from typing import Optional
+from io import TextIOWrapper
 import chess
 import torch
 import numpy as np
@@ -11,10 +14,8 @@ NUM_FEATURES = NUM_SQUARES * NUM_PIECE_TYPES * NUM_COLORS * NUM_INPUT_BUCKETS
 NUM_ACCUMULATORS = 512
 NUM_OUTPUT_BUCKETS = 4
 
-
 SCALE_FACTOR = 1024
 NUM_MAX_FEATURES = 32
-
 
 PIECE_VALUES = {
     chess.PAWN: (125, 200),
@@ -25,34 +26,38 @@ PIECE_VALUES = {
 }
 
 
-def sigmoid_loss(y, scores, results):
-    K = 400
-    mix = 0.3
-    y_wdl = torch.sigmoid(SCALE_FACTOR / K * y)
-    scores_wdl = (1 - mix) * torch.sigmoid(scores / K) + mix * results
-    loss = (
-        torch.abs(y_wdl - scores_wdl) +
-        0.1 * torch.abs(torch.sigmoid((y - scores) / K) - 0.5)
-    )
-    return torch.mean(torch.pow(loss, 2.5))
+def dump(
+    tensor: torch.Tensor, dtype: np.dtype, scale: int, file: TextIOWrapper
+) -> None:
+    """Dump a tensor to a file with quantization.
 
-
-class CReLU(nn.Module):
-
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, x):
-        return torch.clamp(x, 0.0, 1.0)
+    Parameters
+    ----------
+    tensor : torch.Tensor
+        Tensor to dump.
+    dtype : np.dtype
+        Numpy data type to use for quantization.
+    scale : int
+        Scale factor for quantization.
+    file : TextIOWrapper
+        File to write the quantized tensor to.
+    """
+    weights = tensor.detach().to('cpu').numpy()
+    quant_weights = np.array(np.round(scale * weights), dtype=dtype)
+    quant_weights.tofile(file)
 
 
 class NNUE(nn.Module):
+    """Efficiently-updatable Neural Network (NNUE)."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.crelu = CReLU()
-        self.psqt = nn.EmbeddingBag(NUM_FEATURES, NUM_OUTPUT_BUCKETS, mode='sum')
-        self.accumulator = nn.EmbeddingBag(NUM_FEATURES, NUM_ACCUMULATORS, mode='sum')
+        self.psqt = nn.EmbeddingBag(
+            NUM_FEATURES, NUM_OUTPUT_BUCKETS, mode='sum'
+        )
+        self.accumulator = nn.EmbeddingBag(
+            NUM_FEATURES, NUM_ACCUMULATORS, mode='sum'
+        )
         self.layer = nn.Linear(2 * NUM_ACCUMULATORS, NUM_OUTPUT_BUCKETS)
         # Clear weights and biases for sparse input layer and PSQT
         self.psqt.weight.data.fill_(0.0)
@@ -69,7 +74,50 @@ class NNUE(nn.Module):
             psqt_view[:, 0, piece - 1, :, :] = eg / (2 * SCALE_FACTOR)
             psqt_view[:, 1, piece - 1, :, :] = -eg / (2 * SCALE_FACTOR)
 
-    def forward(self, w_offset, w_cols, b_offset, b_cols, buckets):
+    @staticmethod
+    def crelu(x: torch.Tensor) -> torch.Tensor:
+        """Apply clipped ReLU activation.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor.
+
+        Returns
+        -------
+        torch.Tensor
+            Activated tensor.
+        """
+        return torch.clamp(x, 0.0, 1.0)
+
+    def forward(
+        self,
+        w_offset: torch.Tensor,
+        w_cols: torch.Tensor,
+        b_offset: torch.Tensor,
+        b_cols: torch.Tensor,
+        buckets: torch.Tensor,
+    ) -> torch.Tensor:
+        """Forward pass of the NNUE.
+
+        Parameters
+        ----------
+        w_offset : torch.Tensor
+            Offsets for white pieces.
+        w_cols : torch.Tensor
+            Columns for white pieces.
+        b_offset : torch.Tensor
+            Offsets for black pieces.
+        b_cols : torch.Tensor
+            Columns for black pieces.
+        buckets : torch.Tensor
+            Output buckets.
+
+        Returns
+        -------
+        torch.Tensor
+            Computed NNUE scores.
+        """
         psqt = self.psqt(w_cols, w_offset) - self.psqt(b_cols, b_offset)
         stm_acc = self.crelu(self.accumulator(w_cols, w_offset))
         ntm_acc = self.crelu(self.accumulator(b_cols, b_offset))
@@ -78,17 +126,56 @@ class NNUE(nn.Module):
         return bucketed_output.gather(-1, buckets.unsqueeze(-1)).squeeze(-1)
 
     @staticmethod
-    def __dump(tensor, dtype, scale, file, transpose=False):
-        weights = tensor.detach().to('cpu').numpy()
-        quant_weights = np.array(np.round(scale * weights), dtype=dtype)
-        if transpose:
-            quant_weights = quant_weights.T
-        quant_weights.tofile(file)
+    def loss(
+        y: torch.Tensor, scores: torch.Tensor, results: torch.Tensor
+    ) -> torch.Tensor:
+        """Loss function for NNUE training.
 
-    def export(self, filename):
+        Parameters
+        ----------
+        y : torch.Tensor
+            Predicted scores.
+        scores : torch.Tensor
+            Target scores.
+        results : torch.Tensor
+            Game results (0: loss, 0.5: draw, 1: win).
+
+        Returns
+        -------
+        torch.Tensor
+            Computed loss.
+        """
+        K = 400
+        mix = 0.3
+        y_wdl = torch.sigmoid(SCALE_FACTOR / K * y)
+        scores_wdl = (1 - mix) * torch.sigmoid(scores / K) + mix * results
+        loss = (
+            torch.abs(y_wdl - scores_wdl) +
+            0.1 * torch.abs(torch.sigmoid((y - scores) / K) - 0.5)
+        )
+        return torch.mean(torch.pow(loss, 2.5))
+
+    def export(self, filename: str) -> None:
+        """Export the NNUE model to a file.
+
+        Parameters
+        ----------
+        filename : str
+            Path to the output file.
+        """
         # Export each layer to the output NNUE file
-        with open(filename, 'w') as output_file:
-            self.__dump(self.accumulator.weight.data, np.short, SCALE_FACTOR, output_file)
-            self.__dump(self.psqt.weight.data, np.short, SCALE_FACTOR, output_file)
-            self.__dump(self.layer.weight.data, np.short, SCALE_FACTOR, output_file)
-            self.__dump(self.layer.bias.data, np.short, SCALE_FACTOR, output_file)
+        with open(filename, 'wb') as file:
+            dump(self.accumulator.weight.data, np.short, SCALE_FACTOR, file)
+            dump(self.psqt.weight.data, np.short, SCALE_FACTOR, file)
+            dump(self.layer.weight.data, np.short, SCALE_FACTOR, file)
+            dump(self.layer.bias.data, np.short, SCALE_FACTOR, file)
+
+    def info(self) -> Optional[str]:
+        """Return model information string.
+
+        Returns
+        -------
+        Optional[str]
+            Model information string or None if not applicable.
+        """
+        return None

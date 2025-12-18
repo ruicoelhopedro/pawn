@@ -1,3 +1,4 @@
+"""Trainer for NNUE models using pawn datasets."""
 from typing import List, Optional, TextIO, Literal
 import os
 import ctypes
@@ -10,7 +11,7 @@ from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
 from torch.utils.data import Dataset, BatchSampler, RandomSampler
 from sklearn.model_selection import train_test_split
 from simple_parsing import ArgumentParser
-from model import NNUE, NUM_MAX_FEATURES, sigmoid_loss
+from model import NNUE, NUM_MAX_FEATURES
 from pmap import ParallelMap
 
 
@@ -173,9 +174,13 @@ class PawnDataset(Dataset):
         print(f'Found {self.n_games} games with {self.n_pos} positions')
 
         # Train-test split
-        self.train_indices, self.test_indices = train_test_split(
-            np.arange(self.n_games), test_size=test_size
-        )
+        if test_size * self.n_games > 1:
+            self.train_indices, self.test_indices = train_test_split(
+                np.arange(self.n_games), test_size=test_size
+            )
+        else:
+            self.train_indices = np.arange(self.n_games)
+            self.test_indices = np.array([], dtype=np.int64)
         self.train_games = len(self.train_indices)
         self.test_games = len(self.test_indices)
         self.train = True
@@ -219,7 +224,7 @@ class PawnDataset(Dataset):
             self.indices,
             games,
             len(games),
-            hash(str(index)),
+            hash(games.tobytes()),
             self.prob_skip,
             w_idx,
             b_idx,
@@ -341,7 +346,8 @@ class TrainingSession:
             # Main training loop
             for epoch in range(self.options.epochs):
                 self._train_epoch(epoch, train_file)
-                self._test_epoch(epoch, test_file)
+                if self.dataset.num_test_games() > 0:
+                    self._test_epoch(epoch, test_file)
 
                 # Step the LR scheduler (if any)
                 if self.scheduler is not None:
@@ -393,7 +399,7 @@ class TrainingSession:
 
                 # Compute prediction error
                 pred = self.model(*data.model_inputs())
-                loss = sigmoid_loss(pred, *data.loss_targets())
+                loss = self.model.loss(pred, *data.loss_targets())
 
                 # Backpropagation
                 self.optimiser.zero_grad()
@@ -401,10 +407,16 @@ class TrainingSession:
                 self.optimiser.step()
 
                 # Update progress
+                info = self.model.info()
+                info_str = f', {info}' if info is not None else ''
                 output_file.write(f'{epoch}\t{batch}\t{loss.item()}\n')
                 output_file.flush()
-                pbar.set_postfix_str(f'Loss: {loss.item():>6.4e}')
+                pbar.set_postfix_str(f'Loss: {loss.item():>6.4e}{info_str}')
                 pbar.update()
+
+                if (batch + 1) % 100 == 0:
+                    base_path = os.path.join(self.options.output_dir, "model")
+                    torch.save(self.model, f"{base_path}-latest-batch")
 
     def _test_epoch(self, epoch, output_file) -> None:
         """Evaluate the model on the test dataset.
@@ -431,13 +443,15 @@ class TrainingSession:
             for data in pmap:
                 data = data.to(self.options.device)
                 pred = self.model(*data.model_inputs())
-                vals.append(sigmoid_loss(pred, *data.loss_targets()).item())
+                vals.append(self.model.loss(pred, *data.loss_targets()).item())
         test_loss = sum(vals) / len(vals)
 
         # Update progress
         output_file.write(f'{epoch}\t{test_loss}\n')
         output_file.flush()
-        print(f'Epoch {epoch + 1}: Test loss: {test_loss:>6.4e}')
+        info = self.model.info()
+        info_str = f', {info}' if info is not None else ''
+        print(f'Epoch {epoch + 1}: Test loss: {test_loss:>6.4e}{info_str}')
 
 
 def main() -> None:
