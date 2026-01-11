@@ -54,6 +54,9 @@ class Options:
     # Cosine LR scheduler parameters: decay ratio
     lr_cosine_final: float = 1e-2
 
+    # Weight decay for the optimiser
+    weight_decay: float = 0.0
+
     # Interval (in epochs) to save model checkpoints
     save_interval: int = 10
 
@@ -114,6 +117,7 @@ class PawnDataset(Dataset):
         dataset_path: str,
         prob_skip: int,
         test_size: float,
+        load_split: Optional[str] = None,
     ) -> None:
         # Load and prepare the library
         self.lib = ctypes.CDLL(pawn_path)
@@ -174,15 +178,23 @@ class PawnDataset(Dataset):
         print(f'Found {self.n_games} games with {self.n_pos} positions')
 
         # Train-test split
-        if test_size * self.n_games > 1:
-            self.train_indices, self.test_indices = train_test_split(
-                np.arange(self.n_games), test_size=test_size
-            )
+        if load_split is None:
+            if test_size * self.n_games > 1:
+                self.train_indices, self.test_indices = train_test_split(
+                    np.arange(self.n_games), test_size=test_size
+                )
+            else:
+                self.train_indices = np.arange(self.n_games)
+                self.test_indices = np.array([], dtype=np.int64)
+            self.train_games = len(self.train_indices)
+            self.test_games = len(self.test_indices)
         else:
-            self.train_indices = np.arange(self.n_games)
-            self.test_indices = np.array([], dtype=np.int64)
-        self.train_games = len(self.train_indices)
-        self.test_games = len(self.test_indices)
+            print(f'Loading train-test split from {load_split}...')
+            split_data = np.load(load_split)
+            self.train_indices = split_data['train_indices']
+            self.test_indices = split_data['test_indices']
+            self.train_games = len(self.train_indices)
+            self.test_games = len(self.test_indices)
         self.train = True
 
     def set_train(self) -> None:
@@ -200,6 +212,14 @@ class PawnDataset(Dataset):
     def num_test_games(self) -> int:
         """Return the number of testing games."""
         return self.test_games
+
+    def export_split(self) -> None:
+        """Export the train-test split to files."""
+        np.savez_compressed(
+            'data_split.npz',
+            train_indices=self.train_indices,
+            test_indices=self.test_indices,
+        )
 
     def __len__(self) -> int:
         return self.train_games if self.train else self.test_games
@@ -316,8 +336,10 @@ class TrainingSession:
         )
 
         # Optimiser
-        self.optimiser = torch.optim.Adam(
-            self.model.parameters(), lr=options.lr
+        self.optimiser = torch.optim.AdamW(
+            self.model.parameters(),
+            lr=options.lr,
+            weight_decay=options.weight_decay,
         )
 
         # Set up LR scheduler
@@ -342,6 +364,9 @@ class TrainingSession:
         os.makedirs(self.options.output_dir, exist_ok=True)
         with open('train.hist', 'w', encoding='utf-8') as train_file, \
              open('test.hist', 'w', encoding='utf-8') as test_file:
+
+            # Export train-test split
+            self.dataset.export_split()
 
             # Main training loop
             for epoch in range(self.options.epochs):
