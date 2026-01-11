@@ -149,10 +149,8 @@ class NNUE(nn.Module):
         mix = 0.3
         y_wdl = torch.sigmoid(SCALE_FACTOR / K * y)
         scores_wdl = (1 - mix) * torch.sigmoid(scores / K) + mix * results
-        loss = (
-            torch.abs(y_wdl - scores_wdl) +
-            0.1 * torch.abs(torch.sigmoid((y - scores) / K) - 0.5)
-        )
+        weight = 1 + 4 * torch.square(scores_wdl - 0.5)
+        loss = weight * torch.abs(y_wdl - scores_wdl)
         return torch.mean(torch.pow(loss, 2.5))
 
     def export(self, filename: str) -> None:
