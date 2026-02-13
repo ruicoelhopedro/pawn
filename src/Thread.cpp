@@ -571,6 +571,8 @@ SearchResult Thread::simple_search(Position& pos, const Search::Limits& limits)
                             MOVE_NULL);
 
     // Probe tablebases and only select the top TB-scored moves
+    bool root_in_tb = false;
+    Score tb_scores[NUM_MAX_MOVES];
     if (pos.board().get_pieces().count() <= Syzygy::Cardinality)
     {
         // Root probing is not thread-safe, so we need to lock here
@@ -579,9 +581,12 @@ SearchResult Thread::simple_search(Position& pos, const Search::Limits& limits)
         Syzygy::Root = Syzygy::RootPos(pos);
         if (Syzygy::Root.in_tb())
         {
+            root_in_tb = true;
             m_root_moves.clear();
             for (int idx = 0; idx < Syzygy::Root.num_preserving_moves(); idx++)
                 m_root_moves.push(Syzygy::Root.ordered_moves(idx));
+            for (int i = 0; i < m_root_moves.length(); i++)
+                tb_scores[i] = Syzygy::Root.move_score(m_root_moves[i]);
         }
     }
 
@@ -600,6 +605,15 @@ SearchResult Thread::simple_search(Position& pos, const Search::Limits& limits)
             break;
     }
     m_data_gen = false;
+
+    // Inject TB score, if any
+    if (root_in_tb)
+        for (int i = 0; i < m_root_moves.length(); i++)
+            if (m_root_moves[i] == *pv.pv)
+            {
+                pv.tb_score = tb_scores[i];
+                break;
+            }
 
     return SearchResult(pv.score() * turn_to_color(pos.get_turn()), *pv.pv);
 }

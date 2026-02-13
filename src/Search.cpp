@@ -119,7 +119,7 @@ namespace Search
         // Use search score if:
         // 1. We have no TB info
         // 2. We have found a forced mate
-        if (!Syzygy::Root.in_tb() ||
+        if (this->tb_score == -SCORE_NONE ||
             (is_mate(this->search_score) && this->search_bound == BoundType::EXACT))
             return this->search_score;
 
@@ -131,7 +131,7 @@ namespace Search
         // Use search bound if:
         // 1. We have no TB info
         // 2. We have found a forced mate
-        if (!Syzygy::Root.in_tb() ||
+        if (this->tb_score == -SCORE_NONE ||
             (is_mate(this->search_score) && this->search_bound == BoundType::EXACT))
             return this->search_bound;
 
@@ -300,7 +300,7 @@ namespace Search
                 return score;
 
             // Inject TB data, if any
-            if (Syzygy::Root.in_tb())
+            if (!thread.data_gen() && Syzygy::Root.in_tb())
                 pv.tb_score = Syzygy::Root.move_score(*data.pv());
 
             // Store results for this PV line
