@@ -201,6 +201,8 @@ namespace UCI
                 GamePlayer::check_games(stream);
             else if (token == "repair_data")
                 GamePlayer::repair_games(stream);
+            else if (token == "export_games")
+                GamePlayer::export_games(stream);
             else if (token == "score_texel")
                 Texel::score_texel(stream);
             else if (token == "score_eval_error")

@@ -707,4 +707,45 @@ namespace GamePlayer
         UCI::Options::ShallowDepthPruning = sdp;
         UCI::Options::UCI_Chess960 = init_chess960;
     }
+
+
+    void export_games(std::istringstream& stream)
+    {
+        // Parameters
+        std::string input_file_path;
+        std::string output_file_path;
+
+        // Parameter reading
+        assert((stream >> input_file_path) && "Input file path required!");
+        assert((stream >> output_file_path) && "Output file path required!");
+
+        // Open files
+        std::ifstream ifile(input_file_path);
+        std::ofstream ofile(output_file_path);
+        assert(ifile.is_open() && "Failed to open input file!");
+        assert(ofile.is_open() && "Failed to open output file!");
+
+        // Fetch eof
+        ifile.seekg(0, std::ios_base::end);
+        auto eof = ifile.tellg();
+        ifile.seekg(0, std::ios_base::beg);
+
+        // Store Chess960 status
+        bool init_chess960 = UCI::Options::UCI_Chess960;
+        UCI::Options::UCI_Chess960 = true;
+
+        // Read entire file
+        BinaryGame game;
+        while(ifile.tellg() < eof)
+        {
+             // Write each game in PGN format
+            if (BinaryGame::read(ifile, game))
+                game.export_pgn(ofile);
+            else
+                std::cerr << "Bad game encountered during export" << std::endl;
+        }
+
+        // Restore Chess960 status
+        UCI::Options::UCI_Chess960 = init_chess960;
+    }
 }

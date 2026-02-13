@@ -94,6 +94,8 @@ struct BinaryGame
     inline void push(Move m, Score s) { nodes.push_back(BinaryNode(m, s)); }
 
     void write(std::ofstream& stream);
+
+    void export_pgn(std::ofstream& stream) const;
 };
 
 

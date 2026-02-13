@@ -705,6 +705,12 @@ public:
 
 
     std::string to_uci(Move m) const;
+
+
+    std::string to_san(Move m) const;
+
+
+    inline int fullmove_number() const { return m_full_move_clock; }
 };
 
 

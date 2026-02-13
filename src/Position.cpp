@@ -886,6 +886,69 @@ std::string Board::to_uci(Move m) const
 
 
 
+std::string Board::to_san(Move m) const
+{
+    // Castling
+    if (m.is_castle())
+        return file(m.to()) >= 4 ? "O-O" : "O-O-O";
+
+    std::ostringstream ss;
+    
+    // Piece letter
+    PieceType piece = get_piece_at(m.from());
+    const char piece_letters[] = { 'P', 'N', 'B', 'R', 'Q', 'K' };
+    if (piece != PAWN)
+        ss << piece_letters[piece];
+
+    // Disambiguation
+    bool need_file = false;
+    bool need_rank = false;
+    Move moves[NUM_MAX_MOVES];
+    MoveList move_list(moves);
+    generate_moves(move_list, MoveGenType::LEGAL);
+
+    for (Move candidate : move_list)
+    {
+        if (candidate.to() == m.to() && get_piece_at(candidate.from()) == piece)
+        {
+            if (file(candidate.from()) != file(m.from()))
+                need_file = true;
+            else if (rank(candidate.from()) != rank(m.from()))
+                need_rank = true;
+        }
+    }
+
+    if (need_file || (piece == PAWN && m.is_capture()))
+        ss << char('a' + file(m.from()));
+    if (need_rank)
+        ss << char('1' + rank(m.from()));
+
+    // Capture
+    if (m.is_capture())
+        ss << "x";
+
+    // Destination square
+    ss << get_square(m.to());
+
+    // Promotion
+    if (m.is_promotion())
+        ss << piece_letters[m.promo_piece()];
+
+    // Check or checkmate
+    Board new_board = make_move(m);
+    if (new_board.checkers())
+    {
+        Move reply_moves[NUM_MAX_MOVES];
+        MoveList reply_list(reply_moves);
+        new_board.generate_moves(reply_list, MoveGenType::LEGAL);
+        if (reply_list.length() == 0)
+            ss << "#";
+        else
+            ss << "+";
+    }
+
+    return ss.str();
+}
 
 
 Position::Position()

@@ -113,7 +113,9 @@ namespace GamePlayer
 
     void repair_games(std::istringstream& stream);
 
-    bool file_valid(std::string filename);
+    bool file_valid(std::string filename, bool stats);
 
     void rescore_games(std::istringstream& stream);
+
+    void export_games(std::istringstream& stream);
 }

@@ -169,6 +169,47 @@ void BinaryGame::write(std::ofstream& stream)
 }
 
 
+void BinaryGame::export_pgn(std::ofstream& stream) const
+{
+    std::string fen = starting_pos.fen();
+    std::string result = (nodes.back().score > 0) ? "1-0"
+                       : (nodes.back().score < 0) ? "0-1"
+                       :                            "1/2-1/2";
+    stream << "[Event \"?\"]\n";
+    stream << "[Site \"?\"]\n";
+    stream << "[Date \"?\"]\n";
+    stream << "[Round \"?\"]\n";
+    stream << "[White \"pawn\"]\n";
+    stream << "[Black \"pawn\"]\n";
+    stream << "[Result \"" << result << "\"]\n";
+    stream << "[FEN \"" << fen << "\"]\n";
+    stream << "\n\n";
+
+    Position pos(fen);
+    std::size_t move_number = 0;
+    for (BinaryNode node : nodes)
+    {
+        if (node.move == MOVE_NULL)
+            break;
+        
+        if (pos.get_turn() == WHITE)
+            stream << pos.board().fullmove_number() << ". ";
+        else if (move_number == 0)
+            stream << pos.board().fullmove_number() << "... ";
+    
+        stream << pos.board().to_san(node.move)
+               << " {" << node.score << "} ";
+        
+        if (pos.get_turn() == BLACK)
+            stream << "\n";
+        
+        pos.make_move(node.move);
+        move_number++;
+    }
+    stream << result << "\n\n\n";
+}
+
+
 std::vector<std::string> read_fens(std::string file_name)
 {
     std::string line;
