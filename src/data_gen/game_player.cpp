@@ -160,7 +160,7 @@ namespace GamePlayer
                         continue;
 
                     // Determine if we keep using this position or discard it based on the score
-                    result = thread.simple_search(pos, limits, threads > 1);
+                    result = thread.simple_search(pos, limits);
                     int prob = 200 * (1 + accept_threshold) / (1 + abs(result.score));
                     if (result.bestmove != MOVE_NULL && int(random.next(100)) <= prob)
                         break;
@@ -176,7 +176,7 @@ namespace GamePlayer
                     game.push(result.bestmove, result.score);
                     pos.make_move(result.bestmove);
                     pos.set_init_ply();
-                    result = thread.simple_search(pos, limits, threads > 1);
+                    result = thread.simple_search(pos, limits);
                 }
 
                 // Add termination node
@@ -611,7 +611,7 @@ namespace GamePlayer
                         break;
 
                     pos.set_init_ply();
-                    SearchResult result = thread.simple_search(pos, limits, threads > 1);
+                    SearchResult result = thread.simple_search(pos, limits);
                     node.score = result.score;
                     pos.make_move(node.move);
                 }

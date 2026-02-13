@@ -545,7 +545,7 @@ void Thread::search()
 }
 
 
-SearchResult Thread::simple_search(Position& pos, const Search::Limits& limits, bool skip_tb)
+SearchResult Thread::simple_search(Position& pos, const Search::Limits& limits)
 {
     // For depth 0, return the quiescence score
     if (limits.depth == 0)
@@ -571,8 +571,11 @@ SearchResult Thread::simple_search(Position& pos, const Search::Limits& limits, 
                             MOVE_NULL);
 
     // Probe tablebases and only select the top TB-scored moves
-    if (!skip_tb)
+    if (pos.board().get_pieces().count() <= Syzygy::Cardinality)
     {
+        // Root probing is not thread-safe, so we need to lock here
+        std::unique_lock<std::mutex> lock(m_pool.m_mutex);
+
         Syzygy::Root = Syzygy::RootPos(pos);
         if (Syzygy::Root.in_tb())
         {

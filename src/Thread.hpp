@@ -74,7 +74,7 @@ public:
 
     bool data_gen() const;
 
-    SearchResult simple_search(Position& pos, const Search::Limits& limits, bool skip_tb = false);
+    SearchResult simple_search(Position& pos, const Search::Limits& limits);
 
     GameResult play_game(std::string fen, Depth depth, Score adjudication);
 
@@ -103,6 +103,7 @@ protected:
     Search::Limits m_limits;
     Search::SearchTime m_time;
     std::atomic<ThreadStatus> m_status;
+    std::mutex m_mutex;
 
 public:
     ThreadPool(int n_threads, int hash_size_mb);
