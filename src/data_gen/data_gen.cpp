@@ -207,6 +207,7 @@ void BinaryGame::export_pgn(std::ofstream& stream) const
         move_number++;
     }
     stream << result << "\n\n\n";
+    stream.flush();
 }
 
 

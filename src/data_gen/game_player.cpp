@@ -714,10 +714,21 @@ namespace GamePlayer
         // Parameters
         std::string input_file_path;
         std::string output_file_path;
+        std::optional<std::size_t> game_number;
 
         // Parameter reading
         assert((stream >> input_file_path) && "Input file path required!");
         assert((stream >> output_file_path) && "Output file path required!");
+
+        // Optional game number
+        std::string token;
+        if (stream >> token)
+        {
+            game_number = std::stoul(token);
+            std::cout << "Exporting game number " << *game_number << std::endl;
+        }
+        else
+            std::cout << "Exporting all games" << std::endl;
 
         // Open files
         std::ifstream ifile(input_file_path);
@@ -736,13 +747,18 @@ namespace GamePlayer
 
         // Read entire file
         BinaryGame game;
-        while(ifile.tellg() < eof)
+        std::size_t current_game = 0;
+        while(ifile.tellg() < eof || (game_number && current_game < *game_number))
         {
              // Write each game in PGN format
             if (BinaryGame::read(ifile, game))
-                game.export_pgn(ofile);
+            {
+                if (!game_number || (game_number && current_game == *game_number))
+                    game.export_pgn(ofile);
+            }
             else
                 std::cerr << "Bad game encountered during export" << std::endl;
+            current_game++;
         }
 
         // Restore Chess960 status
