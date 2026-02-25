@@ -55,7 +55,7 @@ class Options:
     lr_cosine_final: float = 1e-2
 
     # Weight decay for the optimiser
-    weight_decay: float = 0.0
+    weight_decay: float = 0.01
 
     # Interval (in epochs) to save model checkpoints
     save_interval: int = 10
