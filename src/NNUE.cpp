@@ -148,6 +148,10 @@ namespace NNUE
             int stm_acc = std::clamp(stm.m_net[i], int16_t(0), SCALE_FACTOR);
             int ntm_acc = std::clamp(ntm.m_net[i], int16_t(0), SCALE_FACTOR);
 
+            // Squared CReLU
+            stm_acc = (stm_acc * stm_acc) / SCALE_FACTOR;
+            ntm_acc = (ntm_acc * ntm_acc) / SCALE_FACTOR;
+
             // Net output
             int j = i + NUM_ACCUMULATORS;
             output += nnue_net->m_dense[bucket][i] * stm_acc

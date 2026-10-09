@@ -2,7 +2,7 @@
 #include "Types.hpp"
 
 
-#define NNUE_Default_File "nnue-15a31a27e1d7.dat"
+#define NNUE_Default_File "nnue-85fc42bfcbc9.dat"
 
 
 namespace NNUE
