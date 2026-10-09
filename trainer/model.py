@@ -73,6 +73,15 @@ class NNUE(nn.Module):
         for piece, (_, eg) in PIECE_VALUES.items():
             psqt_view[:, 0, piece - 1, :, :] = eg / (2 * SCALE_FACTOR)
             psqt_view[:, 1, piece - 1, :, :] = -eg / (2 * SCALE_FACTOR)
+        # Initialise accumulator with king features at mid-levels
+        accumulator_view = self.accumulator.weight.data.view(
+            NUM_INPUT_BUCKETS,
+            NUM_COLORS,
+            NUM_PIECE_TYPES,
+            NUM_SQUARES,
+            NUM_ACCUMULATORS,
+        )
+        accumulator_view[:, 0, 5, :, :] = 0.5
 
     @staticmethod
     def crelu(x: torch.Tensor) -> torch.Tensor:
@@ -89,6 +98,22 @@ class NNUE(nn.Module):
             Activated tensor.
         """
         return torch.clamp(x, 0.0, 1.0)
+
+    @staticmethod
+    def sqrcrelu(x: torch.Tensor) -> torch.Tensor:
+        """Apply squared clipped ReLU activation.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor.
+
+        Returns
+        -------
+        torch.Tensor
+            Activated tensor.
+        """
+        return torch.clamp(x, 0.0, 1.0).square()
 
     def forward(
         self,
@@ -119,8 +144,8 @@ class NNUE(nn.Module):
             Computed NNUE scores.
         """
         psqt = self.psqt(w_cols, w_offset) - self.psqt(b_cols, b_offset)
-        stm_acc = self.crelu(self.accumulator(w_cols, w_offset))
-        ntm_acc = self.crelu(self.accumulator(b_cols, b_offset))
+        stm_acc = self.sqrcrelu(self.accumulator(w_cols, w_offset))
+        ntm_acc = self.sqrcrelu(self.accumulator(b_cols, b_offset))
         positional = self.layer(torch.cat([stm_acc, ntm_acc], dim=1))
         bucketed_output = psqt + positional
         return bucketed_output.gather(-1, buckets.unsqueeze(-1)).squeeze(-1)
